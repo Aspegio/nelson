@@ -2,9 +2,15 @@
 
 Codex subagents cannot message each other directly. Only the admiral can `send_input` to agents. Use this "Fleet Comms" protocol to emulate Claude-style agent-team chatter with low token overhead and minimal file conflicts.
 
+## Policy
+
+- If you are running `subagents` mode with 2+ agents, Fleet Comms is mandatory.
+- If you cannot create `.nelson/comms/` in the target repo, fall back to `single-session` or reduce to 1 agent.
+- Treat `.nelson/comms/interfaces.md` as the fleet's single source of truth for cross-ship contracts/decisions.
+
 ## Setup (mailboxes + broadcast)
 
-If you are running `subagents` mode and there are cross-task dependencies, create a comms blackboard in the target repo:
+Create a comms blackboard in the target repo:
 
 ```
 .nelson/
@@ -61,4 +67,3 @@ When an agent is spawned, include these comms orders:
 If agents cannot reliably read/write the comms files, fall back to routing signals inline:
 - Agents include "Signals Out" blocks in their responses to the admiral.
 - The admiral forwards the full signal content via `functions.send_input` to the target agent.
-

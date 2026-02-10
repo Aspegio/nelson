@@ -10,6 +10,10 @@ Task ID:
 - Dependencies:
 - Station tier (0-3):
 - File ownership (if code):
+- Comms (Fleet Comms, if enabled):
+  - Callsign:
+  - Signals expected:
+  - Interfaces/decisions touched:
 - Validation required:
 - Rollback note required: yes/no
 ```

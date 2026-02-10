@@ -3,7 +3,10 @@
 ```text
 Ship:
 - Name:
+- Callsign (Fleet Comms):
 - Captain:
+- Inbox (Fleet Comms):
+- Outbox (Fleet Comms):
 - Task:
 - Crew manifest:
   - [Role Abbr]: [Sub-task description]

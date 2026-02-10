@@ -34,7 +34,7 @@ Subagent mapping:
 - When spawning 3+ agents, prefer one `multi_tool_use.parallel` call.
 
 Fleet comms (Codex approximation of agent-team):
-- If mode is `subagents` and there are cross-task dependencies, set up Fleet Comms in the target repo per `references/fleet-comms.md`.
+- If mode is `subagents` and you spawn 2+ agents, Fleet Comms is mandatory. Set it up in the target repo per `references/fleet-comms.md` before spawning.
 - Use `references/admiralty-templates/signal.md` for cross-ship signals.
 
 Use `references/squadron-composition.md` for selection rules.

@@ -8,6 +8,11 @@ Progress:
 - in_progress:
 - completed:
 
+Comms (Fleet Comms, if enabled):
+- signals routed:
+- signals pending:
+- interface/decision updates:
+
 Blockers:
 - blocker:
   owner:

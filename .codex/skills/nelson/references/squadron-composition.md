@@ -9,13 +9,13 @@ Choose the first condition that matches.
 1. If work is sequential, tightly coupled, or mostly in the same files, use `single-session`.
 2. If work is parallel but each worker only needs to report to admiral, use `subagents`.
 
-## Decision Matrix
+## Fleet Comms (Codex)\r\n\r\nIf you choose subagents and spawn 2+ agents, enable Fleet Comms per eferences/fleet-comms.md.\r\n\r\n## Decision Matrix
 
 | Condition | Preferred Mode | Why |
 | --- | --- | --- |
 | Single critical path, low ambiguity | `single-session` | Lowest coordination overhead |
 | Parallel discovery, synthesis by admiral | `subagents` | Fast throughput without peer chatter |
-| Parallel implementation with dependencies | `subagents` + integration checkpoints | Keep ownership clear and coordinate merges explicitly |
+| Parallel implementation with dependencies | `subagents` + Fleet Comms + integration checkpoints | Keep ownership clear and coordinate merges explicitly |
 | High threat or high blast radius | `subagents` + red-cell navigator | Adds explicit control points |
 
 ## Team Sizing
