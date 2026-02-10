@@ -36,7 +36,7 @@ Never exceed 4 crew per ship. If the task demands more, split it into two ships.
 
 ### Read-Only Roles
 
-NO and COX use the `explorer` agent type. They cannot modify files. They report findings to the captain or XO, who decides how to act on them.
+NO and COX use the `explorer` agent type. They must not modify source code. They may write to Fleet Comms artifacts under `.nelson/` when used for coordination. They report findings to the captain or XO, who decides how to act on them.
 
 ### Role Boundaries
 

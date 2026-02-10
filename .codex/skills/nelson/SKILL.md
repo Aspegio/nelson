@@ -33,6 +33,10 @@ Subagent mapping:
 - Use `agent_type: worker` for implementation/testing roles (PWO, MEO, WEO, LOGO, XO).
 - When spawning 3+ agents, prefer one `multi_tool_use.parallel` call.
 
+Fleet comms (Codex approximation of agent-team):
+- If mode is `subagents` and there are cross-task dependencies, set up Fleet Comms in the target repo per `references/fleet-comms.md`.
+- Use `references/admiralty-templates/signal.md` for cross-ship signals.
+
 Use `references/squadron-composition.md` for selection rules.
 Use `references/crew-roles.md` for ship naming and crew composition.
 Consult `references/standing-orders.md` before forming the squadron.
@@ -63,6 +67,7 @@ Consult `references/standing-orders.md` when assigning files or if scope is uncl
 Codex comms:
 - Use `functions.send_input` for targeted check-ins and course corrections.
 - Use `functions.wait` to collect results and prevent idle agents.
+- When Fleet Comms is enabled, route decisions and cross-ship signals via `.nelson/comms/` and send agents pointers to their inbox files instead of pasting long messages.
 
 Use `references/admiralty-templates.md` for the quarterdeck report template.
 Consult `references/standing-orders.md` if admiral is doing implementation or tasks are drifting from scope.

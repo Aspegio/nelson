@@ -87,6 +87,8 @@ Restart Codex to pick up the new skill. Invoke it with:
 $nelson
 ```
 
+In `subagents` mode, the Codex port can use a lightweight `.nelson/comms/` mailbox to emulate agent-team comms.
+
 ### Verify installation
 
 Open Claude Code and ask:
