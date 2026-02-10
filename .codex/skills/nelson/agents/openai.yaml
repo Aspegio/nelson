@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nelson"
+  short_description: "Royal Navy subagent mission coordinator"
+  default_prompt: "Use $nelson to coordinate Codex subagents with sailing orders, battle plans, action stations, and a captain's log."
