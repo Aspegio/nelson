@@ -65,6 +65,24 @@ cp -r /tmp/nelson/.claude/skills/nelson ~/.claude/skills/nelson
 
 Then commit `.claude/skills/nelson/` to version control so your team can use it.
 
+### Codex (OpenAI)
+
+This repo also includes a Codex-native skill at `.codex/skills/nelson/`, tuned for Codex's experimental subagent tools.
+
+```bash
+git clone https://github.com/harrymunro/nelson.git /tmp/nelson
+mkdir -p ~/.codex/skills
+cp -r /tmp/nelson/.codex/skills/nelson ~/.codex/skills/nelson
+```
+
+Restart Codex to pick up the new skill. Invoke it with:
+
+```
+$nelson
+```
+
+In `subagents` mode, the Codex port can use a lightweight `.nelson/comms/` mailbox to emulate agent-team comms.
+
 ### Verify installation
 
 Open Claude Code and ask:
@@ -220,6 +238,9 @@ The skill includes structured templates for consistent output across missions:
 
 ## Skill file structure
 
+Claude Code skill (original): `.claude/skills/nelson/`  
+Codex skill: `.codex/skills/nelson/`
+
 ```
 .claude/skills/nelson/
 ├── SKILL.md                                  # Main skill instructions (entrypoint)
@@ -281,6 +302,7 @@ Edit `references/squadron-composition.md` to adjust the decision matrix or defau
 
 - **Subagents** are a stable Claude Code feature and work out of the box.
 - **Agent teams** are experimental and disabled by default. See [Prerequisites](#prerequisites) above for setup. Without agent teams enabled, Nelson falls back to `single-session` or `subagents` mode. Full details: [Agent teams documentation](https://code.claude.com/docs/en/agent-teams).
+- **Codex** support is provided via `.codex/skills/nelson/`, which uses Codex's experimental subagent tools (`spawn_agent`, `send_input`, `wait`, `close_agent`).
 
 ## Disclaimer
 

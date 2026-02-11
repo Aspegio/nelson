@@ -14,7 +14,7 @@ Bug fixes, improvements to the skill instructions or templates, documentation fi
 
 ## Skill structure
 
-The skill lives in `.claude/skills/nelson/`. The key files:
+The Claude Code skill lives in `.claude/skills/nelson/`. A Codex port lives in `.codex/skills/nelson/`. The key files:
 
 - `SKILL.md` — Main skill instructions (the entrypoint Claude reads)
 - `references/` — Supporting docs loaded on demand (risk tiers, templates, team sizing)
