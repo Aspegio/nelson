@@ -38,59 +38,37 @@ Nelson gives Claude a six-step operational framework for tackling complex missio
 
 ## Installation
 
-### Plugin install (recommended)
+### Add the marketplace and install (recommended)
 
-```
-/plugin install harrymunro/nelson
-```
+First, add the marketplace to make Nelson available:
 
-Or add the marketplace first, then install by name:
-
-```
+```shell
 /plugin marketplace add harrymunro/nelson
+```
+
+Then install the plugin:
+
+```shell
 /plugin install nelson@nelson-marketplace
 ```
 
-### Prompt-based
+By default this installs to **user scope** (available across all your projects). You can also choose a scope:
 
-Open Claude Code and say:
+- **Project scope** — shared with collaborators via `.claude/settings.json`: install through the `/plugin` UI and select "Project scope"
+- **Local scope** — just you, just this repo: install through the `/plugin` UI and select "Local scope"
 
-```
-Install skills from https://github.com/harrymunro/nelson
-```
+### Install via the UI
 
-Claude will clone the repo, copy the skill into your project's `.claude/skills/` directory, and clean up. To install it globally across all projects, ask Claude to install it to `~/.claude/skills/` instead.
+You can also browse and install interactively:
 
-### Manual
-
-Clone the repo and copy the skill directory yourself:
-
-```bash
-# Project-level (recommended for teams)
-git clone https://github.com/harrymunro/nelson.git /tmp/nelson
-mkdir -p .claude/skills
-cp -r /tmp/nelson/skills/nelson .claude/skills/nelson
-rm -rf /tmp/nelson
-
-# Or user-level (personal, all projects)
-cp -r /tmp/nelson/skills/nelson ~/.claude/skills/nelson
-```
-
-Then commit `.claude/skills/nelson/` to version control so your team can use it.
+1. Run `/plugin` to open the plugin manager
+2. Go to the **Marketplaces** tab and add `harrymunro/nelson`
+3. Go to the **Discover** tab to find Nelson
+4. Select it and choose your installation scope
 
 ### Verify installation
 
-Open Claude Code and ask:
-
-```
-What skills are available?
-```
-
-You should see `nelson` listed. You can also invoke it directly:
-
-```
-/nelson
-```
+Run `/nelson` to invoke the skill, or check it appears in the `/plugin` **Installed** tab.
 
 ## Usage
 

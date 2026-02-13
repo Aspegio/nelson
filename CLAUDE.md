@@ -30,17 +30,11 @@ This is a documentation-driven skill with zero runtime dependencies. There is no
 
 ## Testing changes
 
-Install the plugin and run a mission to verify:
-
-```
-/plugin install harrymunro/nelson
-```
-
-Or add the marketplace first, then install:
+Add the marketplace and install the plugin:
 
 ```
 /plugin marketplace add harrymunro/nelson
-/plugin install nelson
+/plugin install nelson@nelson-marketplace
 ```
 
 For local development in this repo, the symlink at `.claude/skills/nelson` → `../../skills/nelson` means `/nelson` works automatically.
@@ -51,7 +45,7 @@ Then invoke `/nelson` in Claude Code.
 
 - Keep instructions simple and clear
 - Follow the existing Royal Navy tone and terminology
-- Markdown for all documentation; YAML for agent interfaces
+- Markdown for all documentation; Markdown with YAML frontmatter for agent definitions
 - The battleships demo (`demos/battleships/index.html`) uses vanilla HTML/CSS/JS with no dependencies
 
 ## Git workflow
