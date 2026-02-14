@@ -37,4 +37,4 @@ Choose the first condition that matches.
 
 ## Anti-Patterns
 
-See `references/standing-orders.md` for the full list of standing orders and known anti-patterns.
+See the Standing Orders table in SKILL.md for the full list of standing orders and known anti-patterns.
