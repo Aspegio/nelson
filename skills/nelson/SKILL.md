@@ -1,6 +1,7 @@
 ---
 name: nelson
-description: Command a Royal Navy agent squadron from sailing orders through execution and stand-down. Use when work can be parallelized, requires tight coordination, or needs explicit action-station controls, quality gates, and a final captain's log.
+description: Commands a Royal Navy agent squadron from sailing orders through execution and stand-down. Use when work can be parallelized, requires tight coordination, or needs explicit action-station controls, quality gates, and a final captain's log.
+argument-hint: "[mission description]"
 ---
 
 # Nelson
@@ -14,7 +15,7 @@ Execute this workflow for the user's mission.
 - Define what is out of scope.
 - Define stop criteria and required handoff artifacts.
 
-You MUST read `references/admiralty-templates.md` and use the sailing-orders template when the user does not provide structure.
+You MUST read `references/admiralty-templates/sailing-orders.md` and use the sailing-orders template when the user does not provide structure.
 
 ## 2. Form The Squadron
 
@@ -29,11 +30,11 @@ You MUST read `references/admiralty-templates.md` and use the sailing-orders tem
 - Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
 - Assign each captain a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Captain decides crew composition per ship using the crew-or-direct decision tree in `references/crew-roles.md`.
-- Captains may also deploy Royal Marines during execution for short-lived sorties — see `references/royal-marines.md`.
+- Captains may also deploy Royal Marines during execution for short-lived sorties — see `references/royal-marines.md` and use `references/admiralty-templates/marine-deployment-brief.md` for the deployment brief.
 
 You MUST read `references/squadron-composition.md` for selection rules.
 You MUST read `references/crew-roles.md` for ship naming and crew composition.
-You MUST consult `references/standing-orders.md` before forming the squadron.
+You MUST consult the Standing Orders table below before forming the squadron.
 
 ## 3. Draft Battle Plan
 
@@ -43,12 +44,13 @@ You MUST consult `references/standing-orders.md` before forming the squadron.
 - Keep one task in progress per agent unless the mission explicitly requires multitasking.
 - For each captain's task, include a ship manifest. If crew are mustered, list crew roles with sub-tasks and sequence. If the captain implements directly (0 crew), note "Captain implements directly." If the captain anticipates needing marine support, note marine capacity in the ship manifest (max 2).
 
-You MUST read `references/admiralty-templates.md` for the battle plan and ship manifest template.
-You MUST consult `references/standing-orders.md` when assigning files or if scope is unclear.
+You MUST read `references/admiralty-templates/battle-plan.md` for the battle plan template.
+You MUST read `references/admiralty-templates/ship-manifest.md` for the ship manifest template.
+You MUST consult the Standing Orders table below when assigning files or if scope is unclear.
 
 **Before proceeding to Step 4:** Verify sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier.
 
-**Crew Briefing:** When spawning each teammate via `Task()`, you MUST include a crew briefing using the template from `references/admiralty-templates.md`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context to operate independently.
+**Crew Briefing:** When spawning each teammate via `Task()`, you MUST include a crew briefing using the template from `references/admiralty-templates/crew-briefing.md`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context to operate independently.
 
 ## 4. Run Quarterdeck Rhythm
 
@@ -61,10 +63,10 @@ You MUST consult `references/standing-orders.md` when assigning files or if scop
 - Check for active marine deployments; verify marines have returned and outputs are incorporated.
 - Track burn against token/time budget.
 - Re-scope early when a task drifts from mission metric.
-- When a mission encounters difficulties, you MUST consult `references/damage-control.md` for recovery and escalation procedures.
+- When a mission encounters difficulties, you MUST consult the Damage Control table below for recovery and escalation procedures.
 
-You MUST  use `references/admiralty-templates.md` for the quarterdeck report template.
-You MUST consult `references/standing-orders.md` if admiral is doing implementation or tasks are drifting from scope.
+You MUST use `references/admiralty-templates/quarterdeck-report.md` for the quarterdeck report template.
+You MUST consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
 You MUST use `references/commendations.md` for recognition signals and graduated correction.
 
 ## 5. Set Action Stations
@@ -78,10 +80,11 @@ You MUST use `references/commendations.md` for recognition signals and graduated
 - Task completion.
 - Agent idle with unverified outputs.
 - Before final synthesis.
-- For crewed tasks, verify crew outputs align with role boundaries (consult `references/crew-roles.md` and `references/standing-orders.md` if role violations are detected).
+- For crewed tasks, verify crew outputs align with role boundaries (consult `references/crew-roles.md` and the Standing Orders table below if role violations are detected).
 - Marine deployments follow station-tier rules in `references/royal-marines.md`. Station 2+ marine deployments require admiral approval.
 
-You MUST consult `references/standing-orders.md` if tasks lack a tier or red-cell is assigned implementation work.
+You MUST read `references/admiralty-templates/red-cell-review.md` for the red-cell review template.
+You MUST consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
 
 ## 6. Stand Down And Log Action
 
@@ -94,8 +97,40 @@ You MUST consult `references/standing-orders.md` if tasks lack a tier or red-cel
 - Mentioned in Despatches: name agents and contributions that were exemplary.
 - Record reusable patterns and failure modes for future missions.
 
-You MUST use `references/admiralty-templates.md` for the captain's log template.
+You MUST use `references/admiralty-templates/captains-log.md` for the captain's log template.
 You MUST use `references/commendations.md` for Mentioned in Despatches criteria.
+
+## Standing Orders
+
+Consult the specific standing order that matches the situation.
+
+| Situation | Standing Order |
+|---|---|
+| Choosing between single-session and multi-agent | `references/standing-orders/becalmed-fleet.md` |
+| Deciding whether to add another agent | `references/standing-orders/crew-without-canvas.md` |
+| Assigning files to agents in the battle plan | `references/standing-orders/split-keel.md` |
+| Task scope drifting from sailing orders | `references/standing-orders/drifting-anchorage.md` |
+| Admiral doing implementation instead of coordinating | `references/standing-orders/admiral-at-the-helm.md` |
+| Assigning work to the red-cell navigator | `references/standing-orders/press-ganged-navigator.md` |
+| Tasks proceeding without a risk tier classification | `references/standing-orders/unclassified-engagement.md` |
+| Captain implementing instead of coordinating crew | `references/standing-orders/captain-at-the-capstan.md` |
+| Crewing every role regardless of task needs | `references/standing-orders/all-hands-on-deck.md` |
+| Spawning one crew member for an atomic task | `references/standing-orders/skeleton-crew.md` |
+| Assigning crew work outside their role | `references/standing-orders/pressed-crew.md` |
+| Captain deploying marines for crew work or sustained tasks | `references/standing-orders/battalion-ashore.md` |
+
+## Damage Control
+
+Consult the specific procedure that matches the situation.
+
+| Situation | Procedure |
+|---|---|
+| Agent unresponsive, looping, or producing no useful output | `references/damage-control/man-overboard.md` |
+| Session interrupted (context limit, crash, timeout) | `references/damage-control/session-resumption.md` |
+| Completed task found faulty, other tasks are sound | `references/damage-control/partial-rollback.md` |
+| Mission cannot succeed, continuing wastes budget | `references/damage-control/scuttle-and-reform.md` |
+| Issue exceeds current authority or needs clarification | `references/damage-control/escalation.md` |
+| Ship's crew consuming disproportionate tokens or time | `references/damage-control/crew-overrun.md` |
 
 ## Admiralty Doctrine
 
