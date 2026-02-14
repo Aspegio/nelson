@@ -3,6 +3,7 @@
 Classify each task before execution. Apply the minimum required controls.
 
 ## Contents
+
 - [Station 0: Patrol](#station-0-patrol)
 - [Station 1: Caution](#station-1-caution)
 - [Station 2: Action](#station-2-action)
