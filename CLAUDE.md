@@ -66,6 +66,21 @@ Then invoke `/nelson` in Claude Code.
 - Commit messages: imperative mood, concise summary line
 - Open a PR for review
 
+## Releasing
+
+After merging to `main`:
+
+1. Bump the `version` field in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to match the new release tag.
+2. Commit and push the version bump to `main`.
+3. Create a GitHub release with `gh release create vX.Y.Z --target main`.
+4. Update the file tree in this file and in `README.md` if new files were added.
+
+Plugin installs are cached snapshots — they do not auto-update. Users must re-install to pick up a new version:
+
+```
+/plugin install harrymunro/nelson
+```
+
 ## Environment
 
 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` must be set to enable the `agent-team` execution mode (configured in `.claude/settings.local.json`).
