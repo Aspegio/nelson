@@ -17,7 +17,7 @@ Nelson gives Claude a six-step operational framework for tackling complex missio
 1. **Sailing Orders** — Define the outcome, success metric, constraints, and stop criteria
 2. **Form the Squadron** — Choose an execution mode (single-session, subagents, or agent team) and size the team
 3. **Battle Plan** — Split the mission into independent tasks with owners, dependencies, and file ownership
-4. **Quarterdeck Rhythm** — Run checkpoints to track progress, identify blockers, and manage budget
+4. **Quarterdeck Rhythm** — Run checkpoints to track progress, identify blockers, monitor hull integrity, and manage budget
 5. **Action Stations** — Classify tasks by risk tier and enforce verification before marking complete
 6. **Stand Down** — Produce a captain's log with decisions, artifacts, validation evidence, and follow-ups
 
@@ -218,6 +218,25 @@ Tasks at Station 1 and above also run a **failure-mode checklist**:
 - What dependency could invalidate this plan?
 - What assumption is least certain?
 
+### Damage control
+
+Nelson includes procedures for when things go wrong — stuck agents, budget overruns, faulty outputs, and context window exhaustion.
+
+**Hull integrity monitoring** tracks context window consumption across the squadron. The admiral reads exact token counts from Claude Code session JSONL files at each quarterdeck checkpoint and maintains a squadron readiness board:
+
+| Status | Remaining | Action |
+|---|---|---|
+| Green | 75–100% | Operating normally |
+| Amber | 60–74% | Monitor closely, avoid new work |
+| Red | 40–59% | Relief on station — begin handover |
+| Critical | Below 40% | Immediate relief |
+
+**Relief on station** replaces a ship whose context window is depleted. The damaged ship writes a turnover brief to file, a fresh replacement reads it and continues the mission. Chained reliefs (A → B → C) are supported for long-running tasks. The flagship monitors its own hull integrity too and can hand over to a new session.
+
+The token counts come from the API usage data that Claude Code already records on every assistant turn — no estimation heuristics, no paid APIs, no external dependencies. A utility script (`scripts/count-tokens.py`) extracts the data and produces damage reports.
+
+Other damage control procedures: man overboard (stuck agent replacement), session resumption (picking up after interruption), partial rollback (reverting faulty work), crew overrun (budget recovery), scuttle and reform (mission abort), and escalation (chain of command).
+
 ### Templates
 
 The skill includes structured templates for consistent output across missions:
@@ -226,6 +245,8 @@ The skill includes structured templates for consistent output across missions:
 - **Battle Plan** — Task breakdown with owners, dependencies, threat tiers, and validation requirements
 - **Ship Manifest** — Captain's crew plan with ship name, crew roles, sub-tasks, and budget
 - **Quarterdeck Report** — Checkpoint status with progress, blockers, budget tracking, and risk updates
+- **Damage Report** — JSON format for hull integrity reporting with token counts and status
+- **Turnover Brief** — Handover document for relief on station with progress log, running plot, and relief chain
 - **Red-Cell Review** — Adversarial review with challenge summary, checks, and recommendation
 - **Captain's Log** — Final report with delivered artifacts, decisions, validation evidence, and follow-ups
 
@@ -245,19 +266,24 @@ skills/nelson/
     │   ├── battle-plan.md
     │   ├── captains-log.md
     │   ├── crew-briefing.md
+    │   ├── damage-report.md
     │   ├── marine-deployment-brief.md
     │   ├── quarterdeck-report.md
     │   ├── red-cell-review.md
     │   ├── sailing-orders.md
-    │   └── ship-manifest.md
+    │   ├── ship-manifest.md
+    │   └── turnover-brief.md
     ├── commendations.md                       # Recognition signals and correction guidance
     ├── crew-roles.md                         # Crew role definitions, ship names, sizing
     ├── damage-control/                       # Individual procedure files
     │   ├── crew-overrun.md
     │   ├── escalation.md
+    │   ├── hull-integrity.md
     │   ├── man-overboard.md
     │   ├── partial-rollback.md
+    │   ├── relief-on-station.md
     │   ├── scuttle-and-reform.md
+    │   ├── session-hygiene.md
     │   └── session-resumption.md
     ├── royal-marines.md                      # Royal Marines deployment rules
     ├── squadron-composition.md              # Mode selection and team sizing rules
@@ -276,6 +302,8 @@ skills/nelson/
         └── unclassified-engagement.md
 agents/
 └── nelson.md                                # Subagent definition
+scripts/
+└── count-tokens.py                          # Token counter for hull integrity monitoring
 ```
 
 - `plugin.json` declares the plugin name, version, and component paths for Claude Code's plugin system.
