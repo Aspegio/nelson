@@ -18,6 +18,8 @@ Execute this workflow for the user's mission.
 
 You MUST read `references/admiralty-templates/sailing-orders.md` and use the sailing-orders template when the user does not provide structure.
 
+**Session Hygiene:** Before forming the squadron, execute session hygiene per `references/damage-control/session-hygiene.md`. Clear stale damage reports and turnover briefs from any previous session. Skip this step when resuming an interrupted session.
+
 ## 2. Form The Squadron
 
 - Brief captains on mission intent and constraints. Make the plan clear, invite questions early.
@@ -53,6 +55,8 @@ You MUST consult the Standing Orders table below when assigning files or if scop
 
 **Crew Briefing:** When spawning each teammate via `Task()`, you MUST include a crew briefing using the template from `references/admiralty-templates/crew-briefing.md`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context to operate independently.
 
+**Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a turnover brief using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
+
 ## 4. Run Quarterdeck Rhythm
 
 - Keep admiral focused on coordination and unblock actions.
@@ -63,10 +67,12 @@ You MUST consult the Standing Orders table below when assigning files or if scop
 - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
 - Check for active marine deployments; verify marines have returned and outputs are incorporated.
 - Track burn against token/time budget.
+- Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
 - Re-scope early when a task drifts from mission metric.
 - When a mission encounters difficulties, you MUST consult the Damage Control table below for recovery and escalation procedures.
 
 You MUST use `references/admiralty-templates/quarterdeck-report.md` for the quarterdeck report template.
+You MUST use `references/admiralty-templates/damage-report.md` for damage report format.
 You MUST consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
 You MUST use `references/commendations.md` for recognition signals and graduated correction.
 
@@ -132,6 +138,9 @@ Consult the specific procedure that matches the situation.
 | Mission cannot succeed, continuing wastes budget | `references/damage-control/scuttle-and-reform.md` |
 | Issue exceeds current authority or needs clarification | `references/damage-control/escalation.md` |
 | Ship's crew consuming disproportionate tokens or time | `references/damage-control/crew-overrun.md` |
+| Ship's context window depleted, needs replacement | `references/damage-control/relief-on-station.md` |
+| Ship context window approaching limits | `references/damage-control/hull-integrity.md` |
+| Starting a new session with stale data from a previous mission | `references/damage-control/session-hygiene.md` |
 
 ## Admiralty Doctrine
 

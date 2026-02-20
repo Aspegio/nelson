@@ -13,15 +13,21 @@ skills/nelson/
   references/             — Supporting docs loaded on demand
     action-stations.md      — Risk tier definitions (Station 0–3)
     admiralty-templates/     — One file per template, loaded on demand
+      damage-report.md        — JSON template for hull integrity damage reports
+      turnover-brief.md       — Handover brief for relief on station
     commendations.md        — Recognition signals & graduated correction
     crew-roles.md           — Crew role definitions, ship names & sizing rules
     damage-control/         — One file per procedure, loaded on demand
+      hull-integrity.md       — Threshold definitions & squadron readiness board
+      relief-on-station.md    — Planned ship replacement for context exhaustion
+      session-hygiene.md      — Clean start procedure for new sessions
     royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
     standing-orders/        — One file per anti-pattern, loaded on demand
 agents/                   — Agent interface definitions
 demos/                    — Example applications built with Nelson
-scripts/                  — Maintenance scripts
+scripts/                  — Maintenance & utility scripts
+  count-tokens.py           — Token counter for hull integrity damage reports
 ```
 
 ## No build system
