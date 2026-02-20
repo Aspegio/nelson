@@ -10,6 +10,7 @@ Execute this workflow for the user's mission.
 
 ## 1. Issue Sailing Orders
 
+- Review the user's brief for ambiguity. If the outcome, scope, or constraints are unclear, ask the user to clarify before drafting sailing orders.
 - Write one sentence for `outcome`, `metric`, and `deadline`.
 - Set constraints: token budget, reliability floor, compliance rules, and forbidden actions.
 - Define what is out of scope.
