@@ -241,18 +241,17 @@ skills/nelson/
 ├── SKILL.md                                  # Main skill instructions (entrypoint)
 └── references/
     ├── action-stations.md                    # Risk tier definitions and controls
-    ├── admiralty-templates.md                # Template routing index
     ├── admiralty-templates/                  # Individual template files
     │   ├── battle-plan.md
     │   ├── captains-log.md
     │   ├── crew-briefing.md
+    │   ├── marine-deployment-brief.md
     │   ├── quarterdeck-report.md
     │   ├── red-cell-review.md
     │   ├── sailing-orders.md
     │   └── ship-manifest.md
     ├── commendations.md                       # Recognition signals and correction guidance
     ├── crew-roles.md                         # Crew role definitions, ship names, sizing
-    ├── damage-control.md                     # Error recovery routing index
     ├── damage-control/                       # Individual procedure files
     │   ├── crew-overrun.md
     │   ├── escalation.md
@@ -260,11 +259,12 @@ skills/nelson/
     │   ├── partial-rollback.md
     │   ├── scuttle-and-reform.md
     │   └── session-resumption.md
+    ├── royal-marines.md                      # Royal Marines deployment rules
     ├── squadron-composition.md              # Mode selection and team sizing rules
-    ├── standing-orders.md                    # Anti-pattern routing index
     └── standing-orders/                      # Individual anti-pattern files
         ├── admiral-at-the-helm.md
         ├── all-hands-on-deck.md
+        ├── battalion-ashore.md
         ├── becalmed-fleet.md
         ├── captain-at-the-capstan.md
         ├── crew-without-canvas.md

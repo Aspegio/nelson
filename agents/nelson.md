@@ -5,4 +5,4 @@ description: Coordinates multi-agent work using Royal Navy squadron patterns wit
 
 # Nelson
 
-Use $nelson to run a Royal Navy agent mission with sailing orders, action stations, and a captain's log.
+Use /nelson to run a Royal Navy agent mission with sailing orders, action stations, and a captain's log.

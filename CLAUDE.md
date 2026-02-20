@@ -12,16 +12,16 @@ skills/nelson/
   SKILL.md                — Main entrypoint (what Claude reads)
   references/             — Supporting docs loaded on demand
     action-stations.md      — Risk tier definitions (Station 0–3)
-    admiralty-templates.md   — Index routing to individual template files
     admiralty-templates/     — One file per template, loaded on demand
+    commendations.md        — Recognition signals & graduated correction
     crew-roles.md           — Crew role definitions, ship names & sizing rules
-    damage-control.md       — Index routing to individual procedure files
     damage-control/         — One file per procedure, loaded on demand
+    royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
-    standing-orders.md      — Index routing to individual anti-pattern files
     standing-orders/        — One file per anti-pattern, loaded on demand
 agents/                   — Agent interface definitions
 demos/                    — Example applications built with Nelson
+scripts/                  — Maintenance scripts
 ```
 
 ## No build system
