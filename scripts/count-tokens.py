@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 """Count tokens in a Claude Code session and produce a Nelson damage report.
 
-Used by ship agents to monitor context window consumption during a mission.
-Reads a Claude Code session JSONL file and extracts exact token counts from
-the API usage data embedded in assistant messages. Falls back to a character
-heuristic if the file is plain text rather than JSONL.
+The admiral uses this script to monitor hull integrity across the squadron.
+Reads Claude Code session JSONL files and extracts exact token counts from
+the API usage data embedded in assistant messages. No estimation needed.
 
-Usage:
+Single ship (flagship checks itself):
     python scripts/count-tokens.py --session session.jsonl --ship "HMS Victory"
+
+Squadron readiness board (flagship checks all ships):
+    python scripts/count-tokens.py --squadron /path/to/{session-id}/
+
+Plain text fallback (heuristic estimate):
     python scripts/count-tokens.py --file plain.txt --ship "HMS Victory"
-    python scripts/count-tokens.py --session session.jsonl --ship "HMS Victory" --output report.json
 """
 
 import argparse
+import glob
 import json
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -91,6 +96,50 @@ def build_report(ship_name, token_count, token_limit, method):
     }
 
 
+def scan_squadron(session_dir, token_limit):
+    """Scan a session directory for the flagship and all subagent JSONL files.
+
+    Returns a readiness board: a list of damage reports for every ship found.
+
+    Directory layout:
+        {session-id}/
+            subagents/
+                agent-{agentId}.jsonl   — one per subagent (ship)
+        {session-id}.jsonl              — flagship session (sibling of dir)
+    """
+    reports = []
+    session_dir = session_dir.rstrip("/")
+    session_id = os.path.basename(session_dir)
+
+    # Flagship JSONL is the sibling file with matching session ID
+    flagship_path = session_dir + ".jsonl"
+    if os.path.isfile(flagship_path):
+        token_count = count_tokens_from_jsonl(flagship_path)
+        if token_count is not None:
+            reports.append(
+                build_report("Flagship", token_count, token_limit, "jsonl_usage")
+            )
+
+    # Subagent JSONLs live in the subagents/ subdirectory
+    subagents_dir = os.path.join(session_dir, "subagents")
+    if os.path.isdir(subagents_dir):
+        for jsonl_path in sorted(glob.glob(os.path.join(subagents_dir, "agent-*.jsonl"))):
+            filename = os.path.basename(jsonl_path)
+            agent_id = filename.replace("agent-", "").replace(".jsonl", "")
+            token_count = count_tokens_from_jsonl(jsonl_path)
+            if token_count is not None:
+                reports.append(
+                    build_report(
+                        f"agent-{agent_id}",
+                        token_count,
+                        token_limit,
+                        "jsonl_usage",
+                    )
+                )
+
+    return reports
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Count tokens and produce a Nelson damage report."
@@ -102,7 +151,13 @@ def main():
     source.add_argument(
         "--file", help="Path to a plain text file (heuristic estimate)"
     )
-    parser.add_argument("--ship", required=True, help="Ship name for the report")
+    source.add_argument(
+        "--squadron",
+        help="Path to a session directory to scan flagship + all subagents",
+    )
+    parser.add_argument(
+        "--ship", help="Ship name for the report (required for --session and --file)"
+    )
     parser.add_argument(
         "--limit",
         type=int,
@@ -114,42 +169,54 @@ def main():
     )
     args = parser.parse_args()
 
-    path = args.session or args.file
+    if args.squadron:
+        if not os.path.isdir(args.squadron):
+            print(f"Error: not a directory: {args.squadron}", file=sys.stderr)
+            sys.exit(1)
+        reports = scan_squadron(args.squadron, args.limit)
+        if not reports:
+            print("Warning: no usage data found in session directory", file=sys.stderr)
+            sys.exit(1)
+        result = json.dumps(reports, indent=2)
+    else:
+        if not args.ship:
+            parser.error("--ship is required when using --session or --file")
 
-    try:
-        if args.session:
-            token_count = count_tokens_from_jsonl(path)
-            if token_count is None:
-                print(
-                    "Warning: no usage data found in JSONL, falling back to heuristic",
-                    file=sys.stderr,
-                )
+        path = args.session or args.file
+        try:
+            if args.session:
+                token_count = count_tokens_from_jsonl(path)
+                if token_count is None:
+                    print(
+                        "Warning: no usage data found in JSONL, falling back to heuristic",
+                        file=sys.stderr,
+                    )
+                    token_count = count_tokens_heuristic(path)
+                    method = "heuristic"
+                else:
+                    method = "jsonl_usage"
+            else:
                 token_count = count_tokens_heuristic(path)
                 method = "heuristic"
-            else:
-                method = "jsonl_usage"
-        else:
-            token_count = count_tokens_heuristic(path)
-            method = "heuristic"
-    except FileNotFoundError:
-        print(f"Error: file not found: {path}", file=sys.stderr)
-        sys.exit(1)
-    except OSError as exc:
-        print(f"Error reading file: {exc}", file=sys.stderr)
-        sys.exit(1)
+        except FileNotFoundError:
+            print(f"Error: file not found: {path}", file=sys.stderr)
+            sys.exit(1)
+        except OSError as exc:
+            print(f"Error reading file: {exc}", file=sys.stderr)
+            sys.exit(1)
 
-    report = build_report(args.ship, token_count, args.limit, method)
-    report_json = json.dumps(report, indent=2)
+        report = build_report(args.ship, token_count, args.limit, method)
+        result = json.dumps(report, indent=2)
 
     if args.output:
         try:
             with open(args.output, "w", encoding="utf-8") as f:
-                f.write(report_json + "\n")
+                f.write(result + "\n")
         except OSError as exc:
             print(f"Error writing output: {exc}", file=sys.stderr)
             sys.exit(1)
     else:
-        print(report_json)
+        print(result)
 
 
 if __name__ == "__main__":
