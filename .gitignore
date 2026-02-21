@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 .DS_Store
 .claude/skills/nelson
+.beans.yml
+.beans/
