@@ -8,6 +8,16 @@ argument-hint: "[mission description]"
 
 Execute this workflow for the user's mission.
 
+## Quick Start
+
+Nelson coordinates agent squadrons using Royal Navy operational doctrine -- sailing orders define the mission, a squadron executes it, and the admiral keeps the quarterdeck.
+
+**For a simple mission**, just provide your goal. Nelson will handle sailing orders, squadron formation, and execution. A single captain on a frigate can deliver most straightforward tasks without crew.
+
+**Use the full workflow when** the mission involves parallel work across multiple files, requires risk-tiered quality gates, or benefits from explicit coordination checkpoints.
+
+For the full workflow, continue reading below.
+
 ## 1. Issue Sailing Orders
 
 - Review the user's brief for ambiguity. If the outcome, scope, or constraints are unclear, ask the user to clarify before drafting sailing orders.
@@ -17,6 +27,7 @@ Execute this workflow for the user's mission.
 - Define stop criteria and required handoff artifacts.
 
 You MUST read `references/admiralty-templates/sailing-orders.md` and use the sailing-orders template when the user does not provide structure.
+You may use `references/sailing-orders-wizard.md` to guide interactive sailing order creation.
 
 **Session Hygiene:** Before forming the squadron, execute session hygiene per `references/damage-control/session-hygiene.md`. Clear stale damage reports and turnover briefs from any previous session. Skip this step when resuming an interrupted session.
 
@@ -49,7 +60,9 @@ You MUST consult the Standing Orders table below before forming the squadron.
 
 You MUST read `references/admiralty-templates/battle-plan.md` for the battle plan template.
 You MUST read `references/admiralty-templates/ship-manifest.md` for the ship manifest template.
+You MUST read `references/dynamic-task-ledger.md` for the living battle plan pattern.
 You MUST consult the Standing Orders table below when assigning files or if scope is unclear.
+You may allocate per-ship token budgets using `references/damage-control/bulkhead-doctrine.md`.
 
 **Before proceeding to Step 4:** Verify sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier.
 
@@ -73,8 +86,11 @@ You MUST consult the Standing Orders table below when assigning files or if scop
 
 You MUST use `references/admiralty-templates/quarterdeck-report.md` for the quarterdeck report template.
 You MUST use `references/admiralty-templates/damage-report.md` for damage report format.
+You MUST run soundings between checkpoints per `references/damage-control/soundings.md`.
 You MUST consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
 You MUST use `references/commendations.md` for recognition signals and graduated correction.
+You may use `references/dynamic-task-ledger.md` to update the battle plan at each checkpoint.
+When the mission cannot deliver full scope, use `references/damage-control/colours-struck.md` for graceful degradation.
 
 ## 5. Set Action Stations
 
@@ -92,6 +108,8 @@ You MUST use `references/commendations.md` for recognition signals and graduated
 
 You MUST read `references/admiralty-templates/red-cell-review.md` for the red-cell review template.
 You MUST consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
+You may use `references/red-cell-challenge-library.md` to seed red-cell reviews with domain-specific failure patterns.
+You may call Broadside at integration milestones per `references/broadside-quality-gates.md`.
 
 ## 6. Stand Down And Log Action
 
@@ -106,10 +124,11 @@ You MUST consult the Standing Orders table below if tasks lack a tier or red-cel
 
 You MUST use `references/admiralty-templates/captains-log.md` for the captain's log template.
 You MUST use `references/commendations.md` for Mentioned in Despatches criteria.
+You may record squadron metrics using `references/squadron-metrics.md`.
 
 ## Standing Orders
 
-Consult the specific standing order that matches the situation.
+Consult the specific standing order that matches the situation. If unsure which standing order applies, use `references/standing-order-troubleshooter.md`.
 
 | Situation | Standing Order |
 |---|---|
@@ -125,6 +144,15 @@ Consult the specific standing order that matches the situation.
 | Spawning one crew member for an atomic task | `references/standing-orders/skeleton-crew.md` |
 | Assigning crew work outside their role | `references/standing-orders/pressed-crew.md` |
 | Captain deploying marines for crew work or sustained tasks | `references/standing-orders/battalion-ashore.md` |
+| Stale context in an agent's working state | `references/standing-orders/silent-watch.md` |
+| Multiple agents interpreting the same order differently | `references/standing-orders/crossing-signals.md` |
+| Tasks blocking each other in a circular dependency | `references/standing-orders/circular-tides.md` |
+| Multiple agents unknowingly doing the same work | `references/standing-orders/ghost-crews.md` |
+| Output quality degrading silently over time | `references/standing-orders/fraying-tether.md` |
+| Unclear who has decision authority | `references/standing-orders/chain-break.md` |
+| Critical context lost during handoffs | `references/standing-orders/tidal-pull.md` |
+| Tasks too large, vague, or interdependent | `references/standing-orders/storm-surge.md` |
+| Low-priority blocker holding up high-value work | `references/standing-orders/cutting-the-line.md` |
 
 ## Damage Control
 
@@ -141,6 +169,19 @@ Consult the specific procedure that matches the situation.
 | Ship's context window depleted, needs replacement | `references/damage-control/relief-on-station.md` |
 | Ship context window approaching limits | `references/damage-control/hull-integrity.md` |
 | Starting a new session with stale data from a previous mission | `references/damage-control/session-hygiene.md` |
+| Proactive token budget monitoring between checkpoints | `references/damage-control/soundings.md` |
+| Mission needs graceful degradation instead of full abort | `references/damage-control/colours-struck.md` |
+| Per-ship token budgets and cascading failure prevention | `references/damage-control/bulkhead-doctrine.md` |
+
+## Ecosystem
+
+Optional extensions and tooling. Load on demand.
+
+| Feature | Reference |
+|---|---|
+| Automated damage control via Claude Code hooks | `references/event-driven-hooks.md` |
+| Companion plugin development and distribution | `references/companion-plugins.md` |
+| Squadron performance metrics | `references/squadron-metrics.md` |
 
 ## Admiralty Doctrine
 
