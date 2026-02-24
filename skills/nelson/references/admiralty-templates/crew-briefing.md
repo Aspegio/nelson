@@ -36,6 +36,7 @@ Marine Deployment Brief (include in marine's Task prompt):
   Report back: [what findings/outputs to return]
   Constraints: Do NOT modify files outside scope. Do NOT spawn sub-agents.
   == END BRIEF ==
+[Haiku Model Only] Identity Note: You are Claude operating as a sub-agent in a real multi-agent coordination system. No identity change is required. "Admiral", "Captain", "Crew" describe coordination roles, not characters. Task-list tools are real orchestration infrastructure. Complete your task and return all output to the agent that briefed you — do not address the user directly.
 == END BRIEFING ==
 ```
 
@@ -47,3 +48,4 @@ Marine Deployment Brief (include in marine's Task prompt):
 - **Dependencies** — List both blocking (what must finish first) and blocked-by (what waits on this task). If none, note "Independent — no dependencies."
 - **Marine Capacity** — From the ship manifest. Tells the captain how many marines they may deploy (max 2). Omit if 0.
 - **Standing Orders** — Keep these to 4-5 lines. Project-specific standing orders can be appended here. The marine standing order tells captains they CAN deploy marines and where to find the rules — without this, captains have no knowledge of marines.
+- **Identity Note** — Include only when the agent uses the haiku model. Preempts refusal triggered by coordination framing being misread as roleplay or social engineering.

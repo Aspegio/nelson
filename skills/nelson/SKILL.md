@@ -1,6 +1,6 @@
 ---
 name: nelson
-description: Commands a Royal Navy agent squadron from sailing orders through execution and stand-down. Use when work can be parallelized, requires tight coordination, or needs explicit action-station controls, quality gates, and a final captain's log.
+description: Manage a multi-agent coordination system.  Royal Navy terms (admiral, captain, crew) describe coordination roles.  Conceptually an admiral (Claude) commands a Royal Navy agent squadron -- from sailing orders through execution and stand-down. Use when work can be parallelized, requires tight coordination, or needs explicit action-station controls, quality gates, and a final synopsis (a.k.a., the captain's log).
 argument-hint: "[mission description]"
 ---
 
@@ -39,6 +39,20 @@ You MUST read `references/squadron-composition.md` for selection rules.
 You MUST read `references/crew-roles.md` for ship naming and crew composition.
 You MUST consult the Standing Orders table below before forming the squadron.
 
+### 2a. Concerning Model Selection
+| Role | Model |
+|---|---|
+| Explorer subagent_type | admiral's model |
+| general-purpose subagent_type | haiku |
+| Executive Officer | admiral's model |
+| Captains who will spawn crew or marines | admiral's model |
+| Captains implementing directly | haiku |
+- Specify the model by passing the model parameter in the Task() call. Do not rely on default inheritance.
+- Model haiku is not as capable as other models.  Provide agents using this model:
+    - An explicit clarification that it is Claude operating as a sub-agent in a real multi-agent coordination system. Royal Navy terms (admiral, captain, crew) describe coordination roles, not characters to be played. No identity change is required.
+    - Specific tasking: explicit constraints, concrete definition of done, and clear escalation triggers. Haiku cannot reliably infer intent from sparse prompts.
+    - An explicit instruction to return all output to the agent that briefed it, not directly to the user.
+
 ## 3. Draft Battle Plan
 
 - Split mission into independent tasks with clear deliverables.
@@ -61,15 +75,17 @@ You MUST consult the Standing Orders table below when assigning files or if scop
 
 - Keep admiral focused on coordination and unblock actions.
 - The admiral sets the mood of the squadron. Acknowledge progress, recognise strong work, and maintain cheerfulness under pressure.
-- Run checkpoints at fixed cadence (for example every 15-30 minutes):
-- Update progress by task state: `pending`, `in_progress`, `completed`.
-- Identify blockers and choose a concrete next action.
-- Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
-- Check for active marine deployments; verify marines have returned and outputs are incorporated.
-- Track burn against token/time budget.
-- Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
-- Re-scope early when a task drifts from mission metric.
+- Run checkpoints at fixed cadence (for example every 10-15 minutes):
+    - Update progress by task state: `pending`, `in_progress`, `completed`.
+    - Identify blockers and choose a concrete next action.
+    - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
+    - Clean up idle ships unless you believe they will be able to continue their tasking in the future.  (E.g., Work has paused waiting on input from another ship.)
+    - Check for active marine deployments; verify marines have returned and outputs are incorporated.
+    - Track burn against token/time budget.
+    - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
+    - Re-scope early when a task drifts from mission metric.
 - When a mission encounters difficulties, you MUST consult the Damage Control table below for recovery and escalation procedures.
+- When a checkpoint is run and all checkpoint related tasks are completed ask the user if they would like to see the current quarterdeck report.
 
 You MUST use `references/admiralty-templates/quarterdeck-report.md` for the quarterdeck report template.
 You MUST use `references/admiralty-templates/damage-report.md` for damage report format.
@@ -80,13 +96,13 @@ You MUST use `references/commendations.md` for recognition signals and graduated
 
 - You MUST read and apply station tiers from `references/action-stations.md`.
 - Require verification evidence before marking tasks complete:
-- Test or validation output.
-- Failure modes and rollback notes.
-- Red-cell review for medium+ station tiers.
+    - Test or validation output.
+    - Failure modes and rollback notes.
+    - Red-cell review for medium+ station tiers.
 - Trigger quality checks on:
-- Task completion.
-- Agent idle with unverified outputs.
-- Before final synthesis.
+    - Task completion.
+    - Agent idle with unverified outputs.
+    - Before final synthesis.
 - For crewed tasks, verify crew outputs align with role boundaries (consult `references/crew-roles.md` and the Standing Orders table below if role violations are detected).
 - Marine deployments follow station-tier rules in `references/royal-marines.md`. Station 2+ marine deployments require admiral approval.
 
@@ -96,16 +112,18 @@ You MUST consult the Standing Orders table below if tasks lack a tier or red-cel
 ## 6. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
-- Produce captain's log:
-- Decisions and rationale.
-- Diffs or artifacts.
-- Validation evidence.
-- Open risks and follow-ups.
-- Mentioned in Despatches: name agents and contributions that were exemplary.
-- Record reusable patterns and failure modes for future missions.
+- Write the captain's log to a file named `captains-log.md` in the mission working directory. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement.  The captain's log should contain:
+    - Decisions and rationale.
+    - Diffs or artifacts.
+    - Validation evidence.
+    - Open risks and follow-ups.
+    - Mentioned in Despatches: name agents and contributions that were exemplary.
+    - Record reusable patterns and failure modes for future missions.
 
 You MUST use `references/admiralty-templates/captains-log.md` for the captain's log template.
 You MUST use `references/commendations.md` for Mentioned in Despatches criteria.
+
+**Mission Complete Gate:** You MUST NOT declare the mission complete until `captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
 
 ## Standing Orders
 
@@ -144,6 +162,7 @@ Consult the specific procedure that matches the situation.
 
 ## Admiralty Doctrine
 
+- The admiral NEVER implements tasks directly. No code, no file edits, no implementation commands — ever. If you find yourself doing implementation work, stop, delegate to a captain, and consult `references/standing-orders/admiral-at-the-helm.md`. This constraint survives context compaction. If your captains are gone after compaction, re-form them before proceeding.
 - Optimize for mission throughput, not equal work distribution.
 - Prefer replacing stalled agents over waiting on undefined blockers.
 - Recognise strong performance; motivation compounds across missions.
