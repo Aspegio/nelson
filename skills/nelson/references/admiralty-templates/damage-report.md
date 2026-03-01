@@ -47,3 +47,11 @@ File a damage report to communicate context window usage to the admiral. Store e
 - Set `relief_requested` to `true` when hull integrity drops to Red or Critical. The admiral uses this flag to prioritise relief on station.
 - Update the report at each quarterdeck checkpoint or when hull integrity crosses a threshold boundary.
 - The admiral reads all damage reports from `.claude/nelson/damage-reports/` to build the squadron readiness board.
+
+## Read-Only Agent Variant
+
+Agents spawned with `subagent_type="Explore"` (Navigating Officer, Coxswain, Recce Marines) are read-only — they cannot write files, including damage reports.
+
+These agents report hull integrity via `SendMessage` to their captain. The captain writes the damage report JSON on their behalf using the same template and field definitions above.
+
+If the read-only agent is a Recce Marine reporting directly to a captain, the captain includes the marine's hull integrity in their own damage report under `context_summary`.

@@ -1,6 +1,6 @@
 # Crew Briefing Template
 
-When spawning each teammate via `Task()`, include this briefing in their prompt. Teammates do not inherit the lead's conversation context — they start with a clean slate and need explicit mission context to operate independently.
+When spawning each captain, use the `Agent` tool (see `references/tool-mapping.md` for parameters by mode). Include this briefing in their prompt. Teammates do not inherit the lead's conversation context — they start with a clean slate and need explicit mission context to operate independently.
 
 Target size: ~500 tokens. Enough for the teammate to work without asking clarifying questions, but not so much that it wastes their context window.
 
@@ -21,13 +21,13 @@ Standing Orders:
 - Report blockers to admiral immediately with options and one recommendation
 - When done, report: deliverable, validation evidence, failure modes, rollback note
 - You may deploy Royal Marines (short-lived sub-agents) for focused sorties.
-  Deploy by calling the Task tool directly (NOT via bash/CLI — use the built-in Task tool).
-  Recce Marine: Task tool with subagent_type="Explore" (read-only recon).
-  Assault Marine / Sapper: Task tool with subagent_type="general-purpose".
-  Include a deployment brief in the Task prompt (template below).
+  Deploy by calling the `Agent` tool with `subagent_type` (see `references/tool-mapping.md`).
+  Recce Marine: `Agent` tool with `subagent_type=`"Explore" (read-only recon).
+  Assault Marine / Sapper: `Agent` tool with `subagent_type=`"general-purpose".
+  Include a deployment brief in the `Agent` prompt (template below).
   Station 2+ marine deployments require admiral approval first.
   Max 2 marines at a time. Marines cannot deploy marines.
-Marine Deployment Brief (include in marine's Task prompt):
+Marine Deployment Brief (include in marine's Agent prompt):
   == MARINE DEPLOYMENT BRIEF ==
   Ship: [your ship name]
   Detachment: [Recce Marine / Assault Marine / Sapper]

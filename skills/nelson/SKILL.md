@@ -53,7 +53,7 @@ You MUST consult the Standing Orders table below when assigning files or if scop
 
 **Before proceeding to Step 4:** Verify sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier.
 
-**Crew Briefing:** When spawning each teammate via `Task()`, you MUST include a crew briefing using the template from `references/admiralty-templates/crew-briefing.md`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context to operate independently.
+**Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then create and assign work with `TaskCreate` + `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
 
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a turnover brief using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
 
@@ -61,9 +61,10 @@ You MUST consult the Standing Orders table below when assigning files or if scop
 
 - Keep admiral focused on coordination and unblock actions.
 - The admiral sets the mood of the squadron. Acknowledge progress, recognise strong work, and maintain cheerfulness under pressure.
-- Run checkpoints at fixed cadence (for example every 15-30 minutes):
-- Update progress by task state: `pending`, `in_progress`, `completed`.
+- Run a quarterdeck checkpoint after every 2-3 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
+- Update progress by checking `TaskList` for task states: `pending`, `in_progress`, `completed`.
 - Identify blockers and choose a concrete next action.
+- Use `SendMessage` to unblock captains or redirect their approach.
 - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
 - Check for active marine deployments; verify marines have returned and outputs are incorporated.
 - Track burn against token/time budget.
@@ -71,6 +72,7 @@ You MUST consult the Standing Orders table below when assigning files or if scop
 - Re-scope early when a task drifts from mission metric.
 - When a mission encounters difficulties, you MUST consult the Damage Control table below for recovery and escalation procedures.
 
+See `references/tool-mapping.md` for the full set of coordination tools.
 You MUST use `references/admiralty-templates/quarterdeck-report.md` for the quarterdeck report template.
 You MUST use `references/admiralty-templates/damage-report.md` for damage report format.
 You MUST consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.

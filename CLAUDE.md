@@ -8,6 +8,7 @@ Nelson is a Claude Code skill for coordinating agent work using Royal Navy termi
 .claude-plugin/
   plugin.json             — Plugin manifest
   marketplace.json        — Marketplace definition (self-hosted)
+settings.json             — Plugin default settings (enables agent teams)
 skills/nelson/
   SKILL.md                — Main entrypoint (what Claude reads)
   references/             — Supporting docs loaded on demand
@@ -23,6 +24,7 @@ skills/nelson/
       session-hygiene.md      — Clean start procedure for new sessions
     royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
+    tool-mapping.md         — Nelson-to-Claude Code tool reference
     standing-orders/        — One file per anti-pattern, loaded on demand
 agents/                   — Agent interface definitions
 demos/                    — Example applications built with Nelson

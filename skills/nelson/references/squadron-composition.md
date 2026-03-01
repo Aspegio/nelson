@@ -38,3 +38,15 @@ Choose the first condition that matches.
 ## Anti-Patterns
 
 See the Standing Orders table in SKILL.md for the full list of standing orders and known anti-patterns.
+
+## Worktree Isolation
+
+When file ownership boundaries are hard to draw or multiple captains must modify overlapping files, use `isolation: "worktree"` on the `Agent` tool. This gives each captain an isolated copy of the repository via a git worktree.
+
+Worktree isolation is a stronger alternative to the file-ownership approach in `standing-orders/split-keel.md`. Use it when:
+
+- Multiple captains need to edit the same files.
+- Merge conflict risk is high and the split-keel standing order cannot resolve it.
+- Tasks are large enough that the merge cost is justified.
+
+**Trade-off:** Worktree isolation prevents conflicts during execution but requires merging changes afterward. The admiral is responsible for coordinating the merge.

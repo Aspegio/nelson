@@ -24,7 +24,7 @@ Nelson gives Claude a six-step operational framework for tackling complex missio
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and authenticated
-- **Recommended:** Enable [agent teams](https://code.claude.com/docs/en/agent-teams) for the full squadron experience. Nelson works without it (using single-session or subagent modes), but agent teams unlock teammate-to-teammate coordination — the `agent-team` execution mode. Enable it in your [settings.json](https://code.claude.com/docs/en/settings):
+- **Recommended:** Enable [agent teams](https://code.claude.com/docs/en/agent-teams) for the full squadron experience. Nelson works without it (using single-session or subagent modes), but agent teams unlock teammate-to-teammate coordination — the `agent-team` execution mode. Plugin installs ship a `settings.json` that enables this automatically. For manual installs, add this to your [settings.json](https://code.claude.com/docs/en/settings):
 
 ```json
 {
@@ -258,6 +258,7 @@ The skill includes structured templates for consistent output across missions:
 .claude-plugin/
 ├── plugin.json                               # Plugin manifest
 └── marketplace.json                          # Marketplace definition (self-hosted)
+settings.json                                 # Plugin default settings (enables agent teams)
 skills/nelson/
 ├── SKILL.md                                  # Main skill instructions (entrypoint)
 └── references/
@@ -287,6 +288,7 @@ skills/nelson/
     │   └── session-resumption.md
     ├── royal-marines.md                      # Royal Marines deployment rules
     ├── squadron-composition.md              # Mode selection and team sizing rules
+    ├── tool-mapping.md                       # Nelson-to-Claude Code tool reference
     └── standing-orders/                      # Individual anti-pattern files
         ├── admiral-at-the-helm.md
         ├── all-hands-on-deck.md
@@ -301,7 +303,7 @@ skills/nelson/
         ├── split-keel.md
         └── unclassified-engagement.md
 agents/
-└── nelson.md                                # Subagent definition
+└── nelson.md                                # Agent definition with skill binding
 scripts/
 └── count-tokens.py                          # Token counter for hull integrity monitoring
 ```
