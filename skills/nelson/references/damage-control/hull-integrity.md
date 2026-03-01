@@ -65,3 +65,28 @@ Hull integrity monitoring works alongside existing damage control procedures:
 - **Crew Overrun** (`crew-overrun.md`): A crew overrun accelerates hull integrity loss. When a captain detects a crew overrun, the corrective action should account for the ship's current hull integrity — a ship already at Amber has less margin to absorb an overrun than one at Green.
 - **Man Overboard** (`man-overboard.md`): Replacing a stuck agent consumes additional context. Factor hull integrity into the decision to replace versus descope.
 - **Scuttle and Reform** (`scuttle-and-reform.md`): When the flagship reaches Red and multiple ships are also at Red or Critical, consider scuttling the current mission and reforming with fresh context rather than attempting piecemeal relief.
+
+## Advanced: TeammateIdle Hook
+
+An optional `TeammateIdle` hook can trigger an automatic hull integrity check when a captain goes idle unexpectedly. This supplements the quarterdeck checkpoint rhythm with event-driven monitoring.
+
+Example hook configuration in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Captain idle — check hull integrity and task status'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This is an opt-in enhancement. Hull integrity monitoring works without hooks via the quarterdeck checkpoint rhythm.

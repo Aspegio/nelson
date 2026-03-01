@@ -111,3 +111,38 @@ Marine deployments inherit the parent ship's station tier:
 - **Station 0-1:** Captain deploys at discretion. No admiral approval required.
 - **Station 2:** Captain must signal admiral and receive approval before deploying marines.
 - **Station 3:** Marine deployment is not permitted. All Trafalgar-tier work requires explicit Admiralty (human) confirmation.
+
+## Plan Mode for High-Risk Stations
+
+When spawning captains for Station 2 or Station 3 tasks, use `mode: "plan"` on the `Agent` tool. This forces the captain into read-only plan mode — they can explore the codebase and design their approach, but cannot write files until the admiral approves their plan.
+
+- **Station 2 (Action):** Captain submits a plan via `ExitPlanMode`. Admiral reviews and approves via `SendMessage(type="plan_approval_response")`. This maps to the existing "admiral go/no-go" requirement.
+- **Station 3 (Trafalgar):** Same flow, but the admiral must also obtain explicit human confirmation before approving the plan. This maps to the existing "human confirmation required" requirement.
+- **Station 0-1:** Plan mode is not required. Captains execute directly.
+
+See `references/tool-mapping.md` for the full set of coordination tools.
+
+## Advanced: TaskCompleted Hook
+
+An optional `TaskCompleted` hook can enforce quality gate validation before allowing a task to be marked complete. A hook that exits with code 2 rejects the completion and feeds back the reason to the agent.
+
+Example hook configuration in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Verify: validation evidence present, rollback note included, station tier controls satisfied'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This is an opt-in enhancement. Quality gates work without hooks via the admiral's quarterdeck checkpoint and red-cell review process.
