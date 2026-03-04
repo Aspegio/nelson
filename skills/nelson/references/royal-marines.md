@@ -14,11 +14,11 @@ Choose the first condition that matches.
 
 ## Marine Specialisations
 
-| Type | Function | subagent_type | Use case |
-|---|---|---|---|
-| Recce Marine | Reconnaissance & intel gathering | Explore (read-only) | Scout unfamiliar code, gather findings |
-| Assault Marine | Direct action, targeted changes | general-purpose | Small fix, unblock a dependency |
-| Sapper | Engineering support | general-purpose | Quick config, build, infra task |
+| Type | Function | subagent_type | cost-weight | Use case |
+|---|---|---|---|---|
+| Recce Marine | Reconnaissance & intel gathering | Explore (read-only) | 4 | Scout unfamiliar code, gather findings |
+| Assault Marine | Direct action, targeted changes | general-purpose | 3 | Small fix, unblock a dependency |
+| Sapper | Engineering support | general-purpose | 3 | Quick config, build, infra task |
 
 ### Read-Only Specialisation
 

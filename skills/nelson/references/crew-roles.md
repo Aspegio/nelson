@@ -24,15 +24,15 @@ Never exceed 4 crew per ship. If the task demands more, split it into two ships.
 
 ## Role Definitions
 
-| Role | Abbr | Function | subagent_type | When to Crew |
-|---|---|---|---|---|
-| Executive Officer | XO | Integration & orchestration across sub-tasks | general-purpose | 3+ crew or interdependent sub-tasks |
-| Principal Warfare Officer | PWO | Core implementation work | general-purpose | Almost always (default doer) |
-| Navigating Officer | NO | Codebase research & exploration | Explore | Unfamiliar code, large codebase |
-| Marine Engineering Officer | MEO | Testing & validation | general-purpose | Station 1+ or non-trivial verification |
-| Weapon Engineering Officer | WEO | Config, infrastructure, systems integration | general-purpose | Significant config or infrastructure work |
-| Logistics Officer | LOGO | Documentation & dependency management | general-purpose | Docs as deliverable, dependency management |
-| Coxswain | COX | Standards review & quality enforcement | Explore | Station 1+ with established conventions |
+| Role | Abbr | Function | subagent_type | cost-weight | When to Crew |
+|---|---|---|---|---|---|
+| Executive Officer | XO | Integration & orchestration across sub-tasks | general-purpose | 10 | 3+ crew or interdependent sub-tasks |
+| Principal Warfare Officer | PWO | Core implementation work | general-purpose | 2 | Almost always (default doer) |
+| Navigating Officer | NO | Codebase research & exploration | Explore | 7 | Unfamiliar code, large codebase |
+| Marine Engineering Officer | MEO | Testing & validation | general-purpose | 6 | Station 1+ or non-trivial verification |
+| Weapon Engineering Officer | WEO | Config, infrastructure, systems integration | general-purpose | 6 | Significant config or infrastructure work |
+| Logistics Officer | LOGO | Documentation & dependency management | general-purpose | 2 | Docs as deliverable, dependency management |
+| Coxswain | COX | Standards review & quality enforcement | Explore | 4 | Station 1+ with established conventions |
 
 ### Read-Only Roles
 
