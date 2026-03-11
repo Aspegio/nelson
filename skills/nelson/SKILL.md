@@ -19,6 +19,7 @@ Execute this workflow for the user's mission.
 You MUST read `references/admiralty-templates/sailing-orders.md` and use the sailing-orders template when the user does not provide structure.
 
 Example sailing orders summary:
+
 ```
 Outcome: Refactor auth module to use JWT tokens
 Metric: All 47 auth tests pass, no new dependencies
@@ -79,6 +80,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 - When a mission encounters difficulties, consult the Damage Control table below for recovery and escalation procedures.
 
 Example quarterdeck checkpoint:
+
 ```
 Status: 3/5 tasks complete, 1 blocked, 1 in progress
 Blocker: HMS Resolute waiting on API schema from HMS Swift
