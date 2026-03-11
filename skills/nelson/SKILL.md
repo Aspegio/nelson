@@ -1,6 +1,6 @@
 ---
 name: nelson
-description: Commands a Royal Navy agent squadron from sailing orders through execution and stand-down. Use when work can be parallelized, requires tight coordination, or needs explicit action-station controls, quality gates, and a final captain's log.
+description: Orchestrates multi-agent task execution using a Royal Navy squadron metaphor — from mission planning through parallel work coordination to stand-down. Use when work needs parallel agent orchestration, tight task coordination with quality gates, structured delegation with progress checkpoints, or a documented decision log.
 argument-hint: "[mission description]"
 ---
 
@@ -17,6 +17,15 @@ Execute this workflow for the user's mission.
 - Define stop criteria and required handoff artifacts.
 
 You MUST read `references/admiralty-templates/sailing-orders.md` and use the sailing-orders template when the user does not provide structure.
+
+Example sailing orders summary:
+```
+Outcome: Refactor auth module to use JWT tokens
+Metric: All 47 auth tests pass, no new dependencies
+Deadline: This session
+Constraints: Do not modify the public API surface
+Out of scope: Migration script for existing sessions
+```
 
 **Session Hygiene:** Before forming the squadron, execute session hygiene per `references/damage-control/session-hygiene.md`. Clear stale damage reports and turnover briefs from any previous session. Skip this step when resuming an interrupted session.
 
@@ -35,9 +44,7 @@ You MUST read `references/admiralty-templates/sailing-orders.md` and use the sai
     - Captain decides crew composition per ship using the crew-or-direct decision tree in `references/crew-roles.md`.
     - Captains may also deploy Royal Marines during execution for short-lived sorties — see `references/royal-marines.md` and use `references/admiralty-templates/marine-deployment-brief.md` for the deployment brief.
 
-You MUST read `references/squadron-composition.md` for selection rules.
-You MUST read `references/crew-roles.md` for ship naming and crew composition.
-You MUST consult the Standing Orders table below before forming the squadron.
+Reference `references/squadron-composition.md` for selection rules and `references/crew-roles.md` for ship naming and crew composition. Consult the Standing Orders table below before forming the squadron.
 
 ## 3. Draft Battle Plan
 
@@ -47,9 +54,7 @@ You MUST consult the Standing Orders table below before forming the squadron.
 - Keep one task in progress per agent unless the mission explicitly requires multitasking.
 - For each captain's task, include a ship manifest. If crew are mustered, list crew roles with sub-tasks and sequence. If the captain implements directly (0 crew), note "Captain implements directly." If the captain anticipates needing marine support, note marine capacity in the ship manifest (max 2).
 
-You MUST read `references/admiralty-templates/battle-plan.md` for the battle plan template.
-You MUST read `references/admiralty-templates/ship-manifest.md` for the ship manifest template.
-You MUST consult the Standing Orders table below when assigning files or if scope is unclear.
+Reference `references/admiralty-templates/battle-plan.md` for the battle plan template and `references/admiralty-templates/ship-manifest.md` for the ship manifest. Consult the Standing Orders table below when assigning files or if scope is unclear.
 
 **Before proceeding to Step 4:** Verify sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier.
 
@@ -71,13 +76,18 @@ You MUST consult the Standing Orders table below when assigning files or if scop
     - Track burn against token/time budget.
     - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
 - Re-scope early when a task drifts from mission metric.
-- When a mission encounters difficulties, you MUST consult the Damage Control table below for recovery and escalation procedures.
+- When a mission encounters difficulties, consult the Damage Control table below for recovery and escalation procedures.
 
-See `references/tool-mapping.md` for the full set of coordination tools.
-You MUST use `references/admiralty-templates/quarterdeck-report.md` for the quarterdeck report template.
-You MUST use `references/admiralty-templates/damage-report.md` for damage report format.
-You MUST consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
-You MUST use `references/commendations.md` for recognition signals and graduated correction.
+Example quarterdeck checkpoint:
+```
+Status: 3/5 tasks complete, 1 blocked, 1 in progress
+Blocker: HMS Resolute waiting on API schema from HMS Swift
+Action: Redirect HMS Swift to prioritise schema export
+Budget: ~40% tokens consumed, on track
+Hull: All ships green
+```
+
+Reference `references/tool-mapping.md` for coordination tools, `references/admiralty-templates/quarterdeck-report.md` for the report template, and `references/admiralty-templates/damage-report.md` for damage report format. Use `references/commendations.md` for recognition signals and graduated correction. Consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
 
 ## 5. Set Action Stations
 
@@ -93,8 +103,7 @@ You MUST use `references/commendations.md` for recognition signals and graduated
 - For crewed tasks, verify crew outputs align with role boundaries (consult `references/crew-roles.md` and the Standing Orders table below if role violations are detected).
 - Marine deployments follow station-tier rules in `references/royal-marines.md`. Station 2+ marine deployments require admiral approval.
 
-You MUST read `references/admiralty-templates/red-cell-review.md` for the red-cell review template.
-You MUST consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
+Reference `references/admiralty-templates/red-cell-review.md` for the red-cell review template. Consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
 
 ## 6. Stand Down And Log Action
 
@@ -107,8 +116,7 @@ You MUST consult the Standing Orders table below if tasks lack a tier or red-cel
     - Mentioned in Despatches: name agents and contributions that were exemplary.
     - Record reusable patterns and failure modes for future missions.
 
-You MUST use `references/admiralty-templates/captains-log.md` for the captain's log template.
-You MUST use `references/commendations.md` for Mentioned in Despatches criteria.
+Reference `references/admiralty-templates/captains-log.md` for the captain's log template and `references/commendations.md` for Mentioned in Despatches criteria.
 
 **Mission Complete Gate:** You MUST NOT declare the mission complete until `captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
 
