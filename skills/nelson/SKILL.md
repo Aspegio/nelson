@@ -60,6 +60,21 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 
 **Before proceeding to Step 4:** Verify sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier.
 
+**Admiralty Action List:** For each task, consciously mark `admiralty-action-required:` as `yes` or `no`. Then scan the battle plan for tasks marked `admiralty-action-required: yes`. If any exist, surface an Admiralty Action List to the user before spawning any agents:
+
+```
+ADMIRALTY ACTION LIST — Actions required from Admiralty
+
+1. [Task name]
+   action: [what you must do]
+   timing: [before task starts | after task completes]
+   unblocks: [task name or stand-down]
+
+No action needed now. These will be raised by the captain when each step is reached.
+```
+
+If no tasks are marked `admiralty-action-required: yes`, omit the list — no noise on routine missions. This list is informational, not a gate. The user acknowledges by continuing the conversation. Squadron formation proceeds immediately after.
+
 **Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then create and assign work with `TaskCreate` + `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
 
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a turnover brief using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
@@ -74,9 +89,12 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
     - Use `SendMessage` to unblock captains or redirect their approach.
     - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
     - Check for active marine deployments; verify marines have returned and outputs are incorporated.
-    - Clean up idle ships unless you believe they will continue their tasking. (E.g., Work has paused waiting on input from another ship.)
+    - Stand down completed ships immediately — see `references/standing-orders/paid-off.md`. Only hold a ship if a named re-task trigger in the sailing orders has not yet been evaluated.
     - Track burn against token/time budget.
     - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
+    - **Write the quarterdeck report to disk** at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point.
+    - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
+    - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
 - Re-scope early when a task drifts from mission metric.
 - When a mission encounters difficulties, consult the Damage Control table below for recovery and escalation procedures.
 
@@ -141,6 +159,8 @@ Consult the specific standing order that matches the situation.
 | Spawning one crew member for an atomic task | `references/standing-orders/skeleton-crew.md` |
 | Assigning crew work outside their role | `references/standing-orders/pressed-crew.md` |
 | Captain deploying marines for crew work or sustained tasks | `references/standing-orders/battalion-ashore.md` |
+| Captain completed autonomous work and needs human action to continue | `references/standing-orders/awaiting-admiralty.md` |
+| Agent completed task with no remaining work in the dependency graph | `references/standing-orders/paid-off.md` |
 
 ## Damage Control
 

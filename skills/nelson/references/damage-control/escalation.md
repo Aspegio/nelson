@@ -13,6 +13,10 @@ Escalation flows upward: Crew to Captain to Admiral to Admiralty (human).
 | Station 2+ risk discovered mid-task | Admiral elevates the action station and applies required controls |
 | Budget approaching limit with critical work remaining | Admiral escalates to Admiralty with options: extend budget, descope, or abort |
 
+> **Note:** The following entry documents a planned, expected handoff — not a failure condition. It is listed here so that any captain encountering this situation without a prior briefing has a defined path.
+
+| Captain has reached a planned human-action step (`admiralty-action-required: yes`) and cannot continue | Captain invokes the `awaiting-admiralty` standing order |
+
 ## Procedure
 
 1. The agent encountering the issue pauses work on the affected task.

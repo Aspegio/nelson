@@ -35,6 +35,8 @@ Standing Orders:
   Include a deployment brief in the `Agent` prompt (template below).
   Station 2+ marine deployments require admiral approval first.
   Max 2 marines at a time. Marines cannot deploy marines.
+- If you reach a step requiring human action (admiralty-action-required: yes), invoke
+  the awaiting-admiralty standing order: references/standing-orders/awaiting-admiralty.md
 Marine Deployment Brief (include in marine's Agent prompt):
   == MARINE DEPLOYMENT BRIEF ==
   Ship: [your ship name]
