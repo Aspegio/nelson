@@ -37,8 +37,8 @@ Out of scope: Migration script for existing sessions
   - `single-session`: Use for sequential tasks, low complexity, or heavy same-file editing.
   - `subagents`: Use for parallel scouting or isolated tasks that report only to admiral.
   - `agent-team`: Use when independent agents must coordinate with each other directly.
-- Set team size from mission complexity:
-    - Default to `1 admiral + 3-6 captains`.
+- Set team size from task independence, not mission complexity:
+    - Count the independent work units first. Each unit that can run with zero shared state or sequencing dependency is a candidate for its own captain. That count — not a size tier — sets the target captain count.
     - Add `1 red-cell navigator` for medium/high threat work.
     - Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
     - Assign each captain a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
@@ -46,17 +46,34 @@ Out of scope: Migration script for existing sessions
     - Captains may also deploy Royal Marines during execution for short-lived sorties — see `references/royal-marines.md` and use `references/admiralty-templates/marine-deployment-brief.md` for the deployment brief.
 - If the sailing orders express cost-savings priority, load `references/model-selection.md` before assigning models to the squadron. Apply weight-based model selection to all `Agent` tool calls and include haiku briefing enhancements for agents assigned to haiku.
 
-Reference `references/squadron-composition.md` for selection rules and `references/crew-roles.md` for ship naming and crew composition. Consult the Standing Orders table below before forming the squadron.
+Reference `references/squadron-composition.md` for selection rules and `references/crew-roles.md` for ship naming and crew composition.
+
+**Formation Gate — Standing Order Check:** Before finalizing the squadron, explicitly answer each question:
+- `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent?
+- `light-squadron.md`: Is the captain count equal to the number of independent work units, or have tasks been under-split onto fewer captains than independence warrants?
+- `all-hands-on-deck.md`: Does every captain carry genuinely independent work, or are some roles speculative?
+- `crew-without-canvas.md`: Is every agent justified by actual task scope?
+- `skeleton-crew.md`: Would any ship deploy exactly one crew member for an atomic task?
+
+If any answer triggers a standing order, apply the corrective action before proceeding.
 
 ## 3. Draft Battle Plan
 
-- Split mission into independent tasks with clear deliverables.
+- Map the dependency graph first: enumerate every unit of work that can run without shared state or ordering constraints with any other unit. Each such unit is a candidate for its own captain. Only group tasks onto one captain when they share files, require sequential ordering, or the context-setup cost of a separate agent demonstrably exceeds the work itself.
 - Assign owner for each task and explicit dependencies.
 - Assign file ownership when implementation touches code.
 - Keep one task in progress per agent unless the mission explicitly requires multitasking.
 - For each captain's task, include a ship manifest. If crew are mustered, list crew roles with sub-tasks and sequence. If the captain implements directly (0 crew), note "Captain implements directly." If the captain anticipates needing marine support, note marine capacity in the ship manifest (max 2).
 
-Reference `references/admiralty-templates/battle-plan.md` for the battle plan template and `references/admiralty-templates/ship-manifest.md` for the ship manifest. Consult the Standing Orders table below when assigning files or if scope is unclear.
+Reference `references/admiralty-templates/battle-plan.md` for the battle plan template and `references/admiralty-templates/ship-manifest.md` for the ship manifest.
+
+**Battle Plan Gate — Standing Order Check:** Before finalizing task assignments, explicitly answer each question:
+- `split-keel.md`: Does each agent have exclusive file ownership with no conflicts?
+- `captain-at-the-capstan.md`: Are captains with crew coordinating rather than implementing directly?
+- `unclassified-engagement.md`: Does every task have a risk tier assigned?
+- `press-ganged-navigator.md`: Is the red-cell navigator being assigned implementation work?
+
+If any answer triggers a standing order, apply the corrective action before proceeding.
 
 **Before proceeding to Step 4:** Verify sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier.
 
@@ -81,6 +98,12 @@ If no tasks are marked `admiralty-action-required: yes`, omit the list — no no
 
 ## 4. Run Quarterdeck Rhythm
 
+**Idle notification rule (immediate — do not defer to checkpoint):** Every time an idle notification arrives from a ship, ask two questions before doing anything else:
+1. Is this ship's task marked complete?
+2. Does any remaining pending task depend on this ship's output?
+
+If the task is complete and no pending task depends on it, send `shutdown_request` immediately — in the same response. Do not wait for the next checkpoint cadence. This applies even when other ships are still running and even when a captain's results were delivered inline (not as a separate artifact). The `paid-off.md` standing order governs this; consult it if uncertain.
+
 - Keep admiral focused on coordination and unblock actions.
 - The admiral sets the mood of the squadron. Acknowledge progress, recognise strong work, and maintain cheerfulness under pressure.
 - Run a quarterdeck checkpoint after every 2-3 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
@@ -89,9 +112,15 @@ If no tasks are marked `admiralty-action-required: yes`, omit the list — no no
     - Use `SendMessage` to unblock captains or redirect their approach.
     - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
     - Check for active marine deployments; verify marines have returned and outputs are incorporated.
-    - Stand down completed ships immediately — see `references/standing-orders/paid-off.md`. Only hold a ship if a named re-task trigger in the sailing orders has not yet been evaluated.
+    - Confirm all completed ships have already been stood down per the idle notification rule above. If any idle ship with a complete task was missed, send `shutdown_request` now before continuing.
     - Track burn against token/time budget.
     - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
+    - Standing order scan: For each order below, ask "Has this situation arisen since the last checkpoint?" If yes, apply the corrective action now — do not defer.
+        - `admiral-at-the-helm.md`: Has the admiral drifted into implementation work?
+        - `drifting-anchorage.md`: Has any task scope crept beyond the sailing orders?
+        - `captain-at-the-capstan.md`: Has any captain started implementing instead of coordinating crew?
+        - `pressed-crew.md`: Has any crew member been assigned work outside their role?
+        - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
     - **Write the quarterdeck report to disk** at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
     - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
@@ -148,6 +177,7 @@ Consult the specific standing order that matches the situation.
 | Situation | Standing Order |
 |---|---|
 | Choosing between single-session and multi-agent | `references/standing-orders/becalmed-fleet.md` |
+| Tasks under-split onto fewer captains than independence warrants | `references/standing-orders/light-squadron.md` |
 | Deciding whether to add another agent | `references/standing-orders/crew-without-canvas.md` |
 | Assigning files to agents in the battle plan | `references/standing-orders/split-keel.md` |
 | Task scope drifting from sailing orders | `references/standing-orders/drifting-anchorage.md` |
