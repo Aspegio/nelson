@@ -23,13 +23,15 @@ Choose the first condition that matches.
 
 The right number of captains equals the number of independently executable work units — not a complexity tier. Before choosing a number, map the dependency graph and count how many tasks can run concurrently with zero shared state. That count is the target.
 
+**Zero shared state** means: no file ownership overlap AND no sequencing dependency (task B does not require the output of task A). Peer coordination across module boundaries (e.g., agreeing on an API contract) is permitted and handled by the admiral.
+
 - Assign one captain per independent work unit.
 - Only merge tasks onto one captain when they share files, have a sequencing dependency, or are so small that agent setup cost clearly exceeds the work itself.
 - Add `1 red-cell navigator` at medium/high threat.
 - Keep one admiral only.
 - Squadron cap: 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional — up to 4 per captain, governed by `references/crew-roles.md`.
 
-Size labels (small/medium/large) are rough guides, not constraints. An analysis mission with 8 independent sections warrants 8 captains. An implementation mission with 3 independent modules warrants 3. When in doubt, add a captain — idle context is cheap; serialized work is slow.
+An analysis mission with 8 independent sections warrants 8 captains. An implementation mission with 3 independent modules warrants 3. When in doubt, add a captain — idle context is cheap; serialized work is slow. In cost-optimized missions (sailing orders with token-budget priority), consult `references/model-selection.md` before defaulting to maximum parallelism.
 
 ## Role Guide
 
