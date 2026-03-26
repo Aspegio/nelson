@@ -168,6 +168,8 @@ The skill selects one of three execution modes based on your mission:
 
 ### Navy structure vs OmO/RuFlo-style rapid tactics
 
+> [OmO (Oh My OpenAgent)](https://github.com/code-yeongyu/oh-my-openagent) and [RuFlo](https://github.com/ruvnet/ruflo) are rapid-execution agent frameworks that prioritize speed and minimal ceremony.
+
 Both approaches are useful; they optimize for different constraints.
 
 | Approach | Best when | Trade-off |
@@ -179,10 +181,10 @@ If your priority is **speed over ceremony**, Nelson can still run lean:
 
 - Use `single-session` when work is mostly linear or in one file area (lowest overhead).
 - Use `subagents` when you have independent tasks but don't need teammate-to-teammate chat.
-- Start with the **minimum captain count equal to truly independent work units** (often 2-3 for a small fast team), then scale only if parallel leaves increase.
-- Keep crew light per ship (for example, captain + PWO only) unless testing/review pressure requires MEO/COX support.
+- Start with the **minimum captain count equal to truly independent work units** (often 2-3 for a small fast team), then scale only if parallel workstreams increase.
+- Keep crew light per ship (for example, captain + Principal Warfare Officer (PWO) only) unless testing/review pressure requires Marine Engineering Officer (MEO) or Coxswain (COX) support.
 
-In short: choose rapid/guerrilla style for short, low-blast-radius pushes; choose the full Navy structure when coordination, auditability, and safe scaling matter more than raw tempo.
+In short: choose rapid/guerrilla style for short, low blast radius pushes; choose the full Navy structure when coordination, auditability, and safe scaling matter more than raw tempo.
 
 ### Chain of command
 
