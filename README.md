@@ -166,6 +166,24 @@ The skill selects one of three execution modes based on your mission:
 | `subagents` | Parallel tasks where workers only report back to the coordinator | Claude spawns [subagents](https://code.claude.com/docs/en/sub-agents) that work independently and return results |
 | `agent-team` | Parallel tasks where workers need to coordinate with each other | Claude creates an [agent team](https://code.claude.com/docs/en/agent-teams) with direct teammate-to-teammate communication |
 
+### Navy structure vs OmO/RuFlo-style rapid tactics
+
+Both approaches are useful; they optimize for different constraints.
+
+| Approach | Best when | Trade-off |
+|---|---|---|
+| Nelson Navy structure | You need repeatable quality gates, explicit ownership, and a clear decision log across parallel work | More setup and coordination overhead up front |
+| OmO/RuFlo-style rapid/guerrilla flow | You need the fastest possible movement on a narrow, low-risk path | Less formal checkpointing and role separation |
+
+If your priority is **speed over ceremony**, Nelson can still run lean:
+
+- Use `single-session` when work is mostly linear or in one file area (lowest overhead).
+- Use `subagents` when you have independent tasks but don't need teammate-to-teammate chat.
+- Start with the **minimum captain count equal to truly independent work units** (often 2-3 for a small fast team), then scale only if parallel leaves increase.
+- Keep crew light per ship (for example, captain + PWO only) unless testing/review pressure requires MEO/COX support.
+
+In short: choose rapid/guerrilla style for short, low-blast-radius pushes; choose the full Navy structure when coordination, auditability, and safe scaling matter more than raw tempo.
+
 ### Chain of command
 
 Nelson uses a three-tier hierarchy. The admiral coordinates captains, each captain commands a named ship, and crew members aboard each ship do the specialist work.
