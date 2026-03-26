@@ -78,6 +78,22 @@ cp -r /tmp/nelson/skills/nelson ~/.claude/skills/nelson
 
 Then commit `.claude/skills/nelson/` to version control so your team can use it.
 
+### Updating
+
+Plugin installs are cached snapshots — they do not auto-update. To pick up a new release:
+
+```
+/plugin install harrymunro/nelson
+```
+
+If that reports you're already at the latest version, the local marketplace cache is stale. Refresh it manually:
+
+```bash
+cd ~/.claude/plugins/marketplaces/nelson-marketplace && git fetch origin && git reset --hard origin/main
+```
+
+Then reinstall via `/plugin install nelson` or re-enable via `/plugin`.
+
 ### Verify installation
 
 Open Claude Code and ask:
