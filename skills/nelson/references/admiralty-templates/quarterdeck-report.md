@@ -19,7 +19,9 @@ Budget:
 - token/time remaining:
 
 Standing order violations:
-- order: (none / list any triggered since last checkpoint)
+- order: (none / list each triggered since last checkpoint)
+  corrective action taken:
+- order:
   corrective action taken:
 
 Risk updates:
