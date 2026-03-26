@@ -18,6 +18,10 @@ Budget:
 - token/time spent:
 - token/time remaining:
 
+Standing order violations:
+- order: (none / list any triggered since last checkpoint)
+  corrective action taken:
+
 Risk updates:
 - new/changed risks:
 - mitigation:

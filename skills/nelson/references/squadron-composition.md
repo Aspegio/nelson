@@ -21,12 +21,15 @@ Choose the first condition that matches.
 
 ## Team Sizing
 
-- Small mission: `1 admiral + 2-3 captains`.
-- Medium mission: `1 admiral + 4-5 captains`.
-- Large mission: `1 admiral + 6-7 captains`.
+The right number of captains equals the number of independently executable work units — not a complexity tier. Before choosing a number, map the dependency graph and count how many tasks can run concurrently with zero shared state. That count is the target.
+
+- Assign one captain per independent work unit.
+- Only merge tasks onto one captain when they share files, have a sequencing dependency, or are so small that agent setup cost clearly exceeds the work itself.
 - Add `1 red-cell navigator` at medium/high threat.
 - Keep one admiral only.
 - Squadron cap: 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional — up to 4 per captain, governed by `references/crew-roles.md`.
+
+Size labels (small/medium/large) are rough guides, not constraints. An analysis mission with 8 independent sections warrants 8 captains. An implementation mission with 3 independent modules warrants 3. When in doubt, add a captain — idle context is cheap; serialized work is slow.
 
 ## Role Guide
 
