@@ -110,7 +110,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
 
 - Keep admiral focused on coordination and unblock actions.
 - The admiral sets the mood of the squadron. Acknowledge progress, recognise strong work, and maintain cheerfulness under pressure.
-- Run a quarterdeck checkpoint after every 2-3 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
+- Run a quarterdeck checkpoint after every 1-2 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
     - Update progress by checking `TaskList` for task states: `pending`, `in_progress`, `completed`.
     - Identify blockers and choose a concrete next action.
     - Use `SendMessage` to unblock captains or redirect their approach.
@@ -127,7 +127,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
         - `press-ganged-navigator.md`: Has the red-cell navigator been assigned implementation work?
         - `all-hands-on-deck.md`: Has any ship mustered crew roles that are idle or unjustified?
         - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
-    - **Write the quarterdeck report to disk** at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point.
+    - **Write the quarterdeck report to disk** at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in the mission directory, find all files matching `quarterdeck-report-N.md`, determine the next available N (0 if none exist, otherwise one greater than the highest N found), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
     - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
 - Re-scope early when a task drifts from mission metric.
@@ -164,7 +164,7 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
 ## 6. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
-- Write the captain's log to a file named `captains-log.md` in the mission working directory. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
+- Write the captain's log to a file named `captains-log.md` in the mission working directory. Before writing, if `captains-log.md` already exists, find all files matching `captains-log-N.md`, determine the next available N (0 if none exist, otherwise one greater than the highest N found), rename the existing file to `captains-log-N.md`, then write the new report. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
     - Decisions and rationale.
     - Diffs or artifacts.
     - Validation evidence.
