@@ -19,6 +19,7 @@ skills/nelson/
     commendations.md        — Recognition signals & graduated correction
     crew-roles.md           — Crew role definitions, ship names & sizing rules
     damage-control/         — One file per procedure, loaded on demand
+      comms-failure.md        — Agent team infrastructure failure recovery
       hull-integrity.md       — Threshold definitions & squadron readiness board
       relief-on-station.md    — Planned ship replacement for context exhaustion
       session-hygiene.md      — Clean start procedure for new sessions

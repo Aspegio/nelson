@@ -33,10 +33,10 @@ Out of scope: Migration script for existing sessions
 ## 2. Form The Squadron
 
 - Brief captains on mission intent and constraints. Make the plan clear, invite questions early.
-- Select one mode:
+- Select one mode per `references/squadron-composition.md`. If the user explicitly requested a mode, use it — user preference overrides the decision matrix.
   - `single-session`: Use for sequential tasks, low complexity, or heavy same-file editing.
-  - `subagents`: Use for parallel scouting or isolated tasks that report only to admiral.
-  - `agent-team`: Use when independent agents must coordinate with each other directly.
+  - `subagents`: Use for parallel, fully independent tasks that report only to admiral.
+  - `agent-team`: Use when captains benefit from a shared task list, peer messaging, or coordinated deliverables. Also use when 4+ captains are needed.
 - Set team size from task independence, not mission complexity:
     - Count the independent work units first. Each unit that can run with zero shared state or sequencing dependency receives its own captain, unless bundling conditions apply (shared files, sequencing dependency, or setup cost exceeds the work). That count — not a size tier — sets the target captain count.
     - Add `1 red-cell navigator` for medium/high threat work.
@@ -48,7 +48,7 @@ Out of scope: Migration script for existing sessions
 
 Reference `references/squadron-composition.md` for selection rules and `references/crew-roles.md` for ship naming and crew composition.
 
-**Formation Gate — Standing Order Check:** Before finalizing the squadron, explicitly answer each question. If becalmed-fleet triggers, skip the remaining questions — single-session mode has no squadron to validate.
+**Formation Gate — Standing Order Check:** You MUST NOT finalize the squadron until each question below is answered in writing and any triggered standing order remedy has been applied. Show your reasoning — a bare yes/no is not sufficient. If becalmed-fleet triggers, skip the remaining questions — single-session mode has no squadron to validate.
 - `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent?
 - `light-squadron.md`: Is the captain count equal to the number of independent work units, or have tasks been under-split onto fewer captains than independence warrants?
 - `all-hands-on-deck.md`: Does every captain carry genuinely independent work, or are some roles speculative?
@@ -56,7 +56,7 @@ Reference `references/squadron-composition.md` for selection rules and `referenc
 - `skeleton-crew.md`: Would any ship deploy exactly one crew member for an atomic task?
 - `admiral-at-the-helm.md`: Is the admiral assigned only coordination, not implementation?
 
-If any answer triggers a standing order, apply the corrective action before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
+If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. Proceeding with a triggered standing order unresolved is never permitted. For situations not covered by this gate, consult the Standing Orders table below.
 
 ## 3. Draft Battle Plan
 
@@ -69,7 +69,7 @@ If any answer triggers a standing order, apply the corrective action before proc
 
 Reference `references/admiralty-templates/battle-plan.md` for the battle plan template and `references/admiralty-templates/ship-manifest.md` for the ship manifest.
 
-**Battle Plan Gate — Standing Order Check:** Before finalizing task assignments, explicitly answer each question:
+**Battle Plan Gate — Standing Order Check:** You MUST NOT finalize task assignments until each question below is answered in writing and any triggered standing order remedy has been applied. Show your reasoning — a bare yes/no is not sufficient.
 - `split-keel.md`: Does each agent have exclusive file ownership with no conflicts?
 - `captain-at-the-capstan.md`: For each captain with crew in the ship manifest, is the captain's role coordination (not implementation)?
 - `unclassified-engagement.md`: Does every task have a risk tier assigned?
@@ -77,9 +77,9 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 - `all-hands-on-deck.md`: Are all crew roles justified by actual sub-task needs, or are some speculative?
 - `skeleton-crew.md`: Would any ship deploy exactly one crew member for an atomic task that the captain should implement directly?
 
-If any answer triggers a standing order, apply the corrective action before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
+If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. Proceeding with a triggered standing order unresolved is never permitted. For situations not covered by this gate, consult the Standing Orders table below.
 
-**Before proceeding to Step 4:** Verify sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier.
+**Before proceeding to Step 4:** You MUST verify that sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier. Do not proceed until all three conditions are confirmed.
 
 **Admiralty Action List:** For each task, consciously mark `admiralty-action-required:` as `yes` or `no`. Then scan the battle plan for tasks marked `admiralty-action-required: yes`. If any exist, surface an Admiralty Action List to the user before spawning any agents:
 
@@ -213,6 +213,7 @@ Consult the specific procedure that matches the situation.
 | Ship's context window depleted, needs replacement | `references/damage-control/relief-on-station.md` |
 | Ship context window approaching limits | `references/damage-control/hull-integrity.md` |
 | Starting a new session with stale data from a previous mission | `references/damage-control/session-hygiene.md` |
+| Agent team communication failure (lost agent IDs, message bus down) | `references/damage-control/comms-failure.md` |
 
 ## Admiralty Doctrine
 

@@ -313,6 +313,7 @@ skills/nelson/
     ├── commendations.md                       # Recognition signals and correction guidance
     ├── crew-roles.md                         # Crew role definitions, ship names, sizing
     ├── damage-control/                       # Individual procedure files
+    │   ├── comms-failure.md
     │   ├── crew-overrun.md
     │   ├── escalation.md
     │   ├── hull-integrity.md

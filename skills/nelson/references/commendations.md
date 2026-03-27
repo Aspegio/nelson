@@ -30,7 +30,7 @@ Criteria:
 
 ## Graduated Discipline
 
-Correction should be proportional. Progress through levels:
+Correction MUST be proportional. Progress through levels. At Level 2 and above, the correction MUST be applied before the mission proceeds — do not defer corrections to a later checkpoint.
 
 ### Level 1 — Signal
 
@@ -52,7 +52,7 @@ Severe impact, mission-threatening, or remedy failed.
 
 Invoke the relevant damage control procedure: man overboard, partial rollback, scuttle and reform, or escalation.
 
-Do not skip levels unless the issue is immediately mission-critical.
+Do not skip levels unless the issue is immediately mission-critical. At any level, a standing order violation that is not corrected MUST block forward progress until resolved.
 
 ## Morale Awareness
 

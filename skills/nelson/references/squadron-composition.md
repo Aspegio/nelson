@@ -4,20 +4,24 @@ Use this file to choose execution mode and team size.
 
 ## Mode Selection
 
-Choose the first condition that matches.
+**User preference override:** If the user explicitly requests a specific execution mode (e.g., "use agent teams"), that request MUST be honoured. User preference takes priority over the decision matrix below. Do not second-guess or override the user's choice.
 
-1. If work is sequential, tightly coupled, or mostly in the same files, use `single-session`.
-2. If work is parallel but each worker only needs to report to admiral, use `subagents`.
-3. If workers must coordinate directly across task boundaries, use `agent-team`.
+Evaluate all three conditions and select the best fit. When two modes could apply, prefer the one that gives captains more autonomy.
+
+- `single-session`: Work is sequential, tightly coupled, or mostly in the same files.
+- `subagents`: Work is parallel and each captain's task is fully independent — no shared coordination surface needed.
+- `agent-team`: Work is parallel and captains benefit from a shared task list, peer messaging, or coordinated deliverables. Also use when 4+ captains are needed, or when the user requests it.
 
 ## Decision Matrix
 
 | Condition | Preferred Mode | Why |
 | --- | --- | --- |
 | Single critical path, low ambiguity | `single-session` | Lowest coordination overhead |
-| Parallel discovery, synthesis by admiral | `subagents` | Fast throughput without peer chatter |
+| Parallel, fully independent tasks | `subagents` | Independent tasks with no cross-captain dependencies |
 | Parallel implementation with dependencies | `agent-team` | Supports teammate-to-teammate coordination |
+| 4+ parallel captains | `agent-team` | Shared task list simplifies coordination at scale |
 | High threat or high blast radius | `agent-team` + red-cell navigator | Adds explicit control points |
+| User explicitly requests a mode | As requested | User preference overrides the matrix |
 
 ## Team Sizing
 
@@ -35,7 +39,7 @@ An analysis mission with 8 independent sections warrants 8 captains. An implemen
 
 ## Role Guide
 
-- `admiral`: Defines sailing orders, delegates, tracks dependencies, resolves blockers, final synthesis.
+- `admiral`: Defines sailing orders, delegates, tracks dependencies, resolves blockers. Coordinates final synthesis but MUST NOT perform it directly — assign a captain or dedicate a synthesis task.
 - `captain`: Commands a ship. Breaks task into sub-tasks, crews roles, coordinates crew, verifies outputs. Implements directly only when the task is atomic (0 crew).
   - Crew roles: Executive Officer (XO), Principal Warfare Officer (PWO), Navigating Officer (NO), Marine Engineering Officer (MEO), Weapon Engineering Officer (WEO), Logistics Officer (LOGO), Coxswain (COX). See `references/crew-roles.md` for role definitions and crewing rules.
 - `red-cell navigator`: Challenges assumptions, validates outputs, checks rollback readiness.
