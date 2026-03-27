@@ -19,7 +19,7 @@ Hull integrity monitoring may surface context exhaustion before crew overrun is 
 
 1. Admiral signals the damaged ship to prepare for turnover.
 2. Damaged ship pauses current work and commits or saves any in-progress outputs.
-3. Damaged ship writes a turnover brief to file at `.claude/nelson/turnover-briefs/{ship-name}-{timestamp}.md` using the template in `references/admiralty-templates/turnover-brief.md`. Do not send the brief as a message — write it to file to keep the replacement ship's context clean.
+3. Damaged ship writes a turnover brief to file at `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.md` using the template in `references/admiralty-templates/turnover-brief.md`. Do not send the brief as a message — write it to file to keep the replacement ship's context clean.
 4. Damaged ship signals admiral that the turnover brief is written and provides the file path.
 5. Admiral spawns a replacement ship. The replacement need not be the same ship class — select the class that matches the characteristics of the remaining work (e.g., swap a destroyer for a frigate if the remaining work is lighter).
 6. Admiral briefs the replacement ship with a crew briefing that includes the turnover brief file path. The replacement reads the turnover brief as its first action.
@@ -39,7 +39,7 @@ The admiral must monitor its own hull integrity at every quarterdeck checkpoint.
 
 ### Red Hull Integrity (40-60% remaining)
 
-1. Admiral writes a comprehensive flagship turnover brief to `.claude/nelson/turnover-briefs/flagship-{timestamp}.md` containing:
+1. Admiral writes a comprehensive flagship turnover brief to `{mission-dir}/turnover-briefs/flagship-{timestamp}.md` containing:
    - Full sailing orders (copied verbatim).
    - Battle plan with current task statuses, owners, and ship assignments.
    - All active ship statuses and their hull integrity levels.

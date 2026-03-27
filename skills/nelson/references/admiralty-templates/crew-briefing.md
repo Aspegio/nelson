@@ -22,6 +22,7 @@ Deliverable: [what you must produce]
 Action Station: [0-3] — [Patrol / Caution / Action / Trafalgar]
 File Ownership: [files you own — no other agent should edit these]
 Dependencies: [tasks that must complete before yours / tasks waiting on yours]
+Mission Directory: [{mission-dir} absolute path — use for damage reports and turnover briefs]
 Marine Capacity: [0-2, from ship manifest — omit line if 0]
 Standing Orders:
 - Do NOT implement work outside your assigned task scope
@@ -55,5 +56,6 @@ Marine Deployment Brief (include in marine's Agent prompt):
 - **Ship** — From the ship manifest in the battle plan. Gives the teammate identity and signals task weight (frigate, destroyer, etc.).
 - **File Ownership** — Critical for preventing merge conflicts when multiple agents work in parallel. If no files are assigned, note "No file ownership — research/analysis only."
 - **Dependencies** — List both blocking (what must finish first) and blocked-by (what waits on this task). If none, note "Independent — no dependencies."
+- **Mission Directory** — The absolute path to the current mission directory. Captains use this path when writing damage reports and turnover briefs.
 - **Marine Capacity** — From the ship manifest. Tells the captain how many marines they may deploy (max 2). Omit if 0.
 - **Standing Orders** — Keep these to 4-5 lines. Project-specific standing orders can be appended here. The marine standing order tells captains they CAN deploy marines and where to find the rules — without this, captains have no knowledge of marines.

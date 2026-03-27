@@ -41,6 +41,20 @@ scripts/                  — Maintenance & utility scripts
   count-tokens.py           — Token counter for hull integrity damage reports
 ```
 
+## Mission artifacts (runtime)
+
+Each Nelson mission creates a timestamped directory for its artifacts:
+
+```
+.claude/nelson/missions/{YYYY-MM-DD_HHMMSS}/
+  captains-log.md         — Written at stand-down
+  quarterdeck-report.md   — Updated at every checkpoint
+  damage-reports/         — Ship damage reports (JSON)
+  turnover-briefs/        — Ship turnover briefs (markdown)
+```
+
+Previous missions are preserved — each run gets its own directory.
+
 ## No build system
 
 This is a documentation-driven skill with zero runtime dependencies. There is no package manager, no build step, and no test suite.

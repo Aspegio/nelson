@@ -13,6 +13,10 @@ Squadron readiness board (flagship checks all ships):
 
 Plain text fallback (heuristic estimate):
     python scripts/count-tokens.py --file plain.txt --ship "HMS Victory"
+
+During a Nelson mission, use --output to write directly to the mission directory:
+    python scripts/count-tokens.py --session session.jsonl --ship "HMS Victory" \\
+        --output {mission-dir}/damage-reports/hms-victory.json
 """
 
 import argparse

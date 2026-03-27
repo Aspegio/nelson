@@ -1,6 +1,6 @@
 # Damage Report Template
 
-File a damage report to communicate context window usage to the admiral. Store each report as a JSON file at `.claude/nelson/damage-reports/{ship-name}.json` during a mission.
+File a damage report to communicate context window usage to the admiral. Store each report as a JSON file at `{mission-dir}/damage-reports/{ship-name}.json` during a mission.
 
 ```json
 {
@@ -13,7 +13,7 @@ File a damage report to communicate context window usage to the admiral. Store e
   "hull_integrity_status": "",
   "relief_requested": false,
   "context_summary": "",
-  "report_path": ".claude/nelson/damage-reports/{ship-name}.json"
+  "report_path": "{mission-dir}/damage-reports/{ship-name}.json"
 }
 ```
 
@@ -30,7 +30,7 @@ File a damage report to communicate context window usage to the admiral. Store e
 | `hull_integrity_status` | string | One of `"Green"`, `"Amber"`, `"Red"`, `"Critical"` — see thresholds below |
 | `relief_requested` | boolean | `true` when status is `"Red"` or `"Critical"`, `false` otherwise |
 | `context_summary` | string | One-line description of current work (e.g. `"Implementing API endpoint for user search"`) |
-| `report_path` | string | File path where this report is stored |
+| `report_path` | string | File path where this report is stored. Expand `{mission-dir}` to the concrete mission directory path when writing. |
 
 ## Hull Integrity Thresholds
 
@@ -46,7 +46,7 @@ File a damage report to communicate context window usage to the admiral. Store e
 - Hull integrity represents remaining capacity, not usage. A ship at 75% hull integrity has used 25% of its context window.
 - Set `relief_requested` to `true` when hull integrity drops to Red or Critical. The admiral uses this flag to prioritise relief on station.
 - Update the report at each quarterdeck checkpoint or when hull integrity crosses a threshold boundary.
-- The admiral reads all damage reports from `.claude/nelson/damage-reports/` to build the squadron readiness board.
+- The admiral reads all damage reports from `{mission-dir}/damage-reports/` to build the squadron readiness board.
 
 ## Read-Only Agent Variant
 

@@ -1,6 +1,7 @@
 # Quarterdeck Report Template
 
 ```text
+Mission directory:
 Checkpoint time:
 
 Progress:

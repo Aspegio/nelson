@@ -28,7 +28,13 @@ Constraints: Do not modify the public API surface
 Out of scope: Migration script for existing sessions
 ```
 
-**Session Hygiene:** Before forming the squadron, execute session hygiene per `references/damage-control/session-hygiene.md`. Clear stale damage reports and turnover briefs from any previous session. Skip this step when resuming an interrupted session.
+**Establish Mission Directory:**
+- **New session:** Create a mission directory at `.claude/nelson/missions/{YYYY-MM-DD_HHMMSS}/` using the current date and time (24-hour format, including seconds). Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission.
+- **Resumed session:** List `.claude/nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Read `{mission-dir}/quarterdeck-report.md` to recover last known state.
+
+All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
+
+**Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
 ## 2. Form The Squadron
 
@@ -127,7 +133,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
         - `press-ganged-navigator.md`: Has the red-cell navigator been assigned implementation work?
         - `all-hands-on-deck.md`: Has any ship mustered crew roles that are idle or unjustified?
         - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
-    - **Write the quarterdeck report to disk** at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in the working directory, find all files matching `quarterdeck-report-N.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
+    - **Write the quarterdeck report to disk** at `{mission-dir}/quarterdeck-report.md` at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in `{mission-dir}`, find all files matching `quarterdeck-report-N.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
     - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
 - Re-scope early when a task drifts from mission metric.
@@ -164,7 +170,7 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
 ## 6. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
-- Write the captain's log to a file named `captains-log.md` in the mission working directory. Before writing, if `captains-log.md` already exists, find all files matching `captains-log-N.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `captains-log-N.md`, then write the new report. This keeps the latest log at the canonical path while preserving history. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
+- Write the captain's log to `{mission-dir}/captains-log.md`. Before writing, if `captains-log.md` already exists in `{mission-dir}`, find all files matching `captains-log-N.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `captains-log-N.md`, then write the new report. This keeps the latest log at the canonical path while preserving history. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
     - Decisions and rationale.
     - Diffs or artifacts.
     - Validation evidence.
@@ -174,7 +180,7 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
 
 Reference `references/admiralty-templates/captains-log.md` for the captain's log template and `references/commendations.md` for Mentioned in Despatches criteria.
 
-**Mission Complete Gate:** You MUST NOT declare the mission complete until `captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
+**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
 
 ## Standing Orders
 
@@ -212,12 +218,12 @@ Consult the specific procedure that matches the situation.
 | Ship's crew consuming disproportionate tokens or time | `references/damage-control/crew-overrun.md` |
 | Ship's context window depleted, needs replacement | `references/damage-control/relief-on-station.md` |
 | Ship context window approaching limits | `references/damage-control/hull-integrity.md` |
-| Starting a new session with stale data from a previous mission | `references/damage-control/session-hygiene.md` |
+| Preparing the mission directory at session start | `references/damage-control/session-hygiene.md` |
 | Agent team communication failure (lost agent IDs, message bus down) | `references/damage-control/comms-failure.md` |
 
 ## Admiralty Doctrine
 
-- Include this instruction in any admiral's compaction summary: Re-read `references/standing-orders/admiral-at-the-helm.md` to confirm you are in coordination role.
+- Include this instruction in any admiral's compaction summary: Re-read the quarterdeck report at the mission directory path to recover `{mission-dir}`. If the path is unknown, list `.claude/nelson/missions/` and use the most recent directory. Then re-read `references/standing-orders/admiral-at-the-helm.md` to confirm you are in coordination role.
 - Optimize for mission throughput, not equal work distribution.
 - Prefer replacing stalled agents over waiting on undefined blockers.
 - Recognise strong performance; motivation compounds across missions.
