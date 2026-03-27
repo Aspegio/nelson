@@ -28,7 +28,9 @@ Constraints: Do not modify the public API surface
 Out of scope: Migration script for existing sessions
 ```
 
-**Session Hygiene:** Before forming the squadron, execute session hygiene per `references/damage-control/session-hygiene.md`. Clear stale damage reports and turnover briefs from any previous session. Skip this step when resuming an interrupted session.
+**Establish Mission Directory:** Create a mission directory at `.claude/nelson/missions/{YYYY-MM-DD_HHMM}/` using the current date and time (24-hour format). All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside this directory. Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission.
+
+**Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
 ## 2. Form The Squadron
 
@@ -121,7 +123,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
         - `captain-at-the-capstan.md`: Has any captain started implementing instead of coordinating crew?
         - `pressed-crew.md`: Has any crew member been assigned work outside their role?
         - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
-    - **Write the quarterdeck report to disk** at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point.
+    - **Write the quarterdeck report to disk** at `{mission-dir}/quarterdeck-report.md` at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Overwrite the previous checkpoint — the latest state is what matters for recovery. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
     - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
 - Re-scope early when a task drifts from mission metric.
@@ -158,7 +160,7 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
 ## 6. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
-- Write the captain's log to a file named `captains-log.md` in the mission working directory. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
+- Write the captain's log to `{mission-dir}/captains-log.md`. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
     - Decisions and rationale.
     - Diffs or artifacts.
     - Validation evidence.
@@ -168,7 +170,7 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
 
 Reference `references/admiralty-templates/captains-log.md` for the captain's log template and `references/commendations.md` for Mentioned in Despatches criteria.
 
-**Mission Complete Gate:** You MUST NOT declare the mission complete until `captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
+**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
 
 ## Standing Orders
 

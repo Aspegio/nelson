@@ -15,7 +15,7 @@ Each ship maintains a hull integrity percentage representing its remaining conte
 
 ## Squadron Readiness Board
 
-The admiral maintains a readiness board to track hull integrity across all ships. Build the board by reading damage reports from `.claude/nelson/damage-reports/`.
+The admiral maintains a readiness board to track hull integrity across all ships. Build the board by reading damage reports from `{mission-dir}/damage-reports/`.
 
 1. At each quarterdeck checkpoint, collect the latest damage report from every active ship.
 2. List each ship with its hull integrity status, percentage, and whether relief is requested.

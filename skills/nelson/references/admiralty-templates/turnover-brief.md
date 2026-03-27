@@ -1,6 +1,6 @@
 # Turnover Brief Template
 
-Write this brief to `.claude/nelson/turnover-briefs/{ship-name}-{timestamp}.md` before standing down. The replacement ship reads this file as its first action — include everything it needs to continue without asking clarifying questions.
+Write this brief to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.md` before standing down. The replacement ship reads this file as its first action — include everything it needs to continue without asking clarifying questions.
 
 For flagship handovers, use the extended flagship section at the bottom of this template.
 
