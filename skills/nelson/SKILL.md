@@ -130,7 +130,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
     - Check for active marine deployments; verify marines have returned and outputs are incorporated.
     - Safety net: if any idle ship with a complete task was missed between checkpoints, send `shutdown_request` now before continuing.
     - Track burn against token/time budget.
-    - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
+    - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint. **Every ship must file a damage report at every checkpoint** to `{mission-dir}/damage-reports/{ship-name}.json` using the schema in `references/admiralty-templates/damage-report.md` — do not skip this when hull is Green.
     - Standing order scan: For each order below, ask "Has this situation arisen since the last checkpoint?" If yes, apply the corrective action now — do not defer.
         - `admiral-at-the-helm.md`: Has the admiral drifted into implementation work?
         - `drifting-anchorage.md`: Has any task scope crept beyond the sailing orders?
