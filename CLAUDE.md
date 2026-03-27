@@ -20,9 +20,16 @@ skills/nelson/
     crew-roles.md           — Crew role definitions, ship names & sizing rules
     damage-control/         — One file per procedure, loaded on demand
       comms-failure.md        — Agent team infrastructure failure recovery
+      crew-overrun.md         — Ship crew consuming disproportionate resources
+      escalation.md           — Issue exceeds current authority or needs clarification
       hull-integrity.md       — Threshold definitions & squadron readiness board
+      man-overboard.md        — Stuck agent replacement procedure
+      partial-rollback.md     — Completed task found faulty, other tasks sound
       relief-on-station.md    — Planned ship replacement for context exhaustion
+      scuttle-and-reform.md   — Mission cannot succeed, abort and reform
       session-hygiene.md      — Clean start procedure for new sessions
+      session-resumption.md   — Resuming an interrupted session
+    model-selection.md      — Cost-optimized model assignment for agents
     royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
     tool-mapping.md         — Nelson-to-Claude Code tool reference
@@ -30,6 +37,7 @@ skills/nelson/
 agents/                   — Agent interface definitions
 demos/                    — Example applications built with Nelson
 scripts/                  — Maintenance & utility scripts
+  check-references.sh       — Cross-reference validation for documentation links
   count-tokens.py           — Token counter for hull integrity damage reports
 ```
 

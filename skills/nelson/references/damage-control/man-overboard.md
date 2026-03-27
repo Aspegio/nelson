@@ -1,6 +1,6 @@
 # Man Overboard: Stuck Agent Replacement
 
-Use when an agent is unresponsive, looping, or producing no useful output.
+Use when an agent is unresponsive, looping, or producing no useful output. For infrastructure-wide communication failures (multiple agents unreachable, message bus down), see `comms-failure.md` instead.
 
 1. Admiral identifies the stuck agent and its assigned task.
 2. Admiral records the agent's last known progress and any partial outputs.
