@@ -30,7 +30,7 @@ File a damage report to communicate context window usage to the admiral. Store e
 | `hull_integrity_status` | string | One of `"Green"`, `"Amber"`, `"Red"`, `"Critical"` — see thresholds below |
 | `relief_requested` | boolean | `true` when status is `"Red"` or `"Critical"`, `false` otherwise |
 | `context_summary` | string | One-line description of current work (e.g. `"Implementing API endpoint for user search"`) |
-| `report_path` | string | File path where this report is stored |
+| `report_path` | string | File path where this report is stored. Expand `{mission-dir}` to the concrete mission directory path when writing. |
 
 ## Hull Integrity Thresholds
 

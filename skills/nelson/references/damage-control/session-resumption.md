@@ -2,7 +2,7 @@
 
 Use when a session is interrupted (context limit, crash, timeout) and work must continue.
 
-1. Read the most recent quarterdeck report to establish last known state.
+1. List `.claude/nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Read `{mission-dir}/quarterdeck-report.md` to establish last known state.
 2. List all tasks and their statuses: `pending`, `in_progress`, `completed`.
 3. For each `in_progress` task, verify partial outputs against the task deliverable.
 4. Discard any unverified or incomplete outputs that cannot be confirmed correct.

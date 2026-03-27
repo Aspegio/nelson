@@ -324,6 +324,20 @@ scripts/
 └── count-tokens.py                          # Token counter for hull integrity monitoring
 ```
 
+## Mission artifacts
+
+Each mission creates a timestamped directory for its runtime artifacts:
+
+```
+.claude/nelson/missions/{YYYY-MM-DD_HHMMSS}/
+  captains-log.md         — Written at stand-down
+  quarterdeck-report.md   — Updated at every checkpoint
+  damage-reports/         — Ship damage reports (JSON)
+  turnover-briefs/        — Ship turnover briefs (markdown)
+```
+
+Previous missions are preserved — each run gets its own directory.
+
 - `plugin.json` declares the plugin name, version, and component paths for Claude Code's plugin system.
 - `marketplace.json` lets users add this repo as a plugin marketplace and install Nelson by name.
 - `SKILL.md` is the entrypoint that Claude reads when the skill is invoked. It defines the six-step workflow and references the supporting files.
