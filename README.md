@@ -207,7 +207,7 @@ Nelson uses a three-tier hierarchy. The admiral coordinates captains, each capta
 
 **Squadron level:**
 
-- **Admiral** — Coordinates the mission, delegates tasks, resolves blockers, produces the final synthesis. There is always exactly one.
+- **Admiral** — Coordinates the mission, delegates tasks, resolves blockers. Coordinates final synthesis but does not perform it directly. There is always exactly one.
 - **Captains** — Each commands a named ship. Breaks their task into sub-tasks, crews specialist roles, coordinates crew, and verifies outputs. Implements directly only when the task is atomic. Typically 2-7 per mission.
 - **Red-cell navigator** — Challenges assumptions, validates outputs, and checks rollback readiness. Added for medium/high risk work.
 
@@ -313,6 +313,7 @@ skills/nelson/
     ├── commendations.md                       # Recognition signals and correction guidance
     ├── crew-roles.md                         # Crew role definitions, ship names, sizing
     ├── damage-control/                       # Individual procedure files
+    │   ├── comms-failure.md
     │   ├── crew-overrun.md
     │   ├── escalation.md
     │   ├── hull-integrity.md
@@ -328,11 +329,14 @@ skills/nelson/
     └── standing-orders/                      # Individual anti-pattern files
         ├── admiral-at-the-helm.md
         ├── all-hands-on-deck.md
+        ├── awaiting-admiralty.md
         ├── battalion-ashore.md
         ├── becalmed-fleet.md
         ├── captain-at-the-capstan.md
         ├── crew-without-canvas.md
         ├── drifting-anchorage.md
+        ├── light-squadron.md
+        ├── paid-off.md
         ├── press-ganged-navigator.md
         ├── pressed-crew.md
         ├── skeleton-crew.md
