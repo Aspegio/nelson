@@ -29,8 +29,8 @@ Out of scope: Migration script for existing sessions
 ```
 
 **Establish Mission Directory:**
-- **New session:** Create a mission directory at `.claude/nelson/missions/{YYYY-MM-DD_HHMMSS}/` using the current date and time (24-hour format, including seconds). Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission.
-- **Resumed session:** List `.claude/nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Read `{mission-dir}/quarterdeck-report.md` to recover last known state.
+- **New session:** Create a mission directory at `.nelson/missions/{YYYY-MM-DD_HHMMSS}/` using the current date and time (24-hour format, including seconds). Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission.
+- **Resumed session:** List `.nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Read `{mission-dir}/quarterdeck-report.md` to recover last known state.
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
 
@@ -223,7 +223,7 @@ Consult the specific procedure that matches the situation.
 
 ## Admiralty Doctrine
 
-- Include this instruction in any admiral's compaction summary: Re-read the quarterdeck report at the mission directory path to recover `{mission-dir}`. If the path is unknown, list `.claude/nelson/missions/` and use the most recent directory. Then re-read `references/standing-orders/admiral-at-the-helm.md` to confirm you are in coordination role.
+- Include this instruction in any admiral's compaction summary: Re-read the quarterdeck report at the mission directory path to recover `{mission-dir}`. If the path is unknown, list `.nelson/missions/` and use the most recent directory. Then re-read `references/standing-orders/admiral-at-the-helm.md` to confirm you are in coordination role.
 - Optimize for mission throughput, not equal work distribution.
 - Prefer replacing stalled agents over waiting on undefined blockers.
 - Recognise strong performance; motivation compounds across missions.

@@ -46,7 +46,7 @@ scripts/                  — Maintenance & utility scripts
 Each Nelson mission creates a timestamped directory for its artifacts:
 
 ```
-.claude/nelson/missions/{YYYY-MM-DD_HHMMSS}/
+.nelson/missions/{YYYY-MM-DD_HHMMSS}/
   captains-log.md         — Written at stand-down
   quarterdeck-report.md   — Updated at every checkpoint
   damage-reports/         — Ship damage reports (JSON)
