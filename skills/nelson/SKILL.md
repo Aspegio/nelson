@@ -30,7 +30,7 @@ Out of scope: Migration script for existing sessions
 
 **Establish Mission Directory:**
 - **New session:** Create a mission directory at `.nelson/missions/{YYYY-MM-DD_HHMMSS}/` using the current date and time (24-hour format, including seconds). Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission.
-- **Resumed session:** List `.nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Read `{mission-dir}/quarterdeck-report.md` to recover last known state.
+- **Resumed session:** List `.nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose).
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
 

@@ -314,6 +314,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
             "captain_count": len(captains),
             "has_red_cell": args.red_cell is not None,
             "execution_mode": args.mode or "subagents",
+            "standing_order_check": {"triggered": [], "remedies": []},
         },
     }
     _append_event(mission_dir, event)
@@ -540,19 +541,27 @@ def _compute_dag_metrics(tasks: list[dict]) -> tuple[int, int]:
 
     # Critical path = longest path in DAG via DFS with memoisation
     memo: dict[int, int] = {}
+    visiting: set[int] = set()
 
     def longest_path(task_id: int) -> int:
         if task_id in memo:
             return memo[task_id]
+        if task_id in visiting:
+            cycle_members = ", ".join(str(t) for t in sorted(visiting))
+            _die(f"Cycle detected in task dependencies (task IDs involved: {cycle_members})")
+        visiting.add(task_id)
         task = task_map.get(task_id)
         if task is None:
+            visiting.discard(task_id)
             return 0
         deps = task.get("dependencies", [])
         if not deps:
             memo[task_id] = 1
+            visiting.discard(task_id)
             return 1
         length = 1 + max(longest_path(d) for d in deps)
         memo[task_id] = length
+        visiting.discard(task_id)
         return length
 
     if not tasks:
@@ -609,7 +618,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
     events = log.get("events", [])
     checkpoint_num = _get_last_checkpoint_number(events) + 1
 
-    total = args.pending + args.in_progress + args.completed + args.blocked
+    total = args.pending + args.in_progress + args.completed
     tokens_total = args.tokens_spent + args.tokens_remaining
     pct_consumed = round(
         (args.tokens_spent / tokens_total * 100) if tokens_total > 0 else 0.0,
@@ -851,7 +860,7 @@ def cmd_stand_down(args: argparse.Namespace) -> None:
             "standing_order_violations": violation_count,
             "blockers_raised": blockers_raised,
             "blockers_resolved": blockers_resolved,
-            "avg_blocker_duration_minutes": 0,
+            "avg_blocker_duration_minutes": None,
         },
         "open_risks": [],
         "follow_ups": [],
