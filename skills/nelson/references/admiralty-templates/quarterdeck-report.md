@@ -19,6 +19,20 @@ Budget:
 - token/time spent:
 - token/time remaining:
 
+Hull integrity (squadron readiness board):
+- ship: [ship name]
+  hull_pct: [percentage]
+  status: [Green / Amber / Red / Critical]
+  relief_requested: [yes / no]
+- ship:
+  hull_pct:
+  status:
+  relief_requested:
+
+Admiral hull integrity:
+- hull_pct:
+- status:
+
 Standing order violations:
 - order: (none / list each triggered since last checkpoint)
   corrective action taken:
