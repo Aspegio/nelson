@@ -8,6 +8,7 @@ Use when a session is interrupted (context limit, crash, timeout) and work must 
    - If `{mission-dir}/mission-log.json` exists, read it for full event history — task completions, relief chains, standing order violations, and admiral decisions.
    - These JSON files provide faster, more reliable state recovery than re-parsing quarterdeck report prose.
    - **Fallback:** If neither JSON file is present, read `{mission-dir}/quarterdeck-report.md` to establish last known state.
+   - **Sub-fallback:** If the canonical `quarterdeck-report.md` is also missing (e.g. crash during report rotation), check for `{mission-dir}/quarterdeck-report-N.md` files (where N is a number). Use the file with the highest N value — it contains the most recent checkpoint data. The same fallback applies to `captains-log.md` / `captains-log-N.md`.
 3. List all tasks and their statuses: `pending`, `in_progress`, `completed`.
 4. For each `in_progress` task, verify partial outputs against the task deliverable.
 5. Discard any unverified or incomplete outputs that cannot be confirmed correct.
