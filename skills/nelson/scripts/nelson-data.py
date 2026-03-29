@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -122,7 +121,7 @@ def _require_mission_dir(args: argparse.Namespace) -> Path:
     return p
 
 
-def _parse_extra_kv(extra: list[str]) -> dict[str, str]:
+def _parse_extra_kv(extra: list[str]) -> dict[str, Any]:
     """Turn a list of ['--key', 'value', ...] into {'key': 'value', ...}.
 
     Keys that look like ``--some-key`` are normalised to ``some_key``.
