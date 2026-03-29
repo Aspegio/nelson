@@ -33,6 +33,21 @@ The admiral executes session hygiene at Step 1 (Issue Sailing Orders), before fo
 3. Read existing turnover briefs from `{mission-dir}/turnover-briefs/` to recover task state.
 4. Follow `damage-control/session-resumption.md` for the full resumption procedure.
 
+## Rotated Report Files
+
+Within each mission directory, rotated checkpoint files may be present:
+
+- `quarterdeck-report-0.md`, `quarterdeck-report-1.md`, etc.
+- `captains-log-0.md`, `captains-log-1.md`, etc.
+
+These are intentionally preserved as checkpoint history — they record the state of the reports at each checkpoint within that mission. They do not require cleanup because:
+
+1. Each mission has its own timestamped directory (`.nelson/missions/{YYYY-MM-DD_HHMMSS}/`)
+2. Rotated files within a mission directory are historical artifacts of that mission's execution
+3. Previous missions are preserved automatically, so the checkpoint history is part of the permanent record for that mission
+
+You may review checkpoint history by reading the rotated files in the mission directory. You should not delete them.
+
 ## Browsing Previous Missions
 
 Previous missions remain on disk at `.nelson/missions/`. To review past mission logs, list the directory contents sorted by name (which sorts chronologically by date/time).
