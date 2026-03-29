@@ -396,6 +396,10 @@ This project is not associated with, endorsed by, or affiliated with the British
 
 <img width="600" height="200" alt="knot" src="https://github.com/user-attachments/assets/3b8b242b-9e24-43a1-a25f-7864b62acbd1" />
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=harrymunro/nelson&type=Date)](https://star-history.com/#harrymunro/nelson&Date)
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
