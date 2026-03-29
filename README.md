@@ -1,12 +1,52 @@
 # Nelson
 
+[![Version](https://img.shields.io/github/v/release/harrymunro/nelson)](https://github.com/harrymunro/nelson/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-blueviolet)](https://docs.anthropic.com/en/docs/claude-code)
+[![Stars](https://img.shields.io/github/stars/harrymunro/nelson)](https://github.com/harrymunro/nelson/stargazers)
+
+**Squadron-scale agent coordination for Claude Code — with risk tiers, damage control, and decision logs.**
+
+A Claude Code skill that organises multi-agent work into structured naval operations: sailing orders define the mission, captains command parallel workstreams, action stations enforce risk-appropriate controls, and a captain's log captures every decision for audit.
+
+*4 risk tiers · 10 damage control procedures · 10 mission templates · 7 crew roles · 15 standing orders*
+
 <p align="center">
   <img src="docs/images/1024px-Young_Nelson-min.jpg" alt="Captain Horatio Nelson" width="500">
   <br>
   <em>Captain Horatio Nelson — John Francis Rigaud, 1781. Image: Wikimedia Commons</em>
 </p>
 
-A Claude Code skill for coordinating agent work based on the Royal Navy. It provides structured sailing orders, battle plans, action stations, and a captain's log to manage complex tasks — from single-session work through to parallel subagent squadrons.
+## Contents
+
+- [Quick Start](#quick-start)
+- [What it does](#what-it-does)
+- [Why Nelson?](#why-nelson)
+- [How it works](#how-it-works)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Customisation](#customisation)
+- [Plugin file structure](#plugin-file-structure)
+- [Mission artifacts](#mission-artifacts)
+- [Compatibility notes](#compatibility-notes)
+- [Star History](#star-history)
+- [Disclaimer](#disclaimer)
+- [License](#license)
+
+## Quick Start
+
+```
+/plugin install harrymunro/nelson
+```
+
+Then give it a mission:
+
+```
+/nelson Migrate the payment module from Stripe v2 to v3
+```
+
+Nelson will define sailing orders, form a squadron, and coordinate the mission through to a captain's log. See [Prerequisites](#prerequisites) for the full agent-team experience with split panes.
 
 ## What it does
 
@@ -21,140 +61,39 @@ Nelson gives Claude a six-step operational framework for tackling complex missio
 5. **Action Stations** — Classify tasks by risk tier and enforce verification before marking complete
 6. **Stand Down** — Produce a captain's log with decisions, artifacts, validation evidence, and follow-ups
 
-## Prerequisites
+## Why Nelson?
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and authenticated
-- **Recommended:** Enable [agent teams](https://code.claude.com/docs/en/agent-teams) for the full squadron experience. Nelson works without it (using single-session or subagent modes), but agent teams unlock teammate-to-teammate coordination — the `agent-team` execution mode. Plugin installs ship a `settings.json` that enables this automatically. For manual installs, add this to your [settings.json](https://code.claude.com/docs/en/settings):
+Most agent orchestration tools focus on starting missions. Nelson focuses on completing them safely.
 
-```json
-{
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  }
-}
-```
+Nelson gives your missions a shared vocabulary: "action stations" instead of "risk tier escalation", "hull integrity" instead of "context window consumption", "man overboard" instead of "stuck agent replacement". The names stick. So do the habits.
 
-- **For split-pane visibility:** To see each agent working in its own pane (as shown in the demo video), run Claude Code inside [tmux](https://github.com/tmux/tmux/wiki). Agent teams auto-detect tmux and give every teammate a dedicated split pane so you can watch the whole squadron in action.
+- **Risk-gated execution** — Four station tiers (Patrol through Trafalgar) classify every task before it runs. High-risk work requires human confirmation; low-risk work flows without ceremony.
+- **Damage control built in** — Ten named procedures for stuck agents, context exhaustion, faulty output, budget overruns, and mission abort. These are protocols, not improvisation.
+- **A decision log by default** — Captain's log, quarterdeck reports, and turnover briefs are written as the mission runs. Every decision is auditable after the session ends.
 
-## Installation
+Nelson coordinates its own development — the v1.7.0 release was planned and executed as a Nelson mission.
 
-### Plugin install (recommended)
+### Who is this for?
 
-```
-/plugin install harrymunro/nelson
-```
+- You run Claude Code missions spanning multiple files or modules in parallel
+- You want structured checkpoints, risk classification, and a decision log
+- You've lost work to context exhaustion and want systematic handover procedures
+- You care about auditability — knowing what was decided, by which agent, and why
 
-Or add the marketplace first, then install by name:
+It may be overkill if you're doing a quick, single-file edit.
 
-```
-/plugin marketplace add harrymunro/nelson
-/plugin install nelson@nelson-marketplace
-```
+### How Nelson compares
 
-### Prompt-based
+Both rapid-execution frameworks and Nelson's structured approach are useful — they optimise for different constraints.
 
-Open Claude Code and say:
+| Approach | Best when | Trade-off |
+|---|---|---|
+| Nelson Navy structure | You need repeatable quality gates, explicit ownership, and a clear decision log across parallel work | More setup and coordination overhead up front |
+| OmO/RuFlo-style rapid flow | You need the fastest possible movement on a narrow, low-risk path | Less formal checkpointing and role separation |
 
-```
-Install skills from https://github.com/harrymunro/nelson
-```
-
-Claude will clone the repo, copy the skill into your project's `.claude/skills/` directory, and clean up. To install it globally across all projects, ask Claude to install it to `~/.claude/skills/` instead.
-
-### Manual
-
-Clone the repo and copy the skill directory yourself:
-
-```bash
-# Project-level (recommended for teams)
-git clone https://github.com/harrymunro/nelson.git /tmp/nelson
-mkdir -p .claude/skills
-cp -r /tmp/nelson/skills/nelson .claude/skills/nelson
-rm -rf /tmp/nelson
-
-# Or user-level (personal, all projects)
-cp -r /tmp/nelson/skills/nelson ~/.claude/skills/nelson
-```
-
-Then commit `.claude/skills/nelson/` to version control so your team can use it.
-
-### Updating
-
-Plugin installs are cached snapshots — they do not auto-update. To pick up a new release:
-
-```
-/plugin install harrymunro/nelson
-```
-
-If that reports you're already at the latest version, the local marketplace cache is stale. Refresh it manually:
-
-```bash
-cd ~/.claude/plugins/marketplaces/nelson-marketplace && git fetch origin && git reset --hard origin/main
-```
-
-Then reinstall via `/plugin install nelson` or re-enable via `/plugin`.
-
-### Verify installation
-
-Open Claude Code and ask:
-
-```
-What skills are available?
-```
-
-You should see `nelson` listed. You can also invoke it directly:
-
-```
-/nelson
-```
-
-## Usage
-
-### Let Claude invoke it automatically
-
-Claude reads the skill description and loads it when your request matches — for example, when you ask for coordinated parallel work or structured mission execution. Just describe your task:
-
-```
-I need to refactor the authentication system. The work spans the API layer,
-the frontend, and the test suite. Use nelson to coordinate this.
-```
-
-### Invoke it directly
-
-Use the slash command with your mission brief:
-
-```
-/nelson Migrate the payment processing module from Stripe v2 to v3
-```
-
-### Provide structured sailing orders
-
-For maximum control, provide your own sailing orders:
-
-```
-/nelson
-
-Sailing orders:
-- Outcome: All API endpoints return consistent error responses
-- Success metric: Zero test failures, all error responses match the schema
-- Deadline: This session
-
-Constraints:
-- Token/time budget: Stay under 50k tokens
-- Forbidden actions: Do not modify the database schema
-
-Scope:
-- In scope: src/api/ and tests/api/
-- Out of scope: Frontend error handling
-```
+If you need fast parallel execution with minimal ceremony, [OmO](https://github.com/code-yeongyu/oh-my-openagent) or [RuFlo](https://github.com/ruvnet/ruflo) may suit you better. If coordination, auditability, and safe scaling matter more than raw tempo, Nelson is the better fit.
 
 ## How it works
-
-<p align="center">
-  <img src="docs/images/HMP_RNM_1973_76-001.jpg" alt="HMS Victory anchored off the Isle of Wight" width="700">
-  <br>
-  <em>HMS Victory anchored off the Isle of Wight — John Wilson Carmichael (1799–1868), National Museum of the Royal Navy, Portsmouth</em>
-</p>
 
 ### Execution modes
 
@@ -165,26 +104,6 @@ The skill selects one of three execution modes based on your mission:
 | `single-session` | Sequential tasks, low complexity, heavy same-file editing | Claude works through tasks in order within one session |
 | `subagents` | Parallel tasks where workers only report back to the coordinator | Claude spawns [subagents](https://code.claude.com/docs/en/sub-agents) that work independently and return results |
 | `agent-team` | Parallel tasks where workers need to coordinate with each other | Claude creates an [agent team](https://code.claude.com/docs/en/agent-teams) with direct teammate-to-teammate communication |
-
-### Navy structure vs OmO/RuFlo-style rapid tactics
-
-> [OmO (Oh My OpenAgent)](https://github.com/code-yeongyu/oh-my-openagent) and [RuFlo](https://github.com/ruvnet/ruflo) are rapid-execution agent frameworks that prioritize speed and minimal ceremony.
-
-Both approaches are useful; they optimize for different constraints.
-
-| Approach | Best when | Trade-off |
-|---|---|---|
-| Nelson Navy structure | You need repeatable quality gates, explicit ownership, and a clear decision log across parallel work | More setup and coordination overhead up front |
-| OmO/RuFlo-style rapid/guerrilla flow | You need the fastest possible movement on a narrow, low-risk path | Less formal checkpointing and role separation |
-
-If your priority is **speed over ceremony**, Nelson can still run lean:
-
-- Use `single-session` when work is mostly linear or in one file area (lowest overhead).
-- Use `subagents` when you have independent tasks but don't need teammate-to-teammate chat.
-- Start with the **minimum captain count equal to truly independent work units** (often 2-3 for a small fast team), then scale only if parallel workstreams increase.
-- Keep crew light per ship (for example, captain + Principal Warfare Officer (PWO) only) unless testing/review pressure requires Marine Engineering Officer (MEO) or Coxswain (COX) support.
-
-In short: choose rapid/guerrilla style for short, low blast radius pushes; choose the full Navy structure when coordination, auditability, and safe scaling matter more than raw tempo.
 
 ### Chain of command
 
@@ -223,7 +142,7 @@ Nelson uses a three-tier hierarchy. The admiral coordinates captains, each capta
 | Logistics Officer | LOGO | Documentation & dependency management | Docs as deliverable, dep management |
 | Coxswain | COX | Standards review & quality | Station 1+ with established conventions |
 
-NO and COX are read-only — they report findings but never modify files.
+Navigating Officer (NO) and Coxswain (COX) are read-only — they report findings but never modify files.
 
 Ships are named from real Royal Navy warships, matched roughly to task weight: frigates for general-purpose, destroyers for high-tempo, patrol vessels for small tasks, historic flagships for critical-path, and submarines for research.
 
@@ -256,18 +175,18 @@ Tasks at Station 1 and above also run a **failure-mode checklist**:
 
 ### Damage control
 
-Nelson includes procedures for when things go wrong — stuck agents, budget overruns, faulty outputs, and context window exhaustion.
+Most agent frameworks assume the happy path. Nelson includes battle-tested procedures for when things go wrong — stuck agents, budget overruns, faulty outputs, and context window exhaustion all have documented recovery paths.
 
 **Hull integrity monitoring** tracks context window consumption across the squadron. The admiral reads exact token counts from Claude Code session JSONL files at each quarterdeck checkpoint and maintains a squadron readiness board:
 
 | Status | Remaining | Action |
 |---|---|---|
-| Green | 75–100% | Operating normally |
-| Amber | 60–74% | Monitor closely, avoid new work |
-| Red | 40–59% | Relief on station — begin handover |
+| Green | 75-100% | Operating normally |
+| Amber | 60-74% | Monitor closely, avoid new work |
+| Red | 40-59% | Relief on station — begin handover |
 | Critical | Below 40% | Immediate relief |
 
-**Relief on station** replaces a ship whose context window is depleted. The damaged ship writes a turnover brief to file, a fresh replacement reads it and continues the mission. Chained reliefs (A → B → C) are supported for long-running tasks. The flagship monitors its own hull integrity too and can hand over to a new session.
+**Relief on station** replaces a ship whose context window is depleted. The damaged ship writes a turnover brief to file, a fresh replacement reads it and continues the mission. Chained reliefs (A -> B -> C) are supported for long-running tasks. The flagship monitors its own hull integrity too and can hand over to a new session.
 
 The token counts come from the API usage data that Claude Code already records on every assistant turn — no estimation heuristics, no paid APIs, no external dependencies. A utility script (`scripts/count-tokens.py`) extracts the data and produces damage reports.
 
@@ -288,7 +207,175 @@ The skill includes structured templates for consistent output across missions:
 
 <img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/5955341c-a251-4e05-b0ed-61f424181201" />
 
+## Prerequisites
+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and authenticated
+- **Recommended:** Enable [agent teams](https://code.claude.com/docs/en/agent-teams) for the full squadron experience. Nelson works without it (using single-session or subagent modes), but agent teams unlock teammate-to-teammate coordination — the `agent-team` execution mode. Plugin installs ship a `settings.json` that enables this automatically. For manual installs, add this to your [settings.json](https://code.claude.com/docs/en/settings):
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
+
+- **For split-pane visibility:** To see each agent working in its own pane (as shown in the demo video), run Claude Code inside [tmux](https://github.com/tmux/tmux/wiki). Agent teams auto-detect tmux and give every teammate a dedicated split pane so you can watch the whole squadron in action.
+
+## Installation
+
+### Plugin install (recommended)
+
+```
+/plugin install harrymunro/nelson
+```
+
+Or add the marketplace first, then install by name:
+
+```
+/plugin marketplace add harrymunro/nelson
+/plugin install nelson@nelson-marketplace
+```
+
+<details>
+<summary>Prompt-based install</summary>
+
+Open Claude Code and say:
+
+```
+Install skills from https://github.com/harrymunro/nelson
+```
+
+Claude will clone the repo, copy the skill into your project's `.claude/skills/` directory, and clean up. To install it globally across all projects, ask Claude to install it to `~/.claude/skills/` instead.
+
+</details>
+
+<details>
+<summary>Manual install</summary>
+
+Clone the repo and copy the skill directory yourself:
+
+```bash
+# Project-level (recommended for teams)
+git clone https://github.com/harrymunro/nelson.git /tmp/nelson
+mkdir -p .claude/skills
+cp -r /tmp/nelson/skills/nelson .claude/skills/nelson
+rm -rf /tmp/nelson
+
+# Or user-level (personal, all projects)
+cp -r /tmp/nelson/skills/nelson ~/.claude/skills/nelson
+```
+
+Then commit `.claude/skills/nelson/` to version control so your team can use it.
+
+</details>
+
+<details>
+<summary>Updating</summary>
+
+Plugin installs are cached snapshots — they do not auto-update. To pick up a new release:
+
+```
+/plugin install harrymunro/nelson
+```
+
+If that reports you're already at the latest version, the local marketplace cache is stale. Refresh it manually:
+
+```bash
+cd ~/.claude/plugins/marketplaces/nelson-marketplace && git fetch origin && git reset --hard origin/main
+```
+
+Then reinstall via `/plugin install nelson` or re-enable via `/plugin`.
+
+</details>
+
+<details>
+<summary>Verify installation</summary>
+
+Open Claude Code and ask:
+
+```
+What skills are available?
+```
+
+You should see `nelson` listed. You can also invoke it directly:
+
+```
+/nelson
+```
+
+</details>
+
+## Usage
+
+### Just describe your task
+
+Claude reads the skill description and loads it when your request matches — for example, when you ask for coordinated parallel work or structured mission execution. Just describe your task:
+
+```
+I need to refactor the authentication system. The work spans the API layer,
+the frontend, and the test suite. Use nelson to coordinate this.
+```
+
+### Use the slash command
+
+Invoke it directly with your mission brief:
+
+```
+/nelson Migrate the payment processing module from Stripe v2 to v3
+```
+
+### Full sailing orders
+
+For maximum control, provide your own sailing orders:
+
+```
+/nelson
+
+Sailing orders:
+- Outcome: All API endpoints return consistent error responses
+- Success metric: Zero test failures, all error responses match the schema
+- Deadline: This session
+
+Constraints:
+- Token/time budget: Stay under 50k tokens
+- Forbidden actions: Do not modify the database schema
+
+Scope:
+- In scope: src/api/ and tests/api/
+- Out of scope: Frontend error handling
+```
+
+## Customisation
+
+### Modify templates
+
+Edit the individual template files in `references/admiralty-templates/` to match your team's reporting style. The templates use plain text format — adjust fields, add sections, or remove what you don't need.
+
+### Adjust risk tiers
+
+Edit `references/action-stations.md` to change what controls are required at each station level. For example, you might require red-cell review at Station 1 instead of Station 2 for a security-sensitive project.
+
+### Change team sizing
+
+Edit `references/squadron-composition.md` to adjust the decision matrix or default team sizes.
+
 ## Plugin file structure
+
+```
+skills/nelson/
+├── SKILL.md              # Main skill instructions (entrypoint)
+└── references/           # Supporting docs loaded on demand
+    ├── action-stations.md        # Risk tier definitions
+    ├── admiralty-templates/       # 10 structured templates
+    ├── crew-roles.md             # Crew role definitions & ship names
+    ├── damage-control/           # 10 recovery procedures
+    ├── standing-orders/          # 15 anti-pattern guards
+    └── squadron-composition.md   # Mode selection & team sizing
+```
+
+<details>
+<summary>Full file tree</summary>
 
 ```
 .claude-plugin/
@@ -352,9 +439,19 @@ scripts/
 └── test_nelson_data.py                       # Tests for nelson-data.py
 ```
 
+</details>
+
+- `plugin.json` declares the plugin name, version, and component paths for Claude Code's plugin system.
+- `marketplace.json` lets users add this repo as a plugin marketplace and install Nelson by name.
+- `SKILL.md` is the entrypoint that Claude reads when the skill is invoked. It defines the six-step workflow and references the supporting files.
+- Files in `references/` contain detailed guidance that Claude loads on demand — they are not all loaded into context at once.
+
 ## Mission artifacts
 
-Each mission creates a timestamped directory for its runtime artifacts:
+Each mission creates a timestamped directory for its runtime artifacts. Previous missions are preserved — each run gets its own directory.
+
+<details>
+<summary>Artifact directory structure</summary>
 
 ```
 .nelson/missions/{YYYY-MM-DD_HHMMSS}/
@@ -364,41 +461,28 @@ Each mission creates a timestamped directory for its runtime artifacts:
   turnover-briefs/        — Ship turnover briefs (markdown)
 ```
 
-Previous missions are preserved — each run gets its own directory.
-
-- `plugin.json` declares the plugin name, version, and component paths for Claude Code's plugin system.
-- `marketplace.json` lets users add this repo as a plugin marketplace and install Nelson by name.
-- `SKILL.md` is the entrypoint that Claude reads when the skill is invoked. It defines the six-step workflow and references the supporting files.
-- Files in `references/` contain detailed guidance that Claude loads on demand — they are not all loaded into context at once.
-
-## Customisation
-
-### Modify templates
-
-Edit the individual template files in `references/admiralty-templates/` to match your team's reporting style. The templates use plain text format — adjust fields, add sections, or remove what you don't need.
-
-### Adjust risk tiers
-
-Edit `references/action-stations.md` to change what controls are required at each station level. For example, you might require red-cell review at Station 1 instead of Station 2 for a security-sensitive project.
-
-### Change team sizing
-
-Edit `references/squadron-composition.md` to adjust the decision matrix or default team sizes.
+</details>
 
 ## Compatibility notes
 
 - **Subagents** are a stable Claude Code feature and work out of the box.
 - **Agent teams** are experimental and disabled by default. See [Prerequisites](#prerequisites) above for setup. Without agent teams enabled, Nelson falls back to `single-session` or `subagents` mode. Full details: [Agent teams documentation](https://code.claude.com/docs/en/agent-teams).
 
-## Disclaimer
-
-This project is not associated with, endorsed by, or affiliated with the British Royal Navy or the UK Ministry of Defence. All Royal Navy terminology and references are used purely as a creative framework for organising software development tasks.
-
-<img width="600" height="200" alt="knot" src="https://github.com/user-attachments/assets/3b8b242b-9e24-43a1-a25f-7864b62acbd1" />
-
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=harrymunro/nelson&type=Date)](https://star-history.com/#harrymunro/nelson&Date)
+
+## Get started
+
+```
+/plugin install harrymunro/nelson
+```
+
+Start a mission with `/nelson`, or [open an issue](https://github.com/harrymunro/nelson/issues) if something breaks.
+
+## Disclaimer
+
+This project is not associated with, endorsed by, or affiliated with the British Royal Navy or the UK Ministry of Defence. All Royal Navy terminology and references are used purely as a creative framework for organising software development tasks.
 
 ## License
 
