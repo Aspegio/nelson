@@ -116,6 +116,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
 
 - Keep admiral focused on coordination and unblock actions.
 - The admiral sets the mood of the squadron. Acknowledge progress, recognise strong work, and maintain cheerfulness under pressure.
+- **Checkpoint cadence gate:** You MUST NOT process a third task completion without writing a quarterdeck checkpoint. Before dispatching new work or processing the next completion, confirm the last checkpoint is no more than 2 completions old. The quarterdeck report is your only recovery point if context compaction occurs — stale reports mean lost coordination state.
 - Run a quarterdeck checkpoint after every 1-2 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
     - Update progress by checking `TaskList` for task states: `pending`, `in_progress`, `completed`.
     - Identify blockers and choose a concrete next action.
