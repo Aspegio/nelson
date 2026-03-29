@@ -54,7 +54,7 @@ The admiral must monitor its own hull integrity with the same discipline applied
 
 1. Admiral tracks its own token usage and calculates hull integrity at each checkpoint.
 2. At Amber, admiral begins preparing a session resumption handoff using `references/damage-control/session-resumption.md`.
-3. At Red, admiral writes a full quarterdeck report and session state to disk, then signals the Admiralty (human) that a session resumption will be needed.
+3. At Red, admiral writes a full quarterdeck report and session state to disk following the rotation procedure in SKILL.md Step 4, then signals the Admiralty (human) that a session resumption will be needed.
 4. The admiral does not wait for Critical. An admiral at Critical risks losing coordination state that cannot be recovered.
 
 ## Relationship to Other Damage Control Procedures
