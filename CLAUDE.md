@@ -32,6 +32,7 @@ skills/nelson/
     model-selection.md      — Cost-optimized model assignment for agents
     royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
+    structured-data.md      — Structured fleet data capture reference
     tool-mapping.md         — Nelson-to-Claude Code tool reference
     standing-orders/        — One file per anti-pattern, loaded on demand
 agents/                   — Agent interface definitions
@@ -39,6 +40,8 @@ demos/                    — Example applications built with Nelson
 scripts/                  — Maintenance & utility scripts
   check-references.sh       — Cross-reference validation for documentation links
   count-tokens.py           — Token counter for hull integrity damage reports
+  nelson-data.py            — Structured data capture for Nelson missions
+  test_nelson_data.py       — Python tests for nelson-data.py
 ```
 
 ## Mission artifacts (runtime)
@@ -57,7 +60,7 @@ Previous missions are preserved — each run gets its own directory.
 
 ## No build system
 
-This is a documentation-driven skill with zero runtime dependencies. There is no package manager, no build step, and no test suite.
+This is a documentation-driven skill with zero runtime dependencies. There is no package manager and no build step. The `nelson-data.py` script uses Python stdlib only. Tests run via `pytest skills/nelson/scripts/test_nelson_data.py -v`.
 
 ## Testing changes
 

@@ -325,6 +325,7 @@ skills/nelson/
     │   └── session-resumption.md
     ├── royal-marines.md                      # Royal Marines deployment rules
     ├── squadron-composition.md              # Mode selection and team sizing rules
+    ├── structured-data.md                    # Structured fleet data capture reference
     ├── tool-mapping.md                       # Nelson-to-Claude Code tool reference
     └── standing-orders/                      # Individual anti-pattern files
         ├── admiral-at-the-helm.md
@@ -345,7 +346,10 @@ skills/nelson/
 agents/
 └── nelson.md                                # Agent definition with skill binding
 scripts/
-└── count-tokens.py                          # Token counter for hull integrity monitoring
+├── check-references.sh                       # Cross-reference validation for documentation links
+├── count-tokens.py                           # Token counter for hull integrity monitoring
+├── nelson-data.py                            # Structured data capture for Nelson missions
+└── test_nelson_data.py                       # Tests for nelson-data.py
 ```
 
 ## Mission artifacts
