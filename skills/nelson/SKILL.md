@@ -30,9 +30,11 @@ Out of scope: Migration script for existing sessions
 
 **Establish Mission Directory:**
 - **New session:** Create a mission directory at `.nelson/missions/{YYYY-MM-DD_HHMMSS}/` using the current date and time (24-hour format, including seconds). Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission.
-- **Resumed session:** List `.nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Read `{mission-dir}/quarterdeck-report.md` to recover last known state.
+- **Resumed session:** List `.nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose).
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
+
+**Structured Data Capture:** After establishing the mission directory, run `python3 scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."` to create `sailing-orders.json` and initialise `mission-log.json`. See `references/structured-data.md` for the full argument list.
 
 **Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
@@ -64,6 +66,8 @@ Reference `references/squadron-composition.md` for selection rules and `referenc
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. Proceeding with a triggered standing order unresolved is never permitted. For situations not covered by this gate, consult the Standing Orders table below.
 
+**Structured Data Capture:** After formation is complete, run `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "HMS Victory" ...` to record the squadron composition. See `references/structured-data.md` for the captain format and full argument list.
+
 ## 3. Draft Battle Plan
 
 - Split mission into independent tasks with clear deliverables.
@@ -84,6 +88,8 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 - `skeleton-crew.md`: Would any ship deploy exactly one crew member for an atomic task that the captain should implement directly?
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. Proceeding with a triggered standing order unresolved is never permitted. For situations not covered by this gate, consult the Standing Orders table below.
+
+**Structured Data Capture:** Run `python3 scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task in the battle plan, then run `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise. See `references/structured-data.md` for task arguments.
 
 **Before proceeding to Step 4:** You MUST verify that sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier. Do not proceed until all three conditions are confirmed.
 
@@ -125,7 +131,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
     - Check for active marine deployments; verify marines have returned and outputs are incorporated.
     - Safety net: if any idle ship with a complete task was missed between checkpoints, send `shutdown_request` now before continuing.
     - Track burn against token/time budget.
-    - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint.
+    - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint. **Every ship must file a damage report at every checkpoint** to `{mission-dir}/damage-reports/{ship-name}.json` using the schema in `references/admiralty-templates/damage-report.md` — do not skip this when hull is Green.
     - Standing order scan: For each order below, ask "Has this situation arisen since the last checkpoint?" If yes, apply the corrective action now — do not defer.
         - `admiral-at-the-helm.md`: Has the admiral drifted into implementation work?
         - `drifting-anchorage.md`: Has any task scope crept beyond the sailing orders?
@@ -135,6 +141,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
         - `all-hands-on-deck.md`: Has any ship mustered crew roles that are idle or unjustified?
         - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
     - **Write the quarterdeck report to disk** at `{mission-dir}/quarterdeck-report.md` at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in `{mission-dir}`, find all files matching `quarterdeck-report-N.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
+    - **Structured data capture:** Run `python3 scripts/nelson-data.py checkpoint --mission-dir {mission-dir} --pending N --in-progress N --completed N ...` with current progress, budget, hull, and decision data. Between checkpoints, run `python3 scripts/nelson-data.py event --mission-dir {mission-dir} --type <event_type> ...` for state changes (task completions, blockers, hull threshold crossings, standing order violations). See `references/structured-data.md` for event types and arguments.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
     - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
 - Re-scope early when a task drifts from mission metric.
@@ -180,6 +187,8 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
     - Record reusable patterns and failure modes for future missions.
 
 Reference `references/admiralty-templates/captains-log.md` for the captain's log template and `references/commendations.md` for Mentioned in Despatches criteria.
+
+**Structured Data Capture:** Before writing the captain's log, run `python3 scripts/nelson-data.py stand-down --mission-dir {mission-dir} --outcome-achieved --actual-outcome "..." --metric-result "..."` to capture the structured mission summary. See `references/structured-data.md` for the full argument list.
 
 **Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
 
