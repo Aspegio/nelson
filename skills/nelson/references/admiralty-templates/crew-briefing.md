@@ -29,6 +29,10 @@ Standing Orders:
 - Do NOT edit files not assigned to you
 - Report blockers to admiral immediately with options and one recommendation
 - When done, report: deliverable, validation evidence, failure modes, rollback note
+- File a damage report to {mission-dir}/damage-reports/{ship-name}.json when your task
+  is complete or when hull integrity crosses a threshold (Green → Amber → Red → Critical).
+  Use JSON format: {"ship_name", "timestamp", "hull_integrity_pct", "hull_integrity_status",
+  "relief_requested", "context_summary"}. Estimate hull_integrity_pct from your token usage.
 - You may deploy Royal Marines (short-lived sub-agents) for focused sorties.
   Deploy by calling the `Agent` tool with `subagent_type` (see `references/tool-mapping.md`).
   Recce Marine: `Agent` tool with `subagent_type=`"Explore" (read-only recon).
