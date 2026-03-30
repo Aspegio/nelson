@@ -182,7 +182,7 @@ Reference `references/tool-mapping.md` for coordination tools, `references/admir
     - Agent idle with unverified outputs.
     - Before final synthesis.
 - For crewed tasks, verify crew outputs align with role boundaries (consult `references/crew-roles.md` and the Standing Orders table below if role violations are detected).
-- Marine deployments follow station-tier rules in `references/royal-marines.md`. Station 2+ marine deployments require admiral approval.
+- Marine deployments follow station-tier rules in `references/royal-marines.md`. Station 2+ marine deployments require admiral approval. Captains use `references/admiralty-templates/marine-deployment-brief.md` when deploying a marine.
 
 Reference `references/admiralty-templates/red-cell-review.md` for the red-cell review template. Consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
 
