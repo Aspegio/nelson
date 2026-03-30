@@ -9,6 +9,7 @@
 
 A Claude Code skill that organises multi-agent work into structured naval operations: sailing orders define the mission, captains command parallel workstreams, action stations enforce risk-appropriate controls, and a captain's log captures every decision for audit.
 
+<!-- markdownlint-disable-next-line MD036 -->
 *4 risk tiers · 10 damage control procedures · 10 mission templates · 7 crew roles · 15 standing orders*
 
 <p align="center">
