@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import stat
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -98,10 +99,16 @@ def _write_json(path: Path, data: Any) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     content = json.dumps(data, indent=JSON_INDENT) + "\n"
+    try:
+        existing_mode = stat.S_IMODE(os.stat(path).st_mode)
+    except OSError:
+        existing_mode = None
     fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
+        if existing_mode is not None:
+            os.chmod(tmp, existing_mode)
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -335,9 +342,7 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
     sd_tasks = stand_down.get("tasks", {})
     bp_tasks = battle_plan.get("tasks", [])
     task_names = [t.get("name", "") for t in bp_tasks]
-    file_ownership: list[str] = []
-    for t in bp_tasks:
-        file_ownership.extend(t.get("file_ownership", []))
+    file_ownership = [f for t in bp_tasks for f in t.get("file_ownership", [])]
 
     tasks = {
         "completed": sd_tasks.get("completed", 0),
@@ -352,7 +357,7 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
     completed_at = stand_down.get("created_at")
 
     # Event types from mission log
-    event_types = sorted({ev.get("type", "") for ev in events if ev.get("type")})
+    event_types = sorted({ev["type"] for ev in events if ev.get("type")})
 
     return {
         "mission_id": mission_id,
@@ -1146,10 +1151,16 @@ def cmd_status(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def cmd_index(args: argparse.Namespace) -> None:
-    """Build or update the fleet intelligence index."""
+def _resolve_fleet_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    """Return (missions_dir, index_path) from parsed arguments."""
     missions_dir = Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
     index_path = missions_dir.parent / "fleet-intelligence.json"
+    return missions_dir, index_path
+
+
+def cmd_index(args: argparse.Namespace) -> None:
+    """Build or update the fleet intelligence index."""
+    missions_dir, index_path = _resolve_fleet_paths(args)
     rebuild = bool(getattr(args, "rebuild", False))
 
     # Load existing index or start fresh
@@ -1201,6 +1212,26 @@ def cmd_index(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _collect_ship_class_counts(missions: list[dict]) -> dict[str, int]:
+    """Count ship class usage across missions, descending by count."""
+    counts: dict[str, int] = {}
+    for m in missions:
+        for cls in m.get("fleet", {}).get("ship_classes", []):
+            counts[cls] = counts.get(cls, 0) + 1
+    return dict(sorted(counts.items(), key=lambda x: -x[1]))
+
+
+def _collect_station_tier_totals(missions: list[dict]) -> dict[str, int]:
+    """Accumulate task counts by station tier (0-3 only)."""
+    totals: dict[str, int] = {"0": 0, "1": 0, "2": 0, "3": 0}
+    for m in missions:
+        tiers = m.get("tasks", {}).get("by_station_tier", {})
+        for tier, count in tiers.items():
+            if tier in totals:
+                totals[tier] += count
+    return totals
+
+
 def _compute_analytics(missions: list[dict]) -> dict:
     """Compute aggregate analytics across all mission records."""
     if not missions:
@@ -1228,26 +1259,16 @@ def _compute_analytics(missions: list[dict]) -> dict:
 
     durations = [m["duration_minutes"] for m in missions
                  if m.get("duration_minutes") is not None]
-    tokens = [m.get("budget", {}).get("tokens_consumed", 0) for m in missions]
-    budget_pcts = [m.get("budget", {}).get("pct_consumed", 0.0) for m in missions]
-    ships = [m.get("fleet", {}).get("ships_used", 0) for m in missions]
-    task_totals = [m.get("tasks", {}).get("total", 0) for m in missions]
-    violations = [m.get("quality", {}).get("standing_order_violations", 0)
-                  for m in missions]
-    blockers = [m.get("quality", {}).get("blockers_raised", 0) for m in missions]
+    tokens = [v for m in missions if (v := m.get("budget", {}).get("tokens_consumed")) is not None]
+    budget_pcts = [v for m in missions if (v := m.get("budget", {}).get("pct_consumed")) is not None]
+    ships = [v for m in missions if (v := m.get("fleet", {}).get("ships_used")) is not None]
+    task_totals = [v for m in missions if (v := m.get("tasks", {}).get("total")) is not None]
+    violations = [v for m in missions
+                  if (v := m.get("quality", {}).get("standing_order_violations")) is not None]
+    blockers = [v for m in missions if (v := m.get("quality", {}).get("blockers_raised")) is not None]
 
-    # Ship class counts (descending by count)
-    ship_class_counts: dict[str, int] = {}
-    for m in missions:
-        for cls in m.get("fleet", {}).get("ship_classes", []):
-            ship_class_counts[cls] = ship_class_counts.get(cls, 0) + 1
-
-    # Station tier totals
-    station_tier_totals: dict[str, int] = {"0": 0, "1": 0, "2": 0, "3": 0}
-    for m in missions:
-        tiers = m.get("tasks", {}).get("by_station_tier", {})
-        for tier, count in tiers.items():
-            station_tier_totals[tier] = station_tier_totals.get(tier, 0) + count
+    ship_class_counts = _collect_ship_class_counts(missions)
+    station_tier_totals = _collect_station_tier_totals(missions)
 
     avg_dur = _safe_mean(durations)
     avg_tok = _safe_mean(tokens)
@@ -1271,9 +1292,7 @@ def _compute_analytics(missions: list[dict]) -> dict:
         "avg_tasks": round(avg_tsk, 1) if avg_tsk is not None else None,
         "violations_per_mission": round(avg_viol, 2) if avg_viol is not None else None,
         "blockers_per_mission": round(avg_blk, 2) if avg_blk is not None else None,
-        "ship_class_counts": dict(sorted(
-            ship_class_counts.items(), key=lambda x: -x[1],
-        )),
+        "ship_class_counts": ship_class_counts,
         "station_tier_totals": station_tier_totals,
     }
 
@@ -1310,7 +1329,7 @@ def _format_history_text(
     # Tokens
     avg_t = analytics["avg_tokens_consumed"]
     if avg_t is not None:
-        token_str = f"{avg_t // 1000}K" if avg_t >= 1000 else str(avg_t)
+        token_str = f"{round(avg_t / 1000)}K" if avg_t >= 1000 else str(avg_t)
         lines.append(
             f"  Tokens     avg {token_str} consumed, "
             f"avg {analytics['avg_budget_pct']}% of budget"
@@ -1347,21 +1366,28 @@ def _format_history_text(
 
     lines.append("")
 
-    # Recent missions (most recent first)
-    recent = list(reversed(missions))[:last_n]
-    if recent:
-        lines.append("  Recent missions")
-        lines.append("  " + "\u2500" * 62)
-        for m in recent:
-            mid = m["mission_id"]
-            date_str = mid[:10] if len(mid) >= 10 else mid
-            marker = "\u2713" if m.get("outcome_achieved") else "\u2717"
-            outcome = m.get("actual_outcome") or m.get("planned_outcome", "")
-            if len(outcome) > 50:
-                outcome = outcome[:47] + "..."
-            lines.append(f"  {date_str}  {marker}  {outcome}")
+    lines.extend(_format_recent_missions(missions, last_n))
 
     return "\n".join(lines)
+
+
+def _format_recent_missions(missions: list[dict], last_n: int) -> list[str]:
+    """Format the recent missions section (most recent first)."""
+    recent = list(reversed(missions))[:last_n]
+    if not recent:
+        return []
+    lines: list[str] = []
+    lines.append("  Recent missions")
+    lines.append("  " + "\u2500" * 62)
+    for m in recent:
+        mid = m["mission_id"]
+        date_str = mid[:10] if len(mid) >= 10 else mid
+        marker = "\u2713" if m.get("outcome_achieved") else "\u2717"
+        outcome = m.get("actual_outcome") or m.get("planned_outcome", "")
+        if len(outcome) > 50:
+            outcome = outcome[:47] + "..."
+        lines.append(f"  {date_str}  {marker}  {outcome}")
+    return lines
 
 
 def _format_history_json(analytics: dict, missions: list[dict]) -> str:
@@ -1374,15 +1400,14 @@ def _format_history_json(analytics: dict, missions: list[dict]) -> str:
 
 def cmd_history(args: argparse.Namespace) -> None:
     """Display fleet intelligence analytics from the index."""
-    missions_dir = Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
-    index_path = missions_dir.parent / "fleet-intelligence.json"
+    missions_dir, index_path = _resolve_fleet_paths(args)
     last_n = max(0, args.last)
 
     if not index_path.exists():
         _die("No fleet intelligence index found. Run 'nelson-data index' first.")
 
     index = _read_json_optional(index_path)
-    if not index:
+    if index is None:
         _die("Failed to read fleet intelligence index.")
 
     missions = index.get("missions", [])
@@ -1390,7 +1415,6 @@ def cmd_history(args: argparse.Namespace) -> None:
 
     if args.json_output:
         recent = list(reversed(missions))[:last_n]
-        recent.reverse()
         print(_format_history_json(analytics, recent))
     else:
         print(_format_history_text(analytics, missions, last_n))
@@ -1497,12 +1521,14 @@ def build_parser() -> argparse.ArgumentParser:
     # --- index ---
     p_idx = subs.add_parser("index", help="Build fleet intelligence index")
     p_idx.add_argument("--missions-dir", default=None, help="Missions directory path")
+    # Alias: --mission-dir accepted for consistency with other subcommands
     p_idx.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
     p_idx.add_argument("--rebuild", action="store_true", help="Force full re-index")
 
     # --- history ---
     p_hist = subs.add_parser("history", help="Display fleet intelligence analytics")
     p_hist.add_argument("--missions-dir", default=None, help="Missions directory path")
+    # Alias: --mission-dir accepted for consistency with other subcommands
     p_hist.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
     p_hist.add_argument(
         "--json", dest="json_output", action="store_true",

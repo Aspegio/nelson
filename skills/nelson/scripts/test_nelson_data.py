@@ -674,6 +674,7 @@ def create_completed_mission(
 
     If *mission_id* is provided, the mission directory is renamed to that ID
     to allow deterministic test fixtures without timing issues.
+    tmp_path isolation prevents rename collisions across tests.
     """
     mission_dir = init_mission(cwd)
     captain_specs = captains or ["HMS Argyll:frigate:sonnet:1"]
@@ -802,6 +803,7 @@ class TestIndex:
         index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
         m = index["missions"][0]
         assert m["success_metric"] == "All tests pass"
+        assert m["created_at"] is not None
 
     def test_enriches_from_mission_log(self, tmp_path: Path) -> None:
         create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
@@ -811,6 +813,7 @@ class TestIndex:
         assert "squadron_formed" in m["event_types"]
         assert "battle_plan_approved" in m["event_types"]
         assert "mission_complete" in m["event_types"]
+        assert m["fleet"]["execution_mode"] == "subagents"
 
     def test_no_missions_creates_empty_index(self, tmp_path: Path) -> None:
         missions_dir = tmp_path / ".nelson" / "missions"
@@ -894,6 +897,9 @@ class TestIndex:
         index = read_json(idx_path)
         assert index["version"] == 1
         assert index["mission_count"] == 3
+        assert {m["mission_id"] for m in index["missions"]} == {
+            "2026-03-28_100000", "2026-03-29_100000", "2026-03-30_100000",
+        }
 
     def test_accepts_mission_dir_singular(self, tmp_path: Path) -> None:
         """--mission-dir alias works for index."""
@@ -1027,6 +1033,8 @@ class TestHistory:
         data = json.loads(result.stdout)
         assert len(data["missions"]) == 2
         assert data["analytics"]["mission_count"] == 4
+        ids = [m["mission_id"] for m in data["missions"]]
+        assert ids == ["2026-03-31_100000", "2026-03-30_100000"]
 
     def test_last_negative_treated_as_zero(self, tmp_path: Path) -> None:
         """--last -1 → no crash, no recent missions shown."""
@@ -1048,6 +1056,27 @@ class TestHistory:
             "--last", "0", cwd=tmp_path,
         )
         assert "Recent missions" not in result.stdout
+
+    def test_last_exceeds_mission_count(self, tmp_path: Path) -> None:
+        """--last 999 with 2 missions shows all 2."""
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--last", "999", cwd=tmp_path,
+        )
+        assert result.returncode == 0
+        assert "2 missions indexed" in result.stdout
+
+    def test_json_last_zero_shows_empty_missions(self, tmp_path: Path) -> None:
+        """--json --last 0 returns empty missions list."""
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--json", "--last", "0", cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert data["missions"] == []
+        assert data["analytics"]["mission_count"] == 2
 
     def test_history_accepts_mission_dir_singular(self, tmp_path: Path) -> None:
         """--mission-dir alias works for history."""
