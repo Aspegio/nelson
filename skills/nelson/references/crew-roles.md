@@ -1,13 +1,13 @@
 # Crew Roles Reference
 
-Use this file to decide whether a captain should crew a ship or implement directly, and which roles to muster.
+The admiral uses this file during formation to determine initial crew composition for each ship. Captains use it when requesting mid-task crew adjustments (with admiral approval).
 
 ## Crew-or-Direct Decision
 
 Choose the first condition that matches.
 
-1. If the task is atomic and can be completed in a single pass, captain implements directly (0 crew).
-2. If the task has one clear deliverable with no research or testing needs, crew 1 PWO.
+1. If the task is atomic, requires no file reads or research, and can be completed in a single pass, captain implements directly (0 crew).
+2. If the task has one clear deliverable (including tasks that require reading files or light research), crew 1 PWO.
 3. If the task needs exploration, testing, or a second specialism, crew PWO + 1 specialist.
 4. If the task has multiple interdependent sub-tasks, crew XO + PWO + up to 2 specialists.
 
