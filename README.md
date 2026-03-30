@@ -38,16 +38,17 @@ A Claude Code skill that organises multi-agent work into structured naval operat
 ## Quick Start
 
 ```
-/plugin install harrymunro/nelson
+/plugin marketplace add harrymunro/nelson
+/plugin install nelson@nelson-marketplace
 ```
 
-Then give it a mission:
+Then just describe your mission:
 
 ```
-/nelson Migrate the payment module from Stripe v2 to v3
+Use Nelson to migrate the payment module from Stripe v2 to v3
 ```
 
-Nelson will define sailing orders, form a squadron, and coordinate the mission through to a captain's log. See [Prerequisites](#prerequisites) for the full agent-team experience with split panes.
+Nelson is a Claude Code skill — it loads automatically when your request matches. No slash command needed. See [Prerequisites](#prerequisites) for the full agent-team experience with split panes.
 
 ## What it does
 
@@ -227,11 +228,7 @@ The skill includes structured templates for consistent output across missions:
 
 ### Plugin install (recommended)
 
-```
-/plugin install harrymunro/nelson
-```
-
-Or add the marketplace first, then install by name:
+Add the marketplace and install:
 
 ```
 /plugin marketplace add harrymunro/nelson
@@ -274,19 +271,20 @@ Then commit `.claude/skills/nelson/` to version control so your team can use it.
 <details>
 <summary>Updating</summary>
 
-Plugin installs are cached snapshots — they do not auto-update. To pick up a new release:
+Plugin installs are cached snapshots — they do not auto-update. To pick up a new release, refresh the marketplace and reinstall:
 
 ```
-/plugin install harrymunro/nelson
+/plugin marketplace update nelson-marketplace
+/plugin install nelson@nelson-marketplace
 ```
 
-If that reports you're already at the latest version, the local marketplace cache is stale. Refresh it manually:
+If that reports you're already at the latest version, the local marketplace cache may be stale. Refresh it manually:
 
 ```bash
 cd ~/.claude/plugins/marketplaces/nelson-marketplace && git fetch origin && git reset --hard origin/main
 ```
 
-Then reinstall via `/plugin install nelson` or re-enable via `/plugin`.
+Then reinstall via `/plugin install nelson@nelson-marketplace` or re-enable via `/plugin`.
 
 </details>
 
@@ -299,31 +297,38 @@ Open Claude Code and ask:
 What skills are available?
 ```
 
-You should see `nelson` listed. You can also invoke it directly:
-
-```
-/nelson
-```
+You should see `nelson` listed. You can also test it by saying "Use Nelson to..." followed by a task.
 
 </details>
 
 ## Usage
 
-### Just describe your task
+Nelson is a Claude Code skill — it loads automatically when your request matches. No slash command required. Just describe your mission and mention Nelson.
 
-Claude reads the skill description and loads it when your request matches — for example, when you ask for coordinated parallel work or structured mission execution. Just describe your task:
+### Let Nelson pick the execution mode
 
-```
-I need to refactor the authentication system. The work spans the API layer,
-the frontend, and the test suite. Use nelson to coordinate this.
-```
-
-### Use the slash command
-
-Invoke it directly with your mission brief:
+Nelson selects the best execution mode (single-session, subagents, or agent team) based on your mission:
 
 ```
-/nelson Migrate the payment processing module from Stripe v2 to v3
+Use Nelson to migrate the payment processing module from Stripe v2 to v3
+```
+
+### Force an agent team
+
+If you want teammate-to-teammate coordination, ask for an agent team explicitly:
+
+```
+Use an agent team with Nelson to refactor the authentication system across
+the API layer, frontend, and test suite
+```
+
+### Go maximal
+
+For the highest-capability run — Opus 4.6 agents, fully crewed ships, maximum coordination:
+
+```
+Use an agent team with Nelson and Opus 4.6 agents with fully crewed ships
+to deliver the new billing integration
 ```
 
 ### Full sailing orders
@@ -331,7 +336,7 @@ Invoke it directly with your mission brief:
 For maximum control, provide your own sailing orders:
 
 ```
-/nelson
+Use Nelson to deliver this:
 
 Sailing orders:
 - Outcome: All API endpoints return consistent error responses
@@ -346,6 +351,8 @@ Scope:
 - In scope: src/api/ and tests/api/
 - Out of scope: Frontend error handling
 ```
+
+You can also invoke it directly with the `/nelson` slash command if you prefer.
 
 ## Customisation
 
@@ -476,10 +483,11 @@ Each mission creates a timestamped directory for its runtime artifacts. Previous
 ## Get started
 
 ```
-/plugin install harrymunro/nelson
+/plugin marketplace add harrymunro/nelson
+/plugin install nelson@nelson-marketplace
 ```
 
-Start a mission with `/nelson`, or [open an issue](https://github.com/harrymunro/nelson/issues) if something breaks.
+Then just say "Use Nelson to..." and describe your mission, or [open an issue](https://github.com/harrymunro/nelson/issues) if something breaks.
 
 ## Disclaimer
 
