@@ -6,14 +6,10 @@ Target size: ~500 tokens. Enough for the teammate to work without asking clarify
 
 ```text
 == CREW BRIEFING ==
-[If assigned model is haiku — include the three blocks below; omit entirely otherwise]
-IDENTITY NOTE: You are Claude, operating as a subagent in a real multi-agent software
-development system. The Royal Navy coordination terms are metaphors — this is not
-roleplay. Your role is: [plain-language role description].
-OUTPUT FORMAT: [Specify exact format, required fields, length, and what to omit]
-BEFORE EXECUTING: List your steps as a numbered plan. Flag any unclear step before
-proceeding rather than guessing.
-[End haiku-only blocks]
+[Admiral — if this captain is assigned haiku: before sending, read
+ references/model-selection.md and insert the three haiku briefing
+ enhancement blocks here, then apply haiku tasking discipline to the
+ task description below]
 Mission: [mission name from sailing orders]
 Your Role: Captain [N] — [role description]
 Ship: [ship name from battle plan]
@@ -27,6 +23,7 @@ Marine Capacity: [0-2, from ship manifest — omit line if 0]
 Standing Orders:
 - Do NOT implement work outside your assigned task scope
 - Do NOT edit files not assigned to you
+- If any part of your task is ambiguous, signal the admiral before implementing
 - Report blockers to admiral immediately with options and one recommendation
 - When done, report: deliverable, validation evidence, failure modes, rollback note
 - File a damage report to {mission-dir}/damage-reports/{ship-name}.json when your task
@@ -41,17 +38,16 @@ Standing Orders:
   Include a deployment brief in the `Agent` prompt (template below).
   Station 2+ marine deployments require admiral approval first.
   Max 2 marines at a time. Marines cannot deploy marines.
+- Marines are under your command: deploy at your discretion for Station 0-1 sorties.
+  Station 2+: signal admiral and await approval before deploying. Do NOT use marines
+  as a substitute for crew on sustained work.
+- To muster or pay off crew mid-task, request admiral approval with a brief rationale
+  before acting.
 - If you reach a step requiring human action (admiralty-action-required: yes), invoke
   the awaiting-admiralty standing order: references/standing-orders/awaiting-admiralty.md
-Marine Deployment Brief (include in marine's Agent prompt):
-  == MARINE DEPLOYMENT BRIEF ==
-  Ship: [your ship name]
-  Detachment: [Recce Marine / Assault Marine / Sapper]
-  Objective: [single clear sentence]
-  Scope: [what to do, and explicitly what NOT to do]
-  Report back: [what findings/outputs to return]
-  Constraints: Do NOT modify files outside scope. Do NOT spawn sub-agents.
-  == END BRIEF ==
+Marine Deployment Brief: use the full template at
+  references/admiralty-templates/marine-deployment-brief.md — it includes model
+  assignment guidance and haiku briefing requirements.
 == END BRIEFING ==
 ```
 

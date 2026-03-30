@@ -48,6 +48,15 @@ Marine recovery is simple. No separate damage-control procedure is needed.
 - Captain either redeploys a fresh marine or handles the objective directly.
 - If the same marine objective fails twice, captain **escalates to admiral**.
 
+## Model Assignment
+
+The deploying captain applies the same weight-based model judgment the admiral uses for squadron agents. The default weight for a Royal Marine is 3, but adjust before assigning:
+
+- Raise weight when the objective requires judgment, interpretation, or navigating unfamiliar territory.
+- Lower weight when the objective is fully specified and purely mechanical.
+
+If the adjusted weight is ≤ 4 (or cost-savings mode is active), assign haiku and apply the haiku briefing enhancements and tasking discipline from `references/model-selection.md`. Do not assign haiku and then write a vague brief — the two requirements go together.
+
 ## Deployment Template
 
 When deploying a marine, use the briefing template at `admiralty-templates/marine-deployment-brief.md`.
