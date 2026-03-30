@@ -653,3 +653,284 @@ class TestEdgeCases:
         """Running with no subcommand should exit non-zero."""
         result = run(expect_fail=True)
         assert result.returncode != 0
+
+
+# ---------------------------------------------------------------------------
+# Helpers — Fleet Intelligence
+# ---------------------------------------------------------------------------
+
+
+def create_completed_mission(
+    cwd: Path,
+    mission_id: str | None = None,
+    outcome_achieved: bool = True,
+    captains: list[str] | None = None,
+    task_count: int = 1,
+    station_tiers: list[int] | None = None,
+    actual_outcome: str = "Mission completed",
+    metric_result: str = "All tests pass",
+) -> Path:
+    """Create a fully completed mission with all 4 JSON files.
+
+    If *mission_id* is provided, the mission directory is renamed to that ID
+    to allow deterministic test fixtures without timing issues.
+    """
+    mission_dir = init_mission(cwd)
+    captain_specs = captains or ["HMS Argyll:frigate:sonnet:1"]
+    add_squadron(mission_dir, captains=captain_specs)
+
+    tiers = station_tiers or [0] * task_count
+    for i in range(task_count):
+        owner = captain_specs[i % len(captain_specs)].split(":")[0]
+        tier = tiers[i] if i < len(tiers) else 0
+        add_task(
+            mission_dir,
+            task_id=i + 1,
+            name=f"Task {i + 1}",
+            owner=owner,
+            station_tier=tier,
+        )
+
+    run("plan-approved", "--mission-dir", str(mission_dir))
+
+    run(
+        "checkpoint",
+        "--mission-dir", str(mission_dir),
+        "--pending", "0",
+        "--in-progress", "0",
+        "--completed", str(task_count),
+        "--blocked", "0",
+        "--tokens-spent", "50000",
+        "--tokens-remaining", "50000",
+        "--hull-green", str(len(captain_specs)),
+        "--hull-amber", "0",
+        "--hull-red", "0",
+        "--hull-critical", "0",
+        "--decision", "continue",
+        "--rationale", "All good",
+    )
+
+    sd_args = [
+        "stand-down",
+        "--mission-dir", str(mission_dir),
+        "--actual-outcome", actual_outcome,
+        "--metric-result", metric_result,
+    ]
+    if outcome_achieved:
+        sd_args.append("--outcome-achieved")
+    run(*sd_args)
+
+    if mission_id:
+        target = mission_dir.parent / mission_id
+        mission_dir.rename(target)
+        return target
+    return mission_dir
+
+
+# ---------------------------------------------------------------------------
+# Index
+# ---------------------------------------------------------------------------
+
+
+class TestIndex:
+    def _missions_dir(self, tmp_path: Path) -> str:
+        return str(tmp_path / ".nelson" / "missions")
+
+    def test_creates_index_from_completed_missions(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        result = run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["version"] == 1
+        assert index["mission_count"] == 2
+        assert len(index["missions"]) == 2
+        assert "2 missions" in result.stdout
+
+    def test_incremental_adds_new_missions_only(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        create_completed_mission(tmp_path, mission_id="2026-03-30_100000")
+        result = run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 3
+        assert "1 new" in result.stdout
+
+    def test_rebuild_reindexes_all(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        result = run(
+            "index", "--missions-dir", self._missions_dir(tmp_path),
+            "--rebuild", cwd=tmp_path,
+        )
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 2
+        assert "2 new" in result.stdout
+
+    def test_skips_incomplete_missions(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        # Create an incomplete mission (no stand-down.json)
+        incomplete = tmp_path / ".nelson" / "missions" / "2026-03-28_100000"
+        incomplete.mkdir(parents=True)
+        (incomplete / "sailing-orders.json").write_text('{"version": 1}')
+
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 1
+
+    def test_enriches_from_battle_plan(self, tmp_path: Path) -> None:
+        create_completed_mission(
+            tmp_path,
+            mission_id="2026-03-29_100000",
+            captains=["HMS Argyll:frigate:sonnet:1", "HMS Kent:destroyer:sonnet:2"],
+            task_count=2,
+        )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        m = index["missions"][0]
+        assert m["fleet"]["ship_classes"] == ["frigate", "destroyer"]
+        assert m["fleet"]["execution_mode"] == "subagents"
+        assert len(m["tasks"]["task_names"]) == 2
+
+    def test_enriches_from_sailing_orders(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        m = index["missions"][0]
+        assert m["success_metric"] == "All tests pass"
+
+    def test_enriches_from_mission_log(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        m = index["missions"][0]
+        assert "squadron_formed" in m["event_types"]
+        assert "battle_plan_approved" in m["event_types"]
+        assert "mission_complete" in m["event_types"]
+
+    def test_no_missions_creates_empty_index(self, tmp_path: Path) -> None:
+        missions_dir = tmp_path / ".nelson" / "missions"
+        missions_dir.mkdir(parents=True)
+        run("index", "--missions-dir", str(missions_dir), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 0
+        assert index["missions"] == []
+
+    def test_missions_sorted_by_id(self, tmp_path: Path) -> None:
+        # Create in reverse chronological order
+        create_completed_mission(tmp_path, mission_id="2026-03-30_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        ids = [m["mission_id"] for m in index["missions"]]
+        assert ids == ["2026-03-28_100000", "2026-03-29_100000", "2026-03-30_100000"]
+
+
+# ---------------------------------------------------------------------------
+# History
+# ---------------------------------------------------------------------------
+
+
+class TestHistory:
+    def _missions_dir(self, tmp_path: Path) -> str:
+        return str(tmp_path / ".nelson" / "missions")
+
+    def _setup_indexed(self, tmp_path: Path, count: int = 2) -> None:
+        """Create and index *count* completed missions."""
+        for i in range(count):
+            create_completed_mission(
+                tmp_path,
+                mission_id=f"2026-03-{28 + i:02d}_100000",
+                outcome_achieved=(i % 3 != 2),  # Every 3rd mission fails
+            )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+    def test_displays_analytics(self, tmp_path: Path) -> None:
+        self._setup_indexed(tmp_path, count=2)
+        result = run("history", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        assert "Fleet Intelligence" in result.stdout
+        assert "win rate" in result.stdout
+        assert "missions indexed" in result.stdout
+
+    def test_json_output(self, tmp_path: Path) -> None:
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--json", cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert "analytics" in data
+        assert "missions" in data
+        assert data["analytics"]["mission_count"] == 2
+
+    def test_no_index_shows_message(self, tmp_path: Path) -> None:
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            cwd=tmp_path, expect_fail=True,
+        )
+        assert "No fleet intelligence index" in result.stderr
+
+    def test_empty_index_shows_message(self, tmp_path: Path) -> None:
+        missions_dir = tmp_path / ".nelson" / "missions"
+        missions_dir.mkdir(parents=True)
+        run("index", "--missions-dir", str(missions_dir), cwd=tmp_path)
+        result = run("history", "--missions-dir", str(missions_dir), cwd=tmp_path)
+        assert "0 missions indexed" in result.stdout
+
+    def test_win_rate_calculation(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000", outcome_achieved=True)
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000", outcome_achieved=True)
+        create_completed_mission(tmp_path, mission_id="2026-03-30_100000", outcome_achieved=False)
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--json", cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert data["analytics"]["win_rate"] == 66.7
+
+    def test_last_n_flag(self, tmp_path: Path) -> None:
+        for i in range(4):
+            create_completed_mission(
+                tmp_path,
+                mission_id=f"2026-03-{27 + i:02d}_100000",
+            )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--last", "2", cwd=tmp_path,
+        )
+        # Extract dates from the recent missions section
+        lines = result.stdout.split("\n")
+        recent_section = False
+        recent_dates: list[str] = []
+        for line in lines:
+            if "Recent missions" in line:
+                recent_section = True
+                continue
+            if recent_section and line.strip().startswith("2026-"):
+                recent_dates.append(line.strip()[:10])
+        assert len(recent_dates) == 2
+
+    def test_recent_missions_ordered(self, tmp_path: Path) -> None:
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-30_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        result = run("history", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        lines = result.stdout.split("\n")
+        recent_section = False
+        recent_dates: list[str] = []
+        for line in lines:
+            if "Recent missions" in line:
+                recent_section = True
+                continue
+            if recent_section and line.strip().startswith("2026-"):
+                recent_dates.append(line.strip()[:10])
+        # Most recent first
+        assert recent_dates == ["2026-03-30", "2026-03-29", "2026-03-28"]
