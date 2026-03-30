@@ -8,7 +8,7 @@ Relief on station is a planned handover. For stuck or unresponsive agents, use `
 
 Initiate relief when any of the following are true:
 
-- Ship reports Red hull integrity (40-60% context remaining).
+- Ship reports Red hull integrity (40-59% context remaining).
 - Ship reports Critical hull integrity (below 40% context remaining).
 - Admiral observes degraded output quality (repetition, missed instructions, shallow reasoning).
 - Ship explicitly requests relief.
@@ -31,13 +31,17 @@ Hull integrity monitoring may surface context exhaustion before crew overrun is 
 
 The admiral must monitor its own hull integrity at every quarterdeck checkpoint.
 
-### Amber Hull Integrity (60-80% remaining)
+### Green Hull Integrity (75-100% remaining)
+
+No action required. Continue normal operations.
+
+### Amber Hull Integrity (60-74% remaining)
 
 1. Admiral notes hull status in the quarterdeck report.
 2. Admiral begins drafting a flagship turnover brief in the background, capturing current mission state incrementally.
 3. Admiral considers whether remaining coordination work can complete within budget. If not, begin planning the handover early.
 
-### Red Hull Integrity (40-60% remaining)
+### Red Hull Integrity (40-59% remaining)
 
 1. Admiral writes a comprehensive flagship turnover brief to `{mission-dir}/turnover-briefs/flagship-{timestamp}.md` containing:
    - Full sailing orders (copied verbatim).
