@@ -53,9 +53,9 @@ If multiple ships reach Red simultaneously, prioritise relief for the ship close
 The admiral must monitor its own hull integrity with the same discipline applied to the squadron.
 
 1. Admiral tracks its own token usage and calculates hull integrity at each checkpoint.
-2. At Amber, admiral begins preparing a session resumption handoff using `references/damage-control/session-resumption.md`.
-3. At Red, admiral writes a full quarterdeck report (following the rename-before-write procedure in SKILL.md Step 4 — "Write the quarterdeck report to disk") and session state to disk, then signals the Admiralty (human) that a session resumption will be needed.
-4. The admiral does not wait for Critical. An admiral at Critical risks losing coordination state that cannot be recovered.
+2. For Amber, Red, and Critical flagship actions, follow the procedure in
+   `references/damage-control/relief-on-station.md`. The admiral does not wait for
+   Critical — losing coordination state at Critical cannot be recovered.
 
 ## Relationship to Other Damage Control Procedures
 
