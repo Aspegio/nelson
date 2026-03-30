@@ -830,6 +830,88 @@ class TestIndex:
         ids = [m["mission_id"] for m in index["missions"]]
         assert ids == ["2026-03-28_100000", "2026-03-29_100000", "2026-03-30_100000"]
 
+    def test_index_skips_corrupt_stand_down(self, tmp_path: Path) -> None:
+        """Corrupt stand-down.json → mission skipped, no .bak file created."""
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        # Corrupt the stand-down.json of a second mission
+        corrupt_dir = tmp_path / ".nelson" / "missions" / "2026-03-29_100000"
+        corrupt_dir.mkdir(parents=True)
+        (corrupt_dir / "stand-down.json").write_text("NOT VALID JSON{{{", encoding="utf-8")
+
+        result = run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 1
+        # No .bak file — _read_json_optional doesn't rename
+        assert not (corrupt_dir / "stand-down.json.bak").exists()
+
+    def test_index_warns_on_corrupt_optional_json(self, tmp_path: Path) -> None:
+        """Corrupt battle-plan.json → stderr warning, mission still indexed."""
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        # Corrupt the battle-plan.json
+        bp_path = tmp_path / ".nelson" / "missions" / "2026-03-28_100000" / "battle-plan.json"
+        bp_path.write_text("CORRUPT{{{", encoding="utf-8")
+
+        result = run(
+            "index", "--missions-dir", self._missions_dir(tmp_path),
+            "--rebuild", cwd=tmp_path,
+        )
+        assert "corrupt JSON" in result.stderr
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 1
+
+    def test_index_silent_on_missing_optional_json(self, tmp_path: Path) -> None:
+        """Missing battle-plan.json → no warning emitted."""
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        # Remove battle-plan.json
+        bp_path = tmp_path / ".nelson" / "missions" / "2026-03-28_100000" / "battle-plan.json"
+        bp_path.unlink()
+
+        result = run(
+            "index", "--missions-dir", self._missions_dir(tmp_path),
+            "--rebuild", cwd=tmp_path,
+        )
+        assert "Warning" not in result.stderr
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 1
+
+    def test_index_rebuilds_on_version_mismatch(self, tmp_path: Path) -> None:
+        """Index with version 2 → triggers rebuild + warning."""
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
+        # Build initial index
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        # Tamper with the version
+        idx_path = tmp_path / ".nelson" / "fleet-intelligence.json"
+        index = read_json(idx_path)
+        index["version"] = 2
+        idx_path.write_text(json.dumps(index, indent=2) + "\n", encoding="utf-8")
+
+        # Add another mission and run incremental
+        create_completed_mission(tmp_path, mission_id="2026-03-30_100000")
+        result = run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        assert "version 2" in result.stderr
+        index = read_json(idx_path)
+        assert index["version"] == 1
+        assert index["mission_count"] == 3
+
+    def test_accepts_mission_dir_singular(self, tmp_path: Path) -> None:
+        """--mission-dir alias works for index."""
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        result = run(
+            "index", "--mission-dir", self._missions_dir(tmp_path), cwd=tmp_path,
+        )
+        index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
+        assert index["mission_count"] == 1
+
+    def test_no_temp_files_after_index(self, tmp_path: Path) -> None:
+        """No .tmp files left behind after indexing."""
+        create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        nelson_dir = tmp_path / ".nelson"
+        tmp_files = list(nelson_dir.rglob("*.tmp"))
+        assert tmp_files == []
+
 
 # ---------------------------------------------------------------------------
 # History
@@ -934,3 +1016,44 @@ class TestHistory:
                 recent_dates.append(line.strip()[:10])
         # Most recent first
         assert recent_dates == ["2026-03-30", "2026-03-29", "2026-03-28"]
+
+    def test_json_output_respects_last_flag(self, tmp_path: Path) -> None:
+        """--json --last 2 with 4 missions → 2 missions in JSON, analytics covers all 4."""
+        self._setup_indexed(tmp_path, count=4)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--json", "--last", "2", cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert len(data["missions"]) == 2
+        assert data["analytics"]["mission_count"] == 4
+
+    def test_last_negative_treated_as_zero(self, tmp_path: Path) -> None:
+        """--last -1 → no crash, no recent missions shown."""
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--last", "-1", cwd=tmp_path,
+        )
+        # Should not crash
+        assert result.returncode == 0
+        # No recent missions section
+        assert "Recent missions" not in result.stdout
+
+    def test_last_zero_shows_no_recent_missions(self, tmp_path: Path) -> None:
+        """--last 0 → empty recent section."""
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "history", "--missions-dir", self._missions_dir(tmp_path),
+            "--last", "0", cwd=tmp_path,
+        )
+        assert "Recent missions" not in result.stdout
+
+    def test_history_accepts_mission_dir_singular(self, tmp_path: Path) -> None:
+        """--mission-dir alias works for history."""
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "history", "--mission-dir", self._missions_dir(tmp_path),
+            cwd=tmp_path,
+        )
+        assert "Fleet Intelligence" in result.stdout

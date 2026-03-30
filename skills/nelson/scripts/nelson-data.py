@@ -27,7 +27,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -89,9 +91,24 @@ def _read_json(path: Path) -> dict | list:
 
 
 def _write_json(path: Path, data: Any) -> None:
-    """Write *data* as formatted JSON.  Creates parent directories."""
+    """Write *data* as formatted JSON.  Creates parent directories.
+
+    Uses a temporary file + os.replace() for atomic writes so a crash
+    mid-write cannot corrupt the target file.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=JSON_INDENT) + "\n", encoding="utf-8")
+    content = json.dumps(data, indent=JSON_INDENT) + "\n"
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _append_event(mission_dir: Path, event: dict) -> None:
@@ -215,13 +232,20 @@ def _get_last_checkpoint_number(events: list[dict]) -> int:
 
 
 def _read_json_optional(path: Path) -> dict | None:
-    """Read and parse a JSON file, returning None if it doesn't exist."""
-    if not path.exists():
-        return None
+    """Read and parse a JSON file, returning None if it doesn't exist.
+
+    FileNotFoundError is silent; corrupt JSON and OS errors emit a warning.
+    """
     try:
         text = path.read_text(encoding="utf-8")
         return json.loads(text)
-    except (json.JSONDecodeError, OSError):
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError:
+        _err(f"Warning: corrupt JSON at {path}, skipping")
+        return None
+    except OSError as exc:
+        _err(f"Warning: could not read {path}: {exc}")
         return None
 
 
@@ -230,16 +254,6 @@ def _safe_mean(values: list[float | int]) -> float | None:
     if not values:
         return None
     return sum(values) / len(values)
-
-
-def _safe_sum_by_key(dicts: list[dict], key: str) -> int:
-    """Sum *key* across *dicts*, skipping missing or None values."""
-    total = 0
-    for d in dicts:
-        val = d.get(key)
-        if val is not None:
-            total += val
-    return total
 
 
 def _build_empty_index() -> dict:
@@ -278,16 +292,18 @@ def _extract_fleet_details(battle_plan: dict) -> dict:
     }
 
 
-def _build_mission_record(mission_dir: Path) -> dict:
+def _build_mission_record(mission_dir: Path) -> dict | None:
     """Build a denormalized mission record from all JSON files in *mission_dir*.
 
-    Requires stand-down.json to exist.  Enriches from battle-plan.json,
-    sailing-orders.json, and mission-log.json when available.
+    Returns None if stand-down.json is missing or corrupt.  Enriches from
+    battle-plan.json, sailing-orders.json, and mission-log.json when available.
     """
     mission_id = mission_dir.name
 
-    # Stand-down is the gate — caller guarantees it exists
-    stand_down = _read_json(mission_dir / "stand-down.json")
+    # Stand-down is the gate — return None if unreadable
+    stand_down = _read_json_optional(mission_dir / "stand-down.json")
+    if stand_down is None:
+        return None
 
     # Optional enrichment sources
     battle_plan = _read_json_optional(mission_dir / "battle-plan.json") or {}
@@ -1142,6 +1158,12 @@ def cmd_index(args: argparse.Namespace) -> None:
     else:
         index = _read_json_optional(index_path) or _build_empty_index()
 
+    # Guard against future version bumps
+    if not rebuild and index.get("version") is not None and index["version"] != 1:
+        _err(f"Warning: index version {index['version']} != 1, rebuilding")
+        index = _build_empty_index()
+        rebuild = True
+
     indexed_ids = {m["mission_id"] for m in index.get("missions", [])}
 
     # Discover completed missions
@@ -1150,8 +1172,8 @@ def cmd_index(args: argparse.Namespace) -> None:
     # Filter to new missions only (unless rebuilding)
     new_dirs = completed if rebuild else [d for d in completed if d.name not in indexed_ids]
 
-    # Build records
-    new_records = [_build_mission_record(d) for d in new_dirs]
+    # Build records (skip missions with unreadable stand-down.json)
+    new_records = [r for r in (_build_mission_record(d) for d in new_dirs) if r is not None]
 
     # Merge and sort
     all_missions = (
@@ -1354,6 +1376,7 @@ def cmd_history(args: argparse.Namespace) -> None:
     """Display fleet intelligence analytics from the index."""
     missions_dir = Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
     index_path = missions_dir.parent / "fleet-intelligence.json"
+    last_n = max(0, args.last)
 
     if not index_path.exists():
         _die("No fleet intelligence index found. Run 'nelson-data index' first.")
@@ -1366,9 +1389,11 @@ def cmd_history(args: argparse.Namespace) -> None:
     analytics = _compute_analytics(missions)
 
     if args.json_output:
-        print(_format_history_json(analytics, missions))
+        recent = list(reversed(missions))[:last_n]
+        recent.reverse()
+        print(_format_history_json(analytics, recent))
     else:
-        print(_format_history_text(analytics, missions, args.last))
+        print(_format_history_text(analytics, missions, last_n))
 
 
 # ---------------------------------------------------------------------------
@@ -1472,11 +1497,13 @@ def build_parser() -> argparse.ArgumentParser:
     # --- index ---
     p_idx = subs.add_parser("index", help="Build fleet intelligence index")
     p_idx.add_argument("--missions-dir", default=None, help="Missions directory path")
+    p_idx.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
     p_idx.add_argument("--rebuild", action="store_true", help="Force full re-index")
 
     # --- history ---
     p_hist = subs.add_parser("history", help="Display fleet intelligence analytics")
     p_hist.add_argument("--missions-dir", default=None, help="Missions directory path")
+    p_hist.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
     p_hist.add_argument(
         "--json", dest="json_output", action="store_true",
         help="Output as JSON",
