@@ -22,7 +22,7 @@ python3 scripts/nelson-data.py init \
 
 ### `squadron` — Record squadron formation
 
-Run at Step 2 after the squadron is formed.
+Run at Step 3 after the squadron is formed.
 
 Updates `battle-plan.json` with the squadron section. Appends `squadron_formed` event to `mission-log.json`. Writes initial `fleet-status.json`.
 
@@ -40,7 +40,7 @@ Repeat `--captain "name:class:model:task_id"` for each captain. Fields are colon
 
 ### `task` — Add task to battle plan
 
-Run at Step 3 once per task.
+Run at Step 2 once per task.
 
 Appends task to `battle-plan.json`.
 
@@ -55,7 +55,7 @@ python3 scripts/nelson-data.py task \
 
 ### `plan-approved` — Finalize battle plan
 
-Run at Step 3 after all tasks are added.
+Run at Step 2 after all tasks are added.
 
 Computes `parallel_tracks` and `critical_path_length` from the dependency graph. Appends `battle_plan_approved` event to `mission-log.json`. Updates `fleet-status.json`.
 
@@ -125,8 +125,8 @@ python3 scripts/nelson-data.py status \
 | Workflow Step | Script Command | JSON Written | Prose (existing) |
 |---|---|---|---|
 | Step 1: Sailing Orders | `init` | `sailing-orders.json`, `mission-log.json` | (conversation-only) |
-| Step 2: Form Squadron | `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
-| Step 3: Battle Plan | `task` (per task), then `plan-approved` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
+| Step 2: Battle Plan | `task` (per task), then `plan-approved` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
+| Step 3: Form Squadron | `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
 | Step 4: Each Checkpoint | `checkpoint` | `mission-log.json`, `fleet-status.json` | `quarterdeck-report.md` |
 | Step 4: Between Checkpoints | `event` | `mission-log.json` | -- |
 | Step 4: Relief on Station | `event --type relief_on_station` | `mission-log.json` | `turnover-briefs/{ship}.md` |
@@ -137,8 +137,8 @@ python3 scripts/nelson-data.py status \
 
 | Event Type | Trigger | Key Data Fields |
 |---|---|---|
-| `squadron_formed` | Step 2 complete | captain_count, has_red_cell, execution_mode, standing_order_check |
-| `battle_plan_approved` | Step 3 complete | task_count, parallel_tracks, critical_path_length, standing_order_check |
+| `squadron_formed` | Step 3 complete | captain_count, has_red_cell, execution_mode, standing_order_check |
+| `battle_plan_approved` | Step 2 complete | task_count, parallel_tracks, critical_path_length, standing_order_check |
 | `task_started` | Captain begins work | task_id, task_name, owner |
 | `task_completed` | Task verified complete | task_id, task_name, owner, station_tier, verification |
 | `checkpoint` | Each quarterdeck checkpoint | progress, budget, hull_summary, blockers, admiral_decision |

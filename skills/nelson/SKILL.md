@@ -67,7 +67,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
-**Structured Data Capture:** Run `python3 scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task in the battle plan, then run `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise. See `references/structured-data.md` for task arguments.
+**Structured Data Capture:** Run `python3 scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." ...` for each task in the battle plan (owners are not yet assigned — omit `--owner`), then run `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise. See `references/structured-data.md` for task arguments.
 
 ## 3. Form the Squadron
 
@@ -112,6 +112,8 @@ Actions marked `timing: before task starts` require your sign-off before the rel
 Do not spawn any agents or create any tasks until the user approves. If the user requests changes, revise and redisplay before proceeding.
 
 > **Note:** Nelson requires an interactive session for formation approval. Headless and CI invocation are not supported at this time.
+
+**Structured Data Capture:** Once formation is approved, run `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
