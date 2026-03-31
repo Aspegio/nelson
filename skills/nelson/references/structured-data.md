@@ -40,7 +40,7 @@ Repeat `--captain "name:class:model:task_id"` for each captain. Fields are colon
 
 ### `task` — Add task to battle plan
 
-Run at Step 2 once per task.
+Run at Step 3 once per task, after owners are assigned during squadron formation.
 
 Appends task to `battle-plan.json`.
 
@@ -55,7 +55,7 @@ python3 scripts/nelson-data.py task \
 
 ### `plan-approved` — Finalize battle plan
 
-Run at Step 2 after all tasks are added.
+Run at Step 3 after all tasks are added, before the `squadron` call.
 
 Computes `parallel_tracks` and `critical_path_length` from the dependency graph. Appends `battle_plan_approved` event to `mission-log.json`. Updates `fleet-status.json`.
 
@@ -125,8 +125,8 @@ python3 scripts/nelson-data.py status \
 | Workflow Step | Script Command | JSON Written | Prose (existing) |
 |---|---|---|---|
 | Step 1: Sailing Orders | `init` | `sailing-orders.json`, `mission-log.json` | (conversation-only) |
-| Step 2: Battle Plan | `task` (per task), then `plan-approved` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
-| Step 3: Form Squadron | `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
+| Step 2: Battle Plan | (none — owners not yet assigned) | — | (conversation-only) |
+| Step 3: Form Squadron | `task` (per task), then `plan-approved`, then `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
 | Step 4: Each Checkpoint | `checkpoint` | `mission-log.json`, `fleet-status.json` | `quarterdeck-report.md` |
 | Step 4: Between Checkpoints | `event` | `mission-log.json` | -- |
 | Step 4: Relief on Station | `event --type relief_on_station` | `mission-log.json` | `turnover-briefs/{ship}.md` |
