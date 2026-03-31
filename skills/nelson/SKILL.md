@@ -80,8 +80,6 @@ If any answer triggers a standing order, you MUST apply the corrective action an
 - Add `1 red-cell navigator` for medium/high threat work. Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
 - If the sailing orders express cost-savings priority, load `references/model-selection.md` before assigning models. Apply weight-based model selection to all `Agent` tool calls and include haiku briefing enhancements for agents assigned to haiku.
 
-**Formation Orders — Display and Permission Gate:** Display the complete squadron formation to the user. The battle plan (drafted in Step 2) should also be available for review. Wait for explicit permission to proceed.
-
 ```
 SQUADRON FORMATION ORDERS
 
@@ -126,7 +124,14 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a turnover brief using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
 
-## 4. Run Quarterdeck Rhythm
+## 4. Get Permission to Sail
+
+**Display and Permission Gate:**
+1. Display the complete battle plan to the user if `becalmed-fleet.md` is in effect.
+2. Display the complete squadron formation to the user if `bacalmed-fleet.md` is not in effect. The battle plan (drafted in Step 2) should also be available for review.
+3. You are REQUIRED to wait for explicit permission to proceed.
+
+## 5. Run Quarterdeck Rhythm
 
 **Idle notification rule (immediate — do not defer to checkpoint):** Every time an idle notification arrives from a ship, ask two questions before doing anything else:
 1. Is this ship's task marked complete?
