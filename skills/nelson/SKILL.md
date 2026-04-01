@@ -116,13 +116,15 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 2. `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
 3. `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
 
-**Fleet Dashboard (opt-in):** Only launch the dashboard if the user explicitly requests it (e.g. "with dashboard", "launch dashboard", "mission control"). If requested, after `nelson-data.py squadron` completes:
+**Fleet Dashboard (opt-in):** Only offer the dashboard if the user explicitly requests it (e.g. "with dashboard", "launch dashboard", "mission control"). If requested, after `nelson-data.py squadron` completes, display the launch instructions for the user to run in a separate terminal:
 
-1. Check if port 8420 is already in use: `lsof -ti :8420`
-2. If not, start the server: `nohup python3 -m http.server 8420 > /dev/null 2>&1 &`
-3. Open the dashboard: `open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission={mission-dir}"`
+```
+Fleet Dashboard — run in a separate terminal:
+  python3 -m http.server 8420
+  open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission={mission-dir}"
+```
 
-Use `127.0.0.1` (not `localhost`) to avoid IPv6 binding issues. Use `nohup` so the server survives after the shell call returns. The dashboard polls `fleet-status.json` every 3 seconds and is read-only.
+Do NOT start the server from within the Claude Code session — the HTTP access logs will bloat the context window. The dashboard polls `fleet-status.json` every 3 seconds and is read-only.
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
