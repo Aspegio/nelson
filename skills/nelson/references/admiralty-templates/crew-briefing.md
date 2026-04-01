@@ -45,6 +45,9 @@ Standing Orders:
   before acting.
 - If you reach a step requiring human action (admiralty-action-required: yes), invoke
   the awaiting-admiralty standing order: references/standing-orders/awaiting-admiralty.md
+- Shutdown protocol: if you receive `{"type": "shutdown_request"}`, respond immediately
+  with `{"type": "shutdown_response"}` and cease all activity. Do NOT respond with an
+  idle notification or any other message type.
 Marine Deployment Brief: use the full template at
   references/admiralty-templates/marine-deployment-brief.md — it includes model
   assignment guidance and haiku briefing requirements.
