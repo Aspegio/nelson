@@ -373,6 +373,8 @@ Edit `references/squadron-composition.md` to adjust the decision matrix or defau
 
 Nelson includes a live web dashboard that visualises mission state in the browser. It polls `fleet-status.json` every 3 seconds and renders ship cards, task progress, budget consumption, events, and blockers in real time.
 
+<img width="1193" height="771" alt="nelson_dashboard" src="https://github.com/user-attachments/assets/4e6241ad-19b8-4c81-8ea7-a8cd3ee26838" />
+
 To use it, include "with dashboard" in your request:
 
 ```
