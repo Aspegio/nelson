@@ -35,6 +35,14 @@ skills/nelson/
     structured-data.md      — Structured fleet data capture reference
     tool-mapping.md         — Nelson-to-Claude Code tool reference
     standing-orders/        — One file per anti-pattern, loaded on demand
+  fleet-dashboard/          — Live web dashboard for mission visualisation
+    index.html
+    css/main.css
+    css/components.css
+    js/data-loader.js
+    js/renderer.js
+    js/app.js
+    test/fixture.json
 agents/                   — Agent interface definitions
 demos/                    — Example applications built with Nelson
 scripts/                  — Maintenance & utility scripts

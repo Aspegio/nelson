@@ -116,6 +116,16 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 2. `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
 3. `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
 
+**Fleet Dashboard:** After `nelson-data.py squadron` completes, output the dashboard launch command:
+
+```
+Fleet Dashboard available:
+  python3 -m http.server 8420 &
+  open "http://localhost:8420/skills/nelson/fleet-dashboard/index.html?mission={mission-dir}"
+```
+
+The dashboard polls `fleet-status.json` every 3 seconds and renders live mission state in the browser. It is read-only and requires no additional setup beyond the HTTP server.
+
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
 **Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then create and assign work with `TaskCreate` + `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
