@@ -15,6 +15,10 @@ Usage examples:
     python3 nelson-data.py checkpoint --mission-dir .nelson/missions/2026-03-27_120000 ...
     python3 nelson-data.py stand-down --mission-dir .nelson/missions/2026-03-27_120000 ...
     python3 nelson-data.py status --mission-dir .nelson/missions/2026-03-27_120000
+    python3 nelson-data.py index
+    python3 nelson-data.py index --missions-dir .nelson/missions --rebuild
+    python3 nelson-data.py history
+    python3 nelson-data.py history --json --last 5
 
 No external dependencies — stdlib only.
 """
@@ -23,7 +27,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -85,9 +92,30 @@ def _read_json(path: Path) -> dict | list:
 
 
 def _write_json(path: Path, data: Any) -> None:
-    """Write *data* as formatted JSON.  Creates parent directories."""
+    """Write *data* as formatted JSON.  Creates parent directories.
+
+    Uses a temporary file + os.replace() for atomic writes so a crash
+    mid-write cannot corrupt the target file.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=JSON_INDENT) + "\n", encoding="utf-8")
+    content = json.dumps(data, indent=JSON_INDENT) + "\n"
+    try:
+        existing_mode = stat.S_IMODE(os.stat(path).st_mode)
+    except OSError:
+        existing_mode = None
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        if existing_mode is not None:
+            os.chmod(tmp, existing_mode)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _append_event(mission_dir: Path, event: dict) -> None:
@@ -203,6 +231,151 @@ def _get_last_checkpoint_number(events: list[dict]) -> int:
         if e.get("type") == "checkpoint"
     ]
     return max(nums) if nums else 0
+
+
+# ---------------------------------------------------------------------------
+# Fleet Intelligence — Helpers
+# ---------------------------------------------------------------------------
+
+
+def _read_json_optional(path: Path) -> dict | None:
+    """Read and parse a JSON file, returning None if it doesn't exist.
+
+    FileNotFoundError is silent; corrupt JSON and OS errors emit a warning.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+        return json.loads(text)
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError:
+        _err(f"Warning: corrupt JSON at {path}, skipping")
+        return None
+    except OSError as exc:
+        _err(f"Warning: could not read {path}: {exc}")
+        return None
+
+
+def _safe_mean(values: list[float | int]) -> float | None:
+    """Return the mean of *values*, or None if the list is empty."""
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _build_empty_index() -> dict:
+    """Return an empty fleet intelligence index structure."""
+    return {
+        "version": 1,
+        "indexed_at": None,
+        "mission_count": 0,
+        "missions": [],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Fleet Intelligence — Record Builders
+# ---------------------------------------------------------------------------
+
+
+def _find_completed_missions(missions_dir: Path) -> list[Path]:
+    """Return sorted list of mission dirs that contain a stand-down.json."""
+    if not missions_dir.is_dir():
+        return []
+    return sorted(p.parent for p in missions_dir.glob("*/stand-down.json"))
+
+
+def _extract_fleet_details(battle_plan: dict) -> dict:
+    """Extract squadron metadata from a battle-plan dict."""
+    squadron = battle_plan.get("squadron", {})
+    admiral = squadron.get("admiral", {})
+    captains = squadron.get("captains", [])
+    return {
+        "admiral_model": admiral.get("model"),
+        "captain_count": len(captains),
+        "ship_classes": [c.get("ship_class", "unknown") for c in captains],
+        "captain_models": [c.get("model", "unknown") for c in captains],
+        "had_red_cell": "red_cell" in squadron,
+    }
+
+
+def _build_mission_record(mission_dir: Path) -> dict | None:
+    """Build a denormalized mission record from all JSON files in *mission_dir*.
+
+    Returns None if stand-down.json is missing or corrupt.  Enriches from
+    battle-plan.json, sailing-orders.json, and mission-log.json when available.
+    """
+    mission_id = mission_dir.name
+
+    # Stand-down is the gate — return None if unreadable
+    stand_down = _read_json_optional(mission_dir / "stand-down.json")
+    if stand_down is None:
+        return None
+
+    # Optional enrichment sources
+    battle_plan = _read_json_optional(mission_dir / "battle-plan.json") or {}
+    sailing_orders = _read_json_optional(mission_dir / "sailing-orders.json") or {}
+    mission_log = _read_json_optional(mission_dir / "mission-log.json") or {}
+
+    # Fleet details from battle-plan
+    fleet_details = _extract_fleet_details(battle_plan)
+
+    # Execution mode from squadron_formed event
+    events = mission_log.get("events", [])
+    execution_mode = "subagents"
+    for ev in events:
+        if ev.get("type") == "squadron_formed":
+            execution_mode = ev.get("data", {}).get("execution_mode", "subagents")
+            break
+
+    # Merge fleet from stand-down + battle-plan enrichment
+    sd_fleet = stand_down.get("fleet", {})
+    fleet = {
+        "ships_used": sd_fleet.get("ships_used", 0),
+        "reliefs": sd_fleet.get("reliefs", 0),
+        "max_concurrent_ships": sd_fleet.get("max_concurrent_ships", 0),
+        "execution_mode": execution_mode,
+        **fleet_details,
+    }
+
+    # Tasks from stand-down + task names/files from battle-plan
+    sd_tasks = stand_down.get("tasks", {})
+    bp_tasks = battle_plan.get("tasks", [])
+    task_names = [t.get("name", "") for t in bp_tasks]
+    file_ownership = [f for t in bp_tasks for f in t.get("file_ownership", [])]
+
+    tasks = {
+        "completed": sd_tasks.get("completed", 0),
+        "total": sd_tasks.get("total", 0),
+        "by_station_tier": sd_tasks.get("by_station_tier", {"0": 0, "1": 0, "2": 0, "3": 0}),
+        "task_names": task_names,
+        "file_ownership": file_ownership,
+    }
+
+    # Timestamps
+    created_at = sailing_orders.get("created_at") or stand_down.get("created_at")
+    completed_at = stand_down.get("created_at")
+
+    # Event types from mission log
+    event_types = sorted({ev["type"] for ev in events if ev.get("type")})
+
+    return {
+        "mission_id": mission_id,
+        "outcome_achieved": stand_down.get("outcome_achieved", False),
+        "planned_outcome": stand_down.get("planned_outcome", ""),
+        "actual_outcome": stand_down.get("actual_outcome", ""),
+        "success_metric": sailing_orders.get("success_metric", ""),
+        "success_metric_result": stand_down.get("success_metric_result", ""),
+        "created_at": created_at,
+        "completed_at": completed_at,
+        "duration_minutes": stand_down.get("duration_minutes"),
+        "budget": stand_down.get("budget", {}),
+        "fleet": fleet,
+        "tasks": tasks,
+        "quality": stand_down.get("quality", {}),
+        "reusable_patterns": stand_down.get("reusable_patterns", {"adopt": [], "avoid": []}),
+        "event_types": event_types,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -974,6 +1147,285 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Subcommand: index
+# ---------------------------------------------------------------------------
+
+
+def _resolve_fleet_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    """Return (missions_dir, index_path) from parsed arguments."""
+    missions_dir = Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
+    index_path = missions_dir.parent / "fleet-intelligence.json"
+    return missions_dir, index_path
+
+
+def cmd_index(args: argparse.Namespace) -> None:
+    """Build or update the fleet intelligence index.
+
+    Note: not safe for concurrent execution — the read-modify-write on
+    fleet-intelligence.json has no file-level locking.  Acceptable for a
+    single-agent CLI tool; add locking if parallel indexers are ever needed.
+    """
+    missions_dir, index_path = _resolve_fleet_paths(args)
+    rebuild = bool(getattr(args, "rebuild", False))
+
+    # Load existing index or start fresh
+    if rebuild:
+        index = _build_empty_index()
+    else:
+        index = _read_json_optional(index_path) or _build_empty_index()
+
+    # Guard against future version bumps
+    if not rebuild and index.get("version") is not None and index["version"] != 1:
+        _err(f"Warning: index version {index['version']} != 1, rebuilding")
+        index = _build_empty_index()
+        rebuild = True
+
+    indexed_ids = {m["mission_id"] for m in index.get("missions", [])}
+
+    # Discover completed missions
+    completed = _find_completed_missions(missions_dir)
+
+    # Filter to new missions only (unless rebuilding)
+    new_dirs = completed if rebuild else [d for d in completed if d.name not in indexed_ids]
+
+    # Build records (skip missions with unreadable stand-down.json)
+    new_records = [r for r in (_build_mission_record(d) for d in new_dirs) if r is not None]
+
+    # Merge and sort
+    all_missions = (
+        new_records if rebuild
+        else list(index.get("missions", [])) + new_records
+    )
+    all_missions.sort(key=lambda m: m["mission_id"])
+
+    updated_index = {
+        "version": 1,
+        "indexed_at": _now_iso(),
+        "mission_count": len(all_missions),
+        "missions": all_missions,
+    }
+    _write_json(index_path, updated_index)
+
+    print(
+        f"[nelson-data] Fleet intelligence indexed: "
+        f"{len(all_missions)} missions ({len(new_records)} new)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Subcommand: history
+# ---------------------------------------------------------------------------
+
+
+def _collect_ship_class_counts(missions: list[dict]) -> dict[str, int]:
+    """Count ship class usage across missions, descending by count."""
+    counts: dict[str, int] = {}
+    for m in missions:
+        for cls in m.get("fleet", {}).get("ship_classes", []):
+            counts[cls] = counts.get(cls, 0) + 1
+    return dict(sorted(counts.items(), key=lambda x: -x[1]))
+
+
+def _collect_station_tier_totals(missions: list[dict]) -> dict[str, int]:
+    """Accumulate task counts by station tier (0-3 only)."""
+    totals: dict[str, int] = {"0": 0, "1": 0, "2": 0, "3": 0}
+    for m in missions:
+        tiers = m.get("tasks", {}).get("by_station_tier", {})
+        for tier, count in tiers.items():
+            if tier in totals:
+                totals[tier] += count
+    return totals
+
+
+def _compute_analytics(missions: list[dict]) -> dict:
+    """Compute aggregate analytics across all mission records."""
+    if not missions:
+        return {
+            "mission_count": 0,
+            "achieved": 0,
+            "not_achieved": 0,
+            "win_rate": None,
+            "avg_duration": None,
+            "min_duration": None,
+            "max_duration": None,
+            "avg_tokens_consumed": None,
+            "avg_budget_pct": None,
+            "avg_ships": None,
+            "avg_tasks": None,
+            "violations_per_mission": None,
+            "blockers_per_mission": None,
+            "ship_class_counts": {},
+            "station_tier_totals": {"0": 0, "1": 0, "2": 0, "3": 0},
+        }
+
+    achieved = sum(1 for m in missions if m.get("outcome_achieved"))
+    not_achieved = len(missions) - achieved
+    win_rate = round(achieved / len(missions) * 100, 1)
+
+    durations = [m["duration_minutes"] for m in missions
+                 if m.get("duration_minutes") is not None]
+    tokens = [v for m in missions if (v := m.get("budget", {}).get("tokens_consumed")) is not None]
+    budget_pcts = [v for m in missions if (v := m.get("budget", {}).get("pct_consumed")) is not None]
+    ships = [v for m in missions if (v := m.get("fleet", {}).get("ships_used")) is not None]
+    task_totals = [v for m in missions if (v := m.get("tasks", {}).get("total")) is not None]
+    violations = [v for m in missions
+                  if (v := m.get("quality", {}).get("standing_order_violations")) is not None]
+    blockers = [v for m in missions if (v := m.get("quality", {}).get("blockers_raised")) is not None]
+
+    ship_class_counts = _collect_ship_class_counts(missions)
+    station_tier_totals = _collect_station_tier_totals(missions)
+
+    avg_dur = _safe_mean(durations)
+    avg_tok = _safe_mean(tokens)
+    avg_bpct = _safe_mean(budget_pcts)
+    avg_shp = _safe_mean(ships)
+    avg_tsk = _safe_mean(task_totals)
+    avg_viol = _safe_mean(violations)
+    avg_blk = _safe_mean(blockers)
+
+    return {
+        "mission_count": len(missions),
+        "achieved": achieved,
+        "not_achieved": not_achieved,
+        "win_rate": win_rate,
+        "avg_duration": round(avg_dur, 1) if avg_dur is not None else None,
+        "min_duration": min(durations) if durations else None,
+        "max_duration": max(durations) if durations else None,
+        "avg_tokens_consumed": int(round(avg_tok)) if avg_tok is not None else None,
+        "avg_budget_pct": round(avg_bpct, 1) if avg_bpct is not None else None,
+        "avg_ships": round(avg_shp, 1) if avg_shp is not None else None,
+        "avg_tasks": round(avg_tsk, 1) if avg_tsk is not None else None,
+        "violations_per_mission": round(avg_viol, 2) if avg_viol is not None else None,
+        "blockers_per_mission": round(avg_blk, 2) if avg_blk is not None else None,
+        "ship_class_counts": ship_class_counts,
+        "station_tier_totals": station_tier_totals,
+    }
+
+
+def _format_history_text(
+    analytics: dict,
+    missions: list[dict],
+    last_n: int,
+) -> str:
+    """Format fleet intelligence as human-readable text."""
+    lines: list[str] = []
+    mc = analytics["mission_count"]
+    lines.append(f"Fleet Intelligence \u2014 {mc} missions indexed")
+    lines.append("")
+
+    if mc == 0:
+        lines.append("  No missions to display.")
+        return "\n".join(lines)
+
+    # Outcome
+    lines.append(
+        f"  Outcome    {mc} missions: {analytics['achieved']} achieved, "
+        f"{analytics['not_achieved']} not achieved ({analytics['win_rate']}% win rate)"
+    )
+
+    # Duration
+    avg_d = analytics["avg_duration"]
+    if avg_d is not None:
+        lines.append(
+            f"  Duration   avg {avg_d} min "
+            f"(range: {analytics['min_duration']}\u2013{analytics['max_duration']})"
+        )
+
+    # Tokens
+    avg_t = analytics["avg_tokens_consumed"]
+    if avg_t is not None:
+        token_str = f"{round(avg_t / 1000)}K" if avg_t >= 1000 else str(avg_t)
+        lines.append(
+            f"  Tokens     avg {token_str} consumed, "
+            f"avg {analytics['avg_budget_pct']}% of budget"
+        )
+
+    # Squadron
+    avg_s = analytics["avg_ships"]
+    if avg_s is not None:
+        lines.append(
+            f"  Squadron   avg {avg_s} ships, "
+            f"avg {analytics['avg_tasks']} tasks per mission"
+        )
+
+    # Quality
+    vpm = analytics["violations_per_mission"]
+    if vpm is not None:
+        lines.append(
+            f"  Quality    {vpm} violations/mission, "
+            f"{analytics['blockers_per_mission']} blockers/mission"
+        )
+
+    lines.append("")
+
+    # Ship classes
+    scc = analytics["ship_class_counts"]
+    if scc:
+        parts = [f"{cls} ({count})" for cls, count in scc.items()]
+        lines.append(f"  Ship classes   {', '.join(parts)}")
+
+    # Station tiers
+    stt = analytics["station_tier_totals"]
+    tier_parts = [f"{k}: {v} tasks" for k, v in sorted(stt.items())]
+    lines.append(f"  Station tiers  {', '.join(tier_parts)}")
+
+    lines.append("")
+
+    lines.extend(_format_recent_missions(missions, last_n))
+
+    return "\n".join(lines)
+
+
+def _format_recent_missions(missions: list[dict], last_n: int) -> list[str]:
+    """Format the recent missions section (most recent first)."""
+    recent = list(reversed(missions))[:last_n]
+    if not recent:
+        return []
+    lines: list[str] = []
+    lines.append("  Recent missions")
+    lines.append("  " + "\u2500" * 62)
+    for m in recent:
+        mid = m["mission_id"]
+        date_str = mid[:10] if len(mid) >= 10 else mid
+        marker = "\u2713" if m.get("outcome_achieved") else "\u2717"
+        outcome = m.get("actual_outcome") or m.get("planned_outcome", "")
+        if len(outcome) > 50:
+            outcome = outcome[:47] + "..."
+        lines.append(f"  {date_str}  {marker}  {outcome}")
+    return lines
+
+
+def _format_history_json(analytics: dict, missions: list[dict]) -> str:
+    """Format fleet intelligence as machine-readable JSON."""
+    return json.dumps(
+        {"analytics": analytics, "missions": missions},
+        indent=JSON_INDENT,
+    )
+
+
+def cmd_history(args: argparse.Namespace) -> None:
+    """Display fleet intelligence analytics from the index."""
+    missions_dir, index_path = _resolve_fleet_paths(args)
+    last_n = max(0, args.last)
+
+    if not index_path.exists():
+        _die("No fleet intelligence index found. Run 'nelson-data index' first.")
+
+    index = _read_json_optional(index_path)
+    if index is None:
+        _die("Failed to read fleet intelligence index.")
+
+    missions = index.get("missions", [])
+    analytics = _compute_analytics(missions)
+
+    if args.json_output:
+        recent = list(reversed(missions))[:last_n]
+        print(_format_history_json(analytics, recent))
+    else:
+        print(_format_history_text(analytics, missions, last_n))
+
+
+# ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
 
@@ -1071,6 +1523,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_st = subs.add_parser("status", help="Print current fleet status")
     p_st.add_argument("--mission-dir", required=True, help="Mission directory path")
 
+    # --- index ---
+    p_idx = subs.add_parser("index", help="Build fleet intelligence index")
+    p_idx.add_argument("--missions-dir", default=None, help="Missions directory path")
+    # Alias: --mission-dir accepted for consistency with other subcommands
+    p_idx.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
+    p_idx.add_argument("--rebuild", action="store_true", help="Force full re-index")
+
+    # --- history ---
+    p_hist = subs.add_parser("history", help="Display fleet intelligence analytics")
+    p_hist.add_argument("--missions-dir", default=None, help="Missions directory path")
+    # Alias: --mission-dir accepted for consistency with other subcommands
+    p_hist.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
+    p_hist.add_argument(
+        "--json", dest="json_output", action="store_true",
+        help="Output as JSON",
+    )
+    p_hist.add_argument("--last", type=int, default=10, help="Recent missions to show")
+
     return parser
 
 
@@ -1099,6 +1569,8 @@ def main() -> None:
         "checkpoint": lambda: cmd_checkpoint(args),
         "stand-down": lambda: cmd_stand_down(args),
         "status": lambda: cmd_status(args),
+        "index": lambda: cmd_index(args),
+        "history": lambda: cmd_history(args),
     }
 
     handler = dispatch.get(args.command)
