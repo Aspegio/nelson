@@ -1,0 +1,292 @@
+/* ============================================================
+   NELSON FLEET DASHBOARD — Component Styles
+   Dynamic classes, animations, hover effects, and utilities.
+   Structural layout is handled inline in index.html.
+   ============================================================ */
+
+/* ── Animations ──────────────────────────────────────────── */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Status Badge ─────────────────────────────────────────── */
+
+#status-badge.status--underway {
+  background: rgba(46, 204, 113, 0.12);
+  border-color: rgba(46, 204, 113, 0.3);
+  color: var(--signal-green);
+}
+
+#status-badge.status--complete {
+  background: rgba(241, 196, 15, 0.12);
+  border-color: rgba(241, 196, 15, 0.3);
+  color: var(--signal-gold);
+}
+
+/* ── Polling Dot ──────────────────────────────────────────── */
+
+#polling-dot.polling--active {
+  background: var(--signal-green) !important;
+  box-shadow: 0 0 6px var(--signal-green-glow);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+#polling-dot.polling--lost {
+  background: var(--signal-red) !important;
+  box-shadow: none;
+  animation: none;
+}
+
+/* ── Ship Cards ───────────────────────────────────────────── */
+
+.ship-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.ship-card:hover {
+  border-color: var(--glass-highlight);
+}
+
+.ship-card--highlight {
+  border-color: rgba(46, 204, 113, 0.5);
+  box-shadow: var(--shadow-glow-green);
+}
+
+.ship-card__name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ship-card__class {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.ship-card__hull-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(74, 111, 165, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.ship-card__hull-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width var(--transition-mid);
+}
+
+.ship-card__hull-label {
+  font-family: 'SF Mono', 'Fira Mono', 'Cascadia Code', monospace;
+  font-size: 0.7rem;
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.ship-card__task {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ship-card__task-status {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-top: 0.15rem;
+}
+
+/* ── Hull Colours ─────────────────────────────────────────── */
+
+.hull--green {
+  background: linear-gradient(90deg, var(--signal-green-dark), var(--signal-green));
+}
+
+.hull--amber {
+  background: linear-gradient(90deg, var(--signal-amber-dark), var(--signal-amber));
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.hull--red {
+  background: linear-gradient(90deg, var(--signal-red-dark), var(--signal-red));
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.hull--critical {
+  background: var(--signal-red-dark);
+  animation: pulse 0.5s ease-in-out infinite;
+}
+
+/* ── Task Table ───────────────────────────────────────────── */
+
+#task-tbody tr {
+  border-bottom: 1px solid rgba(74, 111, 165, 0.1);
+  transition: background var(--transition-fast);
+}
+
+#task-tbody tr:hover {
+  background: rgba(74, 111, 165, 0.08);
+}
+
+#task-tbody td {
+  padding: 0.45rem 0.5rem;
+  vertical-align: middle;
+}
+
+.task--completed {
+  opacity: 0.6;
+}
+
+.task--blocked {
+  border-left: 3px solid var(--signal-red) !important;
+}
+
+.task--active {
+  border-left: 3px solid var(--signal-green) !important;
+  box-shadow: inset 3px 0 8px rgba(46, 204, 113, 0.15);
+}
+
+.task-status-icon {
+  margin-right: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.station-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(74, 111, 165, 0.2);
+  border: 1px solid rgba(74, 111, 165, 0.3);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.station-badge--0 { background: rgba(46, 204, 113, 0.12); border-color: rgba(46, 204, 113, 0.3); color: var(--signal-green); }
+.station-badge--1 { background: rgba(241, 196, 15, 0.12); border-color: rgba(241, 196, 15, 0.3); color: var(--signal-gold); }
+.station-badge--2 { background: rgba(243, 156, 18, 0.12); border-color: rgba(243, 156, 18, 0.3); color: var(--signal-amber); }
+.station-badge--3 { background: rgba(231, 76, 60, 0.12); border-color: rgba(231, 76, 60, 0.3); color: var(--signal-red); }
+
+/* ── Budget Bar Colour Variants ───────────────────────────── */
+
+#budget-bar.budget--green {
+  background: linear-gradient(90deg, var(--signal-green-dark), var(--signal-green));
+}
+
+#budget-bar.budget--amber {
+  background: linear-gradient(90deg, var(--signal-amber-dark), var(--signal-amber));
+}
+
+#budget-bar.budget--red {
+  background: linear-gradient(90deg, var(--signal-red-dark), var(--signal-red));
+}
+
+/* ── Event Log Entries ────────────────────────────────────── */
+
+#events-log {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.event-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  line-height: 1.4;
+}
+
+.event-entry__time {
+  font-family: 'SF Mono', 'Fira Mono', 'Cascadia Code', monospace;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.event-entry__icon {
+  flex-shrink: 0;
+}
+
+.event-entry__icon--info    { color: var(--steel-bright); }
+.event-entry__icon--success { color: var(--signal-green); }
+.event-entry__icon--warning { color: var(--signal-amber); }
+.event-entry__icon--danger  { color: var(--signal-red); }
+.event-entry__icon--system  { color: var(--text-dim); }
+
+.event-entry__text {
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+/* ── Blocker Banner ───────────────────────────────────────── */
+
+#blocker-banner {
+  border-bottom: 2px solid var(--signal-amber-dark);
+}
+
+#blocker-dismiss:hover {
+  background: rgba(6, 14, 24, 0.15) !important;
+}
+
+/* ── Mission Summary Overlay ──────────────────────────────── */
+
+#mission-summary-overlay > div {
+  animation: fade-in var(--transition-mid) ease both;
+}
+
+/* ── Radar Sweep Loading ──────────────────────────────────── */
+
+.radar-loading {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.radar-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  height: 2px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, var(--signal-green));
+  animation: radar-sweep 2s linear infinite;
+}
+
+/* ── Utility ──────────────────────────────────────────────── */
+
+.hidden {
+  display: none !important;
+}
