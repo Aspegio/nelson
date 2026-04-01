@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nelson Fleet Dashboard</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+<!-- Blocker banner (hidden by default; shown when a blocking issue is detected) -->
+<div id="blocker-banner" style="
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 0.6rem 1.2rem;
+  background: rgba(243, 156, 18, 0.92);
+  color: #060e18;
+  font-size: 0.85rem;
+  font-weight: 600;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+">
+  <span id="blocker-message"></span>
+  <button id="blocker-dismiss" aria-label="Dismiss blocker banner" style="
+    background: transparent;
+    border: 1px solid rgba(6, 14, 24, 0.4);
+    color: #060e18;
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-family: inherit;
+    white-space: nowrap;
+  ">Dismiss</button>
+</div>
+
+<!-- Mission summary overlay (hidden by default; shown at stand-down) -->
+<div id="mission-summary-overlay" style="
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(6, 14, 24, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  align-items: center;
+  justify-content: center;
+">
+  <div style="
+    max-width: 560px;
+    width: 92%;
+    padding: 2.5rem 2rem;
+    background: rgba(27, 40, 56, 0.85);
+    border: 1px solid rgba(74, 111, 165, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    position: relative;
+  ">
+    <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);"></div>
+    <h2 id="summary-title" style="
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-primary);
+      margin-bottom: 0.4rem;
+    ">Mission Complete</h2>
+    <p id="summary-outcome" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;"></p>
+    <div id="summary-body" style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.6; margin-bottom: 1.8rem;"></div>
+    <button id="summary-close" aria-label="Close mission summary" style="
+      padding: 0.65rem 2rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--ocean-abyss);
+      background: linear-gradient(135deg, var(--signal-green), var(--signal-green-dark));
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+    ">Close</button>
+  </div>
+</div>
+
+<!-- Main dashboard grid -->
+<div class="dashboard">
+
+  <!-- Header -->
+  <header class="panel" style="padding: 0.75rem 1.2rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
+      <h1 style="font-size: 1.1rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-primary);">Nelson Fleet Dashboard</h1>
+      <span id="mission-outcome" style="font-size: 0.78rem; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase;"></span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+      <span id="clock" style="font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums;"></span>
+      <span id="status-badge" style="
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.2rem 0.6rem;
+        border-radius: 3px;
+        background: rgba(46, 204, 113, 0.12);
+        border: 1px solid rgba(46, 204, 113, 0.3);
+        color: var(--signal-green);
+      ">Initialising</span>
+      <span id="polling-dot" title="Polling active" style="
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-dim);
+        transition: background var(--transition-fast);
+      "></span>
+    </div>
+  </header>
+
+  <!-- Squadron sidebar -->
+  <aside class="squadron panel" style="padding: 1rem; overflow-y: auto;">
+    <h2 style="
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.9rem;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 0.5rem;
+    ">Squadron</h2>
+    <div id="ship-cards"></div>
+  </aside>
+
+  <!-- Main tasks panel -->
+  <section class="main panel" style="padding: 1rem; overflow: hidden; display: flex; flex-direction: column;">
+    <h2 style="
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.9rem;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 0.5rem;
+      flex-shrink: 0;
+    ">Tasks</h2>
+    <div style="overflow-x: auto; flex: 1;">
+      <table style="
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      ">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--glass-border);">
+            <th style="text-align: left; padding: 0.4rem 0.5rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap;">#</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted);">Task</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap;">Owner</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap;">Status</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap;">Stn</th>
+          </tr>
+        </thead>
+        <tbody id="task-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Bottom row: progress, budget, events -->
+  <div class="bottom">
+
+    <!-- Progress panel -->
+    <div class="panel" style="padding: 1rem;">
+      <h3 style="
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 0.75rem;
+      ">Progress</h3>
+      <div style="margin-bottom: 0.4rem;">
+        <div style="
+          width: 100%;
+          height: 8px;
+          background: rgba(74, 111, 165, 0.15);
+          border-radius: 4px;
+          overflow: hidden;
+        ">
+          <div id="progress-bar" style="
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--signal-green-dark), var(--signal-green));
+            border-radius: 4px;
+            transition: width var(--transition-mid);
+          "></div>
+        </div>
+      </div>
+      <span id="progress-label" style="font-size: 0.75rem; color: var(--text-muted);">0 / 0 tasks</span>
+    </div>
+
+    <!-- Budget panel -->
+    <div class="panel" style="padding: 1rem;">
+      <h3 style="
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 0.75rem;
+      ">Budget</h3>
+      <div style="margin-bottom: 0.4rem;">
+        <div style="
+          width: 100%;
+          height: 8px;
+          background: rgba(74, 111, 165, 0.15);
+          border-radius: 4px;
+          overflow: hidden;
+        ">
+          <div id="budget-bar" style="
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--steel-light), var(--steel-bright));
+            border-radius: 4px;
+            transition: width var(--transition-mid);
+          "></div>
+        </div>
+      </div>
+      <span id="budget-label" style="font-size: 0.75rem; color: var(--text-muted);">—</span>
+    </div>
+
+    <!-- Events log panel -->
+    <div class="panel" style="padding: 1rem; display: flex; flex-direction: column; overflow: hidden;">
+      <h3 style="
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 0.75rem;
+        flex-shrink: 0;
+      ">Events</h3>
+      <div id="events-log" style="
+        flex: 1;
+        overflow-y: auto;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+      "></div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="panel" style="
+    padding: 0.5rem 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  ">
+    <span id="checkpoint-label"></span>
+    <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+      <span>Updated: <span id="last-updated">—</span></span>
+      <span>Poll: <span id="poll-interval">—</span></span>
+      <span id="connection-status">Offline</span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- Scripts loaded in dependency order -->
+<script src="js/data-loader.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
