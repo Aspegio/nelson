@@ -1124,7 +1124,7 @@ class TestWriteJsonCrashCleanup:
                         "from pathlib import Path;"
                         f"sys.path.insert(0, '{SCRIPT.parent}');"
                         "import importlib.util;"
-                        f"spec = importlib.util.spec_from_file_location('nd', '{SCRIPT}');"
+                        f"spec = importlib.util.spec_from_file_location('nelson_data', '{SCRIPT}');"
                         "mod = importlib.util.module_from_spec(spec);"
                         "spec.loader.exec_module(mod);"
                         f"mod._write_json(Path('{locked_target}'), {{'version': 2}})"
@@ -1160,7 +1160,7 @@ class TestWriteJsonCrashCleanup:
                     (
                         f"import sys; sys.path.insert(0, '{SCRIPT.parent}');"
                         "import importlib.util;"
-                        f"spec = importlib.util.spec_from_file_location('nd', '{SCRIPT}');"
+                        f"spec = importlib.util.spec_from_file_location('nelson_data', '{SCRIPT}');"
                         "mod = importlib.util.module_from_spec(spec);"
                         "spec.loader.exec_module(mod);"
                         "from pathlib import Path;"
