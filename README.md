@@ -404,6 +404,7 @@ open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission=ski
 ```
 skills/nelson/
 ├── SKILL.md              # Main skill instructions (entrypoint)
+├── fleet-dashboard/      # Live web dashboard for mission visualisation
 └── references/           # Supporting docs loaded on demand
     ├── action-stations.md        # Risk tier definitions
     ├── admiralty-templates/       # 10 structured templates
@@ -423,6 +424,15 @@ skills/nelson/
 settings.json                                 # Plugin default settings (enables agent teams)
 skills/nelson/
 ├── SKILL.md                                  # Main skill instructions (entrypoint)
+├── fleet-dashboard/                         # Live web dashboard for mission visualisation
+│   ├── index.html
+│   ├── css/main.css
+│   ├── css/components.css
+│   ├── js/utils.js
+│   ├── js/data-loader.js
+│   ├── js/renderer.js
+│   ├── js/app.js
+│   └── test/fixture.json
 └── references/
     ├── action-stations.md                    # Risk tier definitions and controls
     ├── admiralty-templates/                  # Individual template files
@@ -449,11 +459,12 @@ skills/nelson/
     │   ├── scuttle-and-reform.md
     │   ├── session-hygiene.md
     │   └── session-resumption.md
+    ├── model-selection.md                    # Cost-optimized model assignment for agents
     ├── royal-marines.md                      # Royal Marines deployment rules
     ├── squadron-composition.md              # Mode selection and team sizing rules
     ├── structured-data.md                    # Structured fleet data capture reference
     ├── tool-mapping.md                       # Nelson-to-Claude Code tool reference
-    ├── standing-orders/                      # Individual anti-pattern files
+    └── standing-orders/                      # Individual anti-pattern files
         ├── admiral-at-the-helm.md
         ├── all-hands-on-deck.md
         ├── awaiting-admiralty.md
@@ -469,15 +480,6 @@ skills/nelson/
         ├── skeleton-crew.md
         ├── split-keel.md
         └── unclassified-engagement.md
-    └── fleet-dashboard/                     # Live web dashboard for mission visualisation
-        ├── index.html
-        ├── css/main.css
-        ├── css/components.css
-        ├── js/utils.js
-        ├── js/data-loader.js
-        ├── js/renderer.js
-        ├── js/app.js
-        └── test/fixture.json
 agents/
 └── nelson.md                                # Agent definition with skill binding
 scripts/
