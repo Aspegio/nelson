@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <meta name="referrer" content="no-referrer">
+  <title>Nelson Fleet Dashboard</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+<!-- Blocker banner (hidden by default; shown when a blocking issue is detected) -->
+<div id="blocker-banner" class="blocker-banner hidden" role="alert" aria-live="assertive">
+  <span id="blocker-message"></span>
+  <button id="blocker-dismiss" class="blocker-dismiss-btn" aria-label="Dismiss blocker banner">Dismiss</button>
+</div>
+
+<!-- Mission summary overlay (hidden by default; shown at stand-down) -->
+<div id="mission-summary-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="summary-title">
+  <div class="overlay__card">
+    <div class="overlay__highlight"></div>
+    <h2 id="summary-title" class="overlay__title">Mission Complete</h2>
+    <p id="summary-outcome" class="overlay__outcome"></p>
+    <div id="summary-body" class="overlay__body"></div>
+    <button id="summary-close" class="overlay__close" aria-label="Close mission summary">Close</button>
+  </div>
+</div>
+
+<!-- Main dashboard grid -->
+<div class="dashboard">
+
+  <!-- Header -->
+  <header class="panel dashboard-header">
+    <div class="dashboard-header__left">
+      <h1 class="dashboard-header__title">Nelson Fleet Dashboard</h1>
+      <span id="mission-outcome" class="dashboard-header__outcome"></span>
+    </div>
+    <div class="dashboard-header__right">
+      <span id="clock" class="dashboard-header__clock"></span>
+      <span id="status-badge" class="dashboard-header__badge" role="status" aria-live="polite">Initialising</span>
+      <span id="polling-dot" class="dashboard-header__dot" title="Polling active"></span>
+    </div>
+  </header>
+
+  <!-- Squadron sidebar -->
+  <aside class="squadron panel squadron-panel">
+    <h2 class="section-title">Squadron</h2>
+    <ul id="ship-cards" aria-live="polite"></ul>
+  </aside>
+
+  <!-- Main tasks panel -->
+  <main class="main panel tasks-panel">
+    <h2 class="section-title section-title--shrink">Tasks</h2>
+    <div class="tasks-panel__scroll">
+      <table class="tasks-table">
+        <caption class="sr-only">Mission tasks</caption>
+        <thead>
+          <tr class="tasks-table__header-row">
+            <th scope="col" class="tasks-table__th">#</th>
+            <th scope="col" class="tasks-table__th">Task</th>
+            <th scope="col" class="tasks-table__th tasks-table__th--nowrap">Owner</th>
+            <th scope="col" class="tasks-table__th tasks-table__th--nowrap">Status</th>
+            <th scope="col" class="tasks-table__th tasks-table__th--nowrap">Stn</th>
+          </tr>
+        </thead>
+        <tbody id="task-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Bottom row: progress, budget, events -->
+  <div class="bottom">
+
+    <!-- Progress panel -->
+    <div class="panel bottom-panel">
+      <h3 class="section-title section-title--small">Progress</h3>
+      <div class="bar-wrapper">
+        <div id="progress-track" class="bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Task progress">
+          <div id="progress-bar" class="bar-fill bar-fill--progress"></div>
+        </div>
+      </div>
+      <span id="progress-label" class="bar-label">0 / 0 tasks</span>
+    </div>
+
+    <!-- Budget panel -->
+    <div class="panel bottom-panel">
+      <h3 class="section-title section-title--small">Budget</h3>
+      <div class="bar-wrapper">
+        <div id="budget-track" class="bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Budget consumption">
+          <div id="budget-bar" class="bar-fill bar-fill--budget"></div>
+        </div>
+      </div>
+      <span id="budget-label" class="bar-label">&mdash;</span>
+    </div>
+
+    <!-- Events log panel -->
+    <div class="panel events-panel">
+      <h3 class="section-title section-title--small section-title--shrink">Events</h3>
+      <div id="events-log" class="events-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="panel dashboard-footer">
+    <span id="checkpoint-label"></span>
+    <div class="dashboard-footer__right">
+      <span>Updated: <span id="last-updated">&mdash;</span></span>
+      <span>Poll: <span id="poll-interval">&mdash;</span></span>
+      <span id="connection-status" role="status" aria-live="assertive">Offline</span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- Scripts loaded in dependency order -->
+<script src="js/utils.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

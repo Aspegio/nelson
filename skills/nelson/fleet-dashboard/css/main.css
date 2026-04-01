@@ -1,0 +1,191 @@
+/* ============================================================
+   NELSON FLEET DASHBOARD — CSS Foundation
+   Design tokens, layout grid, and base styles.
+   ============================================================ */
+
+/* -- Custom Properties (Design Tokens) -- */
+:root {
+  /* Ocean depths */
+  --ocean-abyss: #060e18;
+  --ocean-deep: #0a1628;
+  --ocean-dark: #0d1b2a;
+  --ocean-mid: #1b2838;
+  --ocean-surface: #1e3a5f;
+  --ocean-light: #24506e;
+  --ocean-foam: #2c6e8a;
+
+  /* Steel & chrome */
+  --steel-dark: #2c3e50;
+  --steel-mid: #34495e;
+  --steel-light: #4a6fa5;
+  --steel-bright: #5a8abf;
+  --steel-chrome: #778da9;
+
+  /* Signal colors */
+  --signal-green: #2ecc71;
+  --signal-green-dark: #27ae60;
+  --signal-green-glow: rgba(46, 204, 113, 0.4);
+  --signal-red: #e74c3c;
+  --signal-red-dark: #c0392b;
+  --signal-red-glow: rgba(231, 76, 60, 0.4);
+  --signal-amber: #f39c12;
+  --signal-amber-dark: #e67e22;
+  --signal-amber-glow: rgba(243, 156, 18, 0.4);
+  --signal-gold: #f1c40f;
+
+  /* Text — A11Y-10: --text-dim improved from #4a6078 to #6b8299 for 4.5:1 contrast */
+  --text-primary: #e0e1dd;
+  --text-secondary: #a8dadc;
+  --text-muted: #778da9;
+  --text-dim: #6b8299;
+
+  /* Glass — PERF-5: increased opacity to compensate for removed backdrop-filter */
+  --glass-bg: rgba(27, 40, 56, 0.92);
+  --glass-border: rgba(74, 111, 165, 0.3);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+  --glass-blur: 12px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-mid: 0.3s ease;
+  --transition-slow: 0.5s ease;
+
+  /* Shadows */
+  --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-heavy: 0 8px 40px rgba(0, 0, 0, 0.5);
+  --shadow-glow-green: 0 0 20px rgba(46, 204, 113, 0.3);
+  --shadow-glow-red: 0 0 20px rgba(231, 76, 60, 0.3);
+  --shadow-glow-blue: 0 0 20px rgba(74, 111, 165, 0.3);
+}
+
+/* -- Reset -- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* -- Base -- */
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  background: var(--ocean-abyss);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* -- Background gradient -- */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(30, 58, 95, 0.4) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(44, 110, 138, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(10, 22, 40, 0.8) 0%, transparent 60%),
+    linear-gradient(180deg, var(--ocean-abyss) 0%, var(--ocean-dark) 40%, var(--ocean-deep) 100%);
+}
+
+/* -- Scan-line overlay -- */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.015) 2px,
+    rgba(0, 0, 0, 0.015) 4px
+  );
+}
+
+/* -- Dashboard grid layout -- */
+.dashboard {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: auto 1fr auto auto;
+  grid-template-areas:
+    "header  header"
+    "squadron main"
+    "squadron bottom"
+    "footer  footer";
+  gap: 0.75rem;
+  min-height: 100vh;
+  padding: 0.75rem;
+}
+
+/* -- Panel base (PERF-5: no backdrop-filter) -- */
+.panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-medium);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle top highlight line on panels */
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  pointer-events: none;
+}
+
+/* -- Grid area assignments -- */
+header.panel {
+  grid-area: header;
+}
+
+aside.squadron.panel {
+  grid-area: squadron;
+}
+
+main.main.panel {
+  grid-area: main;
+}
+
+.bottom {
+  grid-area: bottom;
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 0.75rem;
+}
+
+footer.panel {
+  grid-area: footer;
+}
+
+/* -- Responsive: single column below 900px -- */
+@media (max-width: 900px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      "header"
+      "squadron"
+      "main"
+      "bottom"
+      "footer";
+  }
+
+  .bottom {
+    grid-template-columns: 1fr;
+  }
+}
