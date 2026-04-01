@@ -33,14 +33,14 @@
   --signal-amber-glow: rgba(243, 156, 18, 0.4);
   --signal-gold: #f1c40f;
 
-  /* Text */
+  /* Text — A11Y-10: --text-dim improved from #4a6078 to #6b8299 for 4.5:1 contrast */
   --text-primary: #e0e1dd;
   --text-secondary: #a8dadc;
   --text-muted: #778da9;
-  --text-dim: #4a6078;
+  --text-dim: #6b8299;
 
-  /* Glass */
-  --glass-bg: rgba(27, 40, 56, 0.65);
+  /* Glass — PERF-5: increased opacity to compensate for removed backdrop-filter */
+  --glass-bg: rgba(27, 40, 56, 0.92);
   --glass-border: rgba(74, 111, 165, 0.3);
   --glass-highlight: rgba(255, 255, 255, 0.05);
   --glass-blur: 12px;
@@ -126,13 +126,11 @@ body::after {
   padding: 0.75rem;
 }
 
-/* -- Panel base (glassmorphism) -- */
+/* -- Panel base (PERF-5: no backdrop-filter) -- */
 .panel {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--shadow-medium);
   position: relative;
   overflow: hidden;
@@ -159,7 +157,7 @@ aside.squadron.panel {
   grid-area: squadron;
 }
 
-section.main.panel {
+main.main.panel {
   grid-area: main;
 }
 

@@ -13,67 +13,35 @@
 
   /* -- Clock ------------------------------------------------- */
 
-  /**
-   * Format the current local time as HH:MM:SS.
-   *
-   * @returns {string}
-   */
-  function currentTimeString() {
-    var now = new Date();
-    var pad = function (n) { return String(n).padStart(2, '0'); };
-    return pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-  }
-
-  /**
-   * Update the #clock element with the current time.
-   * Called every second via setInterval.
-   */
   function updateClock() {
     var clockEl = document.getElementById('clock');
     if (clockEl) {
-      clockEl.textContent = currentTimeString();
+      clockEl.textContent = DashboardUtils.currentTimeString();
     }
   }
+
+  /* -- Dismiss state (BUG-2) --------------------------------- */
+
+  var dismissState = {
+    blockerText:      null,
+    overlayDismissed: false
+  };
 
   /* -- State change handler ---------------------------------- */
 
-  /**
-   * Delegate state changes to the Renderer.
-   *
-   * @param {Readonly<object>} state
-   */
   function onStateChange(state) {
-    Renderer.render(state);
+    Renderer.render(state, dismissState);
   }
 
-  /* -- Initialise -------------------------------------------- */
+  /* -- Keyboard shortcuts (QUAL-4: extracted) ----------------- */
 
-  /**
-   * Bootstraps the dashboard: starts the clock, the data loader,
-   * and populates the footer poll-interval label.
-   */
-  function init() {
-    var loader  = new DataLoader();
-    var paused  = false;
-
-    /* Start clock */
-    updateClock();
-    setInterval(updateClock, 1000);
-
-    /* Populate poll interval in footer */
-    var params = DataLoader.getParams();
-    var pollIntervalEl = document.getElementById('poll-interval');
-    if (pollIntervalEl) {
-      pollIntervalEl.textContent = (params.pollMs / 1000).toFixed(1) + 's';
-    }
-
-    /* Start polling */
-    loader.start(onStateChange);
-
-    /* -- Keyboard shortcuts ---------------------------------- */
+  function setupKeyboardShortcuts(loader, params, pollIntervalEl) {
+    var paused = false;
 
     document.addEventListener('keydown', function (event) {
-      /* Ignore events originating from text inputs */
+      /* A11Y-5: Ignore modified keystrokes */
+      if (event.ctrlKey || event.altKey || event.metaKey) { return; }
+
       var tag = event.target && event.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') { return; }
 
@@ -100,22 +68,55 @@
 
         case 'Escape':
           var overlay = document.getElementById('mission-summary-overlay');
-          if (overlay) { overlay.classList.add('hidden'); }
-          var banner  = document.getElementById('blocker-banner');
-          if (banner)  { banner.classList.add('hidden'); }
+          if (overlay && !overlay.classList.contains('hidden')) {
+            overlay.classList.add('hidden');
+            dismissState.overlayDismissed = true;
+          }
+          var banner = document.getElementById('blocker-banner');
+          if (banner && !banner.classList.contains('hidden')) {
+            var msgEl = document.getElementById('blocker-message');
+            dismissState.blockerText = msgEl ? msgEl.textContent : '';
+            banner.classList.add('hidden');
+          }
           break;
       }
     });
+  }
 
-    /* -- Blocker banner dismiss button ----------------------- */
+  /* -- Dismiss button handler (QUAL-4: extracted) ------------- */
 
+  function setupDismissHandlers() {
     var blockerDismiss = document.getElementById('blocker-dismiss');
     if (blockerDismiss) {
       blockerDismiss.addEventListener('click', function () {
         var banner = document.getElementById('blocker-banner');
-        if (banner) { banner.classList.add('hidden'); }
+        if (banner) {
+          var msgEl = document.getElementById('blocker-message');
+          dismissState.blockerText = msgEl ? msgEl.textContent : '';
+          banner.classList.add('hidden');
+        }
       });
     }
+  }
+
+  /* -- Initialise -------------------------------------------- */
+
+  function init() {
+    var loader = new DataLoader();
+
+    updateClock();
+    setInterval(updateClock, DashboardUtils.CLOCK_INTERVAL_MS);
+
+    var params = DataLoader.getParams();
+    var pollIntervalEl = document.getElementById('poll-interval');
+    if (pollIntervalEl) {
+      pollIntervalEl.textContent = (params.pollMs / 1000).toFixed(1) + 's';
+    }
+
+    loader.start(onStateChange);
+
+    setupKeyboardShortcuts(loader, params, pollIntervalEl);
+    setupDismissHandlers();
   }
 
   /* -- Boot -------------------------------------------------- */

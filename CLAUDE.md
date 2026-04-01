@@ -39,6 +39,7 @@ skills/nelson/
     index.html
     css/main.css
     css/components.css
+    js/utils.js
     js/data-loader.js
     js/renderer.js
     js/app.js

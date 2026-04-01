@@ -1,7 +1,7 @@
 /* ============================================================
    NELSON FLEET DASHBOARD — Component Styles
    Dynamic classes, animations, hover effects, and utilities.
-   Structural layout is handled inline in index.html.
+   All structural styles extracted from index.html inline styles.
    ============================================================ */
 
 /* ── Animations ──────────────────────────────────────────── */
@@ -16,9 +16,101 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes radar-sweep {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+/* ── Accessibility ───────────────────────────────────────── */
+
+/* A11Y-6: Focus visibility for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--signal-green);
+  outline-offset: 2px;
+}
+
+/* A11Y-2: Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Dashboard Header ────────────────────────────────────── */
+
+.dashboard-header {
+  padding: 0.75rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-header__left {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-header__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.dashboard-header__outcome {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-header__right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-header__clock {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-header__badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  background: rgba(46, 204, 113, 0.12);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+  color: var(--signal-green);
+}
+
+.dashboard-header__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: background var(--transition-fast);
 }
 
 /* ── Status Badge ─────────────────────────────────────────── */
@@ -47,6 +139,45 @@
   background: var(--signal-red) !important;
   box-shadow: none;
   animation: none;
+}
+
+/* ── Section Titles ──────────────────────────────────────── */
+
+.section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 0.5rem;
+}
+
+.section-title--small {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.75rem;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.section-title--shrink {
+  flex-shrink: 0;
+}
+
+/* ── Squadron Panel ──────────────────────────────────────── */
+
+.squadron-panel {
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+/* Remove list styling from ship-cards <ul> */
+#ship-cards {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 /* ── Ship Cards ───────────────────────────────────────────── */
@@ -121,28 +252,80 @@
   margin-top: 0.15rem;
 }
 
-/* ── Hull Colours ─────────────────────────────────────────── */
+/* ── Hull Colours (PERF-6: scoped pulse to bar only) ─────── */
 
-.hull--green {
+/* Gradient backgrounds — applied to hull bars */
+.ship-card__hull-bar.hull--green {
   background: linear-gradient(90deg, var(--signal-green-dark), var(--signal-green));
 }
 
-.hull--amber {
+.ship-card__hull-bar.hull--amber {
   background: linear-gradient(90deg, var(--signal-amber-dark), var(--signal-amber));
   animation: pulse 2s ease-in-out infinite;
 }
 
-.hull--red {
+.ship-card__hull-bar.hull--red {
   background: linear-gradient(90deg, var(--signal-red-dark), var(--signal-red));
   animation: pulse 1s ease-in-out infinite;
 }
 
-.hull--critical {
+.ship-card__hull-bar.hull--critical {
   background: var(--signal-red-dark);
   animation: pulse 0.5s ease-in-out infinite;
 }
 
-/* ── Task Table ───────────────────────────────────────────── */
+/* Border colour on ship card container (no animation) */
+.ship-card.hull--amber {
+  border-color: rgba(243, 156, 18, 0.4);
+}
+
+.ship-card.hull--red {
+  border-color: rgba(231, 76, 60, 0.4);
+}
+
+.ship-card.hull--critical {
+  border-color: rgba(231, 76, 60, 0.6);
+}
+
+/* ── Tasks Panel ─────────────────────────────────────────── */
+
+.tasks-panel {
+  padding: 1rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tasks-panel__scroll {
+  overflow-x: auto;
+  flex: 1;
+}
+
+.tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tasks-table__header-row {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.tasks-table__th {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tasks-table__th--nowrap {
+  white-space: nowrap;
+}
+
+/* ── Task Table Rows ─────────────────────────────────────── */
 
 #task-tbody tr {
   border-bottom: 1px solid rgba(74, 111, 165, 0.1);
@@ -156,6 +339,21 @@
 #task-tbody td {
   padding: 0.45rem 0.5rem;
   vertical-align: middle;
+}
+
+.task-cell--id {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.task-cell--owner {
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.task-cell--status {
+  white-space: nowrap;
 }
 
 .task--completed {
@@ -195,6 +393,44 @@
 .station-badge--2 { background: rgba(243, 156, 18, 0.12); border-color: rgba(243, 156, 18, 0.3); color: var(--signal-amber); }
 .station-badge--3 { background: rgba(231, 76, 60, 0.12); border-color: rgba(231, 76, 60, 0.3); color: var(--signal-red); }
 
+/* ── Bottom Panels ───────────────────────────────────────── */
+
+.bottom-panel {
+  padding: 1rem;
+}
+
+.bar-wrapper {
+  margin-bottom: 0.4rem;
+}
+
+.bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(74, 111, 165, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 4px;
+  transition: width var(--transition-mid);
+}
+
+.bar-fill--progress {
+  background: linear-gradient(90deg, var(--signal-green-dark), var(--signal-green));
+}
+
+.bar-fill--budget {
+  background: linear-gradient(90deg, var(--steel-light), var(--steel-bright));
+}
+
+.bar-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* ── Budget Bar Colour Variants ───────────────────────────── */
 
 #budget-bar.budget--green {
@@ -209,12 +445,25 @@
   background: linear-gradient(90deg, var(--signal-red-dark), var(--signal-red));
 }
 
-/* ── Event Log Entries ────────────────────────────────────── */
+/* ── Events Panel ────────────────────────────────────────── */
 
-#events-log {
-  max-height: 200px;
-  overflow-y: auto;
+.events-panel {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
+.events-log {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-height: 200px;
+}
+
+/* ── Event Log Entries ────────────────────────────────────── */
 
 .event-entry {
   display: flex;
@@ -248,41 +497,166 @@
 
 /* ── Blocker Banner ───────────────────────────────────────── */
 
-#blocker-banner {
+.blocker-banner {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 0.6rem 1.2rem;
+  background: rgba(243, 156, 18, 0.92);
+  color: #060e18;
+  font-size: 0.85rem;
+  font-weight: 600;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   border-bottom: 2px solid var(--signal-amber-dark);
 }
 
-#blocker-dismiss:hover {
-  background: rgba(6, 14, 24, 0.15) !important;
+.blocker-dismiss-btn {
+  background: transparent;
+  border: 1px solid rgba(6, 14, 24, 0.4);
+  color: #060e18;
+  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.blocker-dismiss-btn:hover {
+  background: rgba(6, 14, 24, 0.15);
 }
 
 /* ── Mission Summary Overlay ──────────────────────────────── */
 
-#mission-summary-overlay > div {
+.overlay {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(6, 14, 24, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay__card {
+  max-width: 560px;
+  width: 92%;
+  padding: 2.5rem 2rem;
+  background: rgba(27, 40, 56, 0.85);
+  border: 1px solid rgba(74, 111, 165, 0.3);
+  border-radius: 12px;
+  box-shadow: var(--shadow-heavy);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  position: relative;
   animation: fade-in var(--transition-mid) ease both;
 }
 
-/* ── Radar Sweep Loading ──────────────────────────────────── */
-
-.radar-loading {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  border: 1px solid var(--glass-border);
-  position: relative;
-  overflow: hidden;
+.overlay__highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
 }
 
-.radar-loading::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 50%;
-  height: 2px;
-  transform-origin: 0 50%;
-  background: linear-gradient(90deg, transparent, var(--signal-green));
-  animation: radar-sweep 2s linear infinite;
+.overlay__title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  margin-bottom: 0.4rem;
+}
+
+.overlay__outcome {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.overlay__body {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin-bottom: 1.8rem;
+}
+
+.overlay__close {
+  padding: 0.65rem 2rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ocean-abyss);
+  background: linear-gradient(135deg, var(--signal-green), var(--signal-green-dark));
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: inherit;
+  transition: opacity var(--transition-fast);
+}
+
+.overlay__stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+}
+
+.overlay__stat-label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.overlay__stat-value {
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.overlay__despatches-title {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.overlay__despatch-entry {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  margin-top: 0.25rem;
+}
+
+.overlay__compiling {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* ── Dashboard Footer ────────────────────────────────────── */
+
+.dashboard-footer {
+  padding: 0.5rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.dashboard-footer__right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
 /* ── Utility ──────────────────────────────────────────────── */
