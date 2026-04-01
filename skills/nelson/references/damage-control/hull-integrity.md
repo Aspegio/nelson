@@ -20,7 +20,7 @@ The admiral maintains a readiness board to track hull integrity across all ships
 1. At each quarterdeck checkpoint, collect the latest damage report from every active ship.
 2. List each ship with its hull integrity status, percentage, and whether relief is requested.
 3. Flag any ship at Red or Critical for immediate attention.
-4. Record the board in the quarterdeck report under the budget section.
+4. Record the board in the quarterdeck report under the "Hull integrity (squadron readiness board):" section.
 
 The readiness board gives the admiral a single view of squadron endurance and drives decisions about task reassignment, descoping, and relief.
 

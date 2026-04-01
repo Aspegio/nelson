@@ -139,6 +139,8 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 If the task is complete and no pending task depends on it, send `shutdown_request` immediately — in the same response. Do not wait for the next checkpoint cadence. Check the current `TaskList` state at the moment the idle notification arrives; each notification is evaluated independently against current state. This applies even when other ships are still running and even when a captain's results were delivered inline (not as a separate artifact). The `paid-off.md` standing order governs this; consult it if uncertain.
 
+**Shutdown attempt ceiling:** If a `shutdown_request` to a ship goes unacknowledged, do not loop indefinitely. After 3 failed attempts to the same agent, abandon the shutdown attempt, note the failure in the captain's log, and continue the mission. If `TeamDelete` is blocked by stuck agents, manual cleanup is available — see `references/damage-control/man-overboard.md` for the procedure.
+
 - Keep admiral focused on coordination and unblock actions.
 - The admiral sets the mood of the squadron. Acknowledge progress, recognise strong work, and maintain cheerfulness under pressure.
 - **Checkpoint Cadence Gate:** You MUST NOT process a third task completion without writing a quarterdeck checkpoint. Before dispatching new work or processing the next completion, confirm the last checkpoint is no more than 2 completions old. The quarterdeck report is your only recovery point if context compaction occurs — stale reports mean lost coordination state.
