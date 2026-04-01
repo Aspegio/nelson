@@ -248,7 +248,7 @@
    */
   DataLoader.prototype._handlePollSuccess = function (result) {
     var self     = this;
-    var basePath = this._mission || '.';
+    var basePath = this._mission ? ('/' + this._mission) : '.';
     var fleetStatus = result.data;
 
     /* PERF-1: Skip processing if raw text is unchanged */
@@ -351,7 +351,7 @@
    */
   DataLoader.prototype._poll = function () {
     var self     = this;
-    var basePath = this._mission || '.';
+    var basePath = this._mission ? ('/' + this._mission) : '.';
 
     self._inflight = true;
     return fetchJSON(basePath, 'fleet-status.json').then(function (result) {
