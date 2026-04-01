@@ -373,24 +373,25 @@ Edit `references/squadron-composition.md` to adjust the decision matrix or defau
 
 Nelson includes a live web dashboard that visualises mission state in the browser. It polls `fleet-status.json` every 3 seconds and renders ship cards, task progress, budget consumption, events, and blockers in real time.
 
-To launch it during a mission, include "with dashboard" in your request:
+To use it, include "with dashboard" in your request:
 
 ```
 Use Nelson with dashboard to refactor the auth module
 ```
 
-Nelson will start a local HTTP server and open the dashboard automatically. The dashboard is read-only — it reads the JSON files that `nelson-data.py` writes during the mission and requires no dependencies.
-
-You can also launch it manually against any mission directory:
+Nelson will print the launch commands for you to run in a **separate terminal** (the HTTP server's access logs would bloat the Claude Code context window if run in-session):
 
 ```bash
-python3 -m http.server 8420 &
+python3 -m http.server 8420
 open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission=.nelson/missions/{YYYY-MM-DD_HHMMSS}"
 ```
 
-Or test it with the bundled fixture:
+The dashboard is read-only — it reads the JSON files that `nelson-data.py` writes during the mission and requires no dependencies.
+
+To test it with the bundled fixture:
 
 ```bash
+python3 -m http.server 8420
 open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission=skills/nelson/fleet-dashboard/test"
 ```
 
