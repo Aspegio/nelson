@@ -478,7 +478,13 @@ Each mission creates a timestamped directory for its runtime artifacts. Previous
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/png?repos=harrymunro/nelson&type=Date)](https://star-history.com/#harrymunro/nelson&Date)
+<a href="https://star-history.com/#harrymunro/nelson&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=harrymunro/nelson&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=harrymunro/nelson&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=harrymunro/nelson&type=Date" width="600" />
+ </picture>
+</a>
 
 ## Get started
 
