@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "mission": {
+    "outcome": "Design and implement the Nelson fleet dashboard with real-time polling and squadron status monitoring",
+    "status": "underway",
+    "started_at": "2026-04-01T09:00:00Z",
+    "checkpoint_number": 2
+  },
+  "progress": {
+    "pending": 1,
+    "in_progress": 1,
+    "completed": 2,
+    "blocked": 1,
+    "total": 5
+  },
+  "budget": {
+    "tokens_spent": 80000,
+    "tokens_remaining": 120000,
+    "pct_consumed": 40.0,
+    "burn_rate_per_checkpoint": 15000
+  },
+  "squadron": [
+    {
+      "ship_name": "HMS Argyll",
+      "ship_class": "frigate",
+      "role": "captain",
+      "hull_integrity_pct": 72,
+      "hull_integrity_status": "Green",
+      "relief_requested": false,
+      "task_id": 1,
+      "task_name": "Design dashboard layout and CSS foundation",
+      "task_status": "completed"
+    },
+    {
+      "ship_name": "HMS Lancaster",
+      "ship_class": "frigate",
+      "role": "ship",
+      "hull_integrity_pct": 55,
+      "hull_integrity_status": "Red",
+      "relief_requested": true,
+      "task_id": 2,
+      "task_name": "Implement API schema integration",
+      "task_status": "blocked"
+    },
+    {
+      "ship_name": "HMS Kent",
+      "ship_class": "destroyer",
+      "role": "ship",
+      "hull_integrity_pct": 95,
+      "hull_integrity_status": "Green",
+      "relief_requested": false,
+      "task_id": 3,
+      "task_name": "Build data loader and polling engine",
+      "task_status": "in_progress"
+    },
+    {
+      "ship_name": "HMS Dragon",
+      "ship_class": "destroyer",
+      "role": "ship",
+      "hull_integrity_pct": 88,
+      "hull_integrity_status": "Green",
+      "relief_requested": false,
+      "task_id": 4,
+      "task_name": "Implement renderer and UI components",
+      "task_status": "pending"
+    }
+  ],
+  "blockers": [
+    "HMS Lancaster waiting on API schema from HMS Kent"
+  ],
+  "recent_events": [
+    "HMS Argyll completed task 1: Design dashboard layout and CSS foundation",
+    "HMS Lancaster hull integrity crossed Red threshold (55%) — relief requested",
+    "Checkpoint 2 reached — quarterdeck report updated",
+    "HMS Kent completed task 0: Project scaffolding and directory structure",
+    "HMS Dragon started task 4: Implement renderer and UI components"
+  ],
+  "last_updated": "2026-04-01T11:30:00Z"
+}
