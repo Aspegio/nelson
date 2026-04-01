@@ -8,7 +8,7 @@ Ship:
 - Crew manifest:
   - [Role Abbr]: [Sub-task description]
   - [Role Abbr]: [Sub-task description]
-- Marine capacity: [0-2, or "as needed"]
+- Marine capacity: [0-2]
 - Sub-task sequence:
   1. [Sub-task] (dependencies: none)
   2. [Sub-task] (dependencies: 1)

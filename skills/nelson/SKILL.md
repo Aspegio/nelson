@@ -38,62 +38,63 @@ All mission artifacts — captain's log, quarterdeck reports, damage reports, an
 
 **Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
-## 2. Form The Squadron
-
-- Brief captains on mission intent and constraints. Make the plan clear, invite questions early.
-- Select one mode per `references/squadron-composition.md`. If the user explicitly requested a mode, use it — user preference overrides the decision matrix.
-  - `single-session`: Use for sequential tasks, low complexity, or heavy same-file editing.
-  - `subagents`: Use for parallel, fully independent tasks that report only to admiral.
-  - `agent-team`: Use when captains benefit from a shared task list, peer messaging, or coordinated deliverables. Also use when 4+ captains are needed.
-- Set team size from task independence, not mission complexity:
-    - Count the independent work units first. Each unit that can run with zero shared state or sequencing dependency receives its own captain, unless bundling conditions apply (shared files, sequencing dependency, or setup cost exceeds the work). That count — not a size tier — sets the target captain count.
-    - Add `1 red-cell navigator` for medium/high threat work.
-    - Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
-    - Assign each captain a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
-    - Captain decides crew composition per ship using the crew-or-direct decision tree in `references/crew-roles.md`.
-    - Captains may also deploy Royal Marines during execution for short-lived sorties — see `references/royal-marines.md` and use `references/admiralty-templates/marine-deployment-brief.md` for the deployment brief.
-- If the sailing orders express cost-savings priority, load `references/model-selection.md` before assigning models to the squadron. Apply weight-based model selection to all `Agent` tool calls and include haiku briefing enhancements for agents assigned to haiku.
-
-Reference `references/squadron-composition.md` for selection rules and `references/crew-roles.md` for ship naming and crew composition.
-
-**Formation Gate — Standing Order Check:** You MUST NOT finalize the squadron until each question below is answered in writing and any triggered standing order remedy has been applied. Show your reasoning — a bare yes/no is not sufficient. If becalmed-fleet triggers, skip the remaining questions — single-session mode has no squadron to validate.
-- `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent?
-- `light-squadron.md`: Is the captain count equal to the number of independent work units, or have tasks been under-split onto fewer captains than independence warrants?
-- `all-hands-on-deck.md`: Does every captain carry genuinely independent work, or are some roles speculative?
-- `crew-without-canvas.md`: Is every agent justified by actual task scope?
-- `skeleton-crew.md`: Would any ship deploy exactly one crew member for an atomic task?
-- `admiral-at-the-helm.md`: Is the admiral assigned only coordination, not implementation?
-
-If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. Proceeding with a triggered standing order unresolved is never permitted. For situations not covered by this gate, consult the Standing Orders table below.
-
-**Structured Data Capture:** After formation is complete, run `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "HMS Victory" ...` to record the squadron composition. See `references/structured-data.md` for the captain format and full argument list.
-
-## 3. Draft Battle Plan
+## 2. Draft Battle Plan
 
 - Split mission into independent tasks with clear deliverables.
     - Map the dependency graph: enumerate units of work that can run without shared state or ordering constraints. Each independent unit receives its own captain. Only group tasks onto one captain when they share files, require sequential ordering, or the context-setup cost demonstrably exceeds the work itself.
-- Assign owner for each task and explicit dependencies.
+    - The default is one captain per independent task. Grouping is the exception and requires a concrete reason.
+    - If cost-savings is a priority, also consider task inputs — avoid multiple agents independently loading the same large inputs into their contexts.
+- Assign explicit dependencies for each task.
 - Assign file ownership when implementation touches code.
+- Assign an action station tier to each task (see `references/action-stations.md`).
+- For each task, note expected crew composition using the crew-or-direct decision tree in `references/crew-roles.md`. If crew are mustered, list crew roles with sub-tasks and sequence. If the captain implements directly (0 crew), note "Captain implements directly." If the captain anticipates needing marine support, note marine capacity (max 2).
+- For each task, consciously mark `admiralty-action-required: yes` or `no`.
 - Keep one task in progress per agent unless the mission explicitly requires multitasking.
-- For each captain's task, include a ship manifest. If crew are mustered, list crew roles with sub-tasks and sequence. If the captain implements directly (0 crew), note "Captain implements directly." If the captain anticipates needing marine support, note marine capacity in the ship manifest (max 2).
 
 Reference `references/admiralty-templates/battle-plan.md` for the battle plan template and `references/admiralty-templates/ship-manifest.md` for the ship manifest.
 
 **Battle Plan Gate — Standing Order Check:** You MUST NOT finalize task assignments until each question below is answered in writing and any triggered standing order remedy has been applied. Show your reasoning — a bare yes/no is not sufficient.
-- `split-keel.md`: Does each agent have exclusive file ownership with no conflicts?
-- `captain-at-the-capstan.md`: For each captain with crew in the ship manifest, is the captain's role coordination (not implementation)?
-- `unclassified-engagement.md`: Does every task have a risk tier assigned?
+- `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent? If yes, skip Step 3 — single-session has no squadron to form.
+- `light-squadron.md`: Is the task count equal to the number of independent work units, or have tasks been under-split?
+- `split-keel.md`: Does each task have exclusive file ownership with no conflicts?
+- `unclassified-engagement.md`: Does every task have a risk tier?
+- `all-hands-on-deck.md`: Has each task been crewed only with roles its work actually demands?
+- `skeleton-crew.md`: Would any task deploy exactly one crew member for an atomic task the captain should handle directly?
+- `crew-without-canvas.md`: Is every agent justified by actual task scope?
+- `captain-at-the-capstan.md`: For each task with crew, is the captain's role coordination, not implementation?
 - `press-ganged-navigator.md`: Is the red-cell navigator being assigned implementation work?
-- `all-hands-on-deck.md`: Are all crew roles justified by actual sub-task needs, or are some speculative?
-- `skeleton-crew.md`: Would any ship deploy exactly one crew member for an atomic task that the captain should implement directly?
+- `admiral-at-the-helm.md`: Does the battle plan assign any implementation work to the admiral?
 
-If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. Proceeding with a triggered standing order unresolved is never permitted. For situations not covered by this gate, consult the Standing Orders table below.
+If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
-**Structured Data Capture:** Run `python3 scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task in the battle plan, then run `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise. See `references/structured-data.md` for task arguments.
+**Structured Data Capture:** Task registration requires owners, which are assigned in Step 3. No script calls at this step.
 
-**Before proceeding to Step 4:** You MUST verify that sailing orders exist, squadron is formed, and every task has an owner, deliverable, and action station tier. Do not proceed until all three conditions are confirmed.
+## 3. Form the Squadron
 
-**Admiralty Action List:** For each task, consciously mark `admiralty-action-required:` as `yes` or `no`. Then scan the battle plan for tasks marked `admiralty-action-required: yes`. If any exist, surface an Admiralty Action List to the user before spawning any agents:
+- Select execution mode per `references/squadron-composition.md`. If the user explicitly requested a mode, use it — user preference overrides the decision matrix.
+    - `single-session`: sequential tasks, low complexity, or heavy same-file editing.
+    - `subagents`: parallel, fully independent tasks that report only to the admiral.
+    - `agent-team`: captains benefit from a shared task list, peer messaging, or coordinated deliverables; or 4+ captains are needed.
+- Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
+- Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
+- Add `1 red-cell navigator` for medium/high threat work. Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
+- If the sailing orders express cost-savings priority, load `references/model-selection.md` before assigning models. Apply weight-based model selection to all `Agent` tool calls and include haiku briefing enhancements for agents assigned to haiku.
+
+```
+SQUADRON FORMATION ORDERS
+
+Mode: [single-session | subagents | agent-team]
+Captain count: [N]
+
+Ships:
+  [Ship name] — [vessel type] — [one-line task summary]
+    Crew: [roles, or "Captain implements directly"]
+  [repeat for each ship]
+
+[Red-cell navigator — HMS X, if present]
+```
+
+If any tasks are marked `admiralty-action-required: yes`, append before awaiting approval:
 
 ```
 ADMIRALTY ACTION LIST — Actions required from Admiralty
@@ -103,16 +104,34 @@ ADMIRALTY ACTION LIST — Actions required from Admiralty
    timing: [before task starts | after task completes]
    unblocks: [task name or stand-down]
 
-No action needed now. These will be raised by the captain when each step is reached.
+Actions marked `timing: before task starts` require your sign-off before the relevant captain is spawned.
 ```
 
-If no tasks are marked `admiralty-action-required: yes`, omit the list — no noise on routine missions. This list is informational, not a gate. The user acknowledges by continuing the conversation. Squadron formation proceeds immediately after.
+Do not spawn any agents or create any tasks until the user approves. If the user requests changes, revise and redisplay before proceeding.
+
+> **Note:** Nelson requires an interactive session for formation approval. Headless and CI invocation are not supported at this time.
+
+**Structured Data Capture:** Once formation is approved, run these three commands in order:
+1. `python3 scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task (owners are now known from formation). See `references/structured-data.md` for task arguments.
+2. `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
+3. `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
+
+**Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
 **Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then create and assign work with `TaskCreate` + `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
 
+**Edit permissions:** When spawning any agent whose task involves editing files, set `mode: "acceptEdits"` on the `Agent` tool call. Omitting this can cause a permission race condition that silently stalls the agent at its first edit. When in doubt, include it.
+
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a turnover brief using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
 
-## 4. Run Quarterdeck Rhythm
+## 4. Get Permission to Sail
+
+**Display and Permission Gate:**
+1. Display the complete battle plan to the user if `becalmed-fleet.md` is in effect.
+2. Display the complete squadron formation to the user if `bacalmed-fleet.md` is not in effect. The battle plan (drafted in Step 2) should also be available for review.
+3. You are REQUIRED to wait for explicit permission to proceed.
+
+## 5. Run Quarterdeck Rhythm
 
 **Idle notification rule (immediate — do not defer to checkpoint):** Every time an idle notification arrives from a ship, ask two questions before doing anything else:
 1. Is this ship's task marked complete?
@@ -140,7 +159,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
         - `press-ganged-navigator.md`: Has the red-cell navigator been assigned implementation work?
         - `all-hands-on-deck.md`: Has any ship mustered crew roles that are idle or unjustified?
         - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
-    - **Write the quarterdeck report to disk** at `{mission-dir}/quarterdeck-report.md` at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in `{mission-dir}`, find all files matching `quarterdeck-report-N.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
+    - **Write the quarterdeck report to disk** at `{mission-dir}/quarterdeck-report.md` at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in `{mission-dir}`, find all files matching glob pattern `quarterdeck-report-[0-9]*.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
     - **Structured data capture:** Run `python3 scripts/nelson-data.py checkpoint --mission-dir {mission-dir} --pending N --in-progress N --completed N ...` with current progress, budget, hull, and decision data. Between checkpoints, run `python3 scripts/nelson-data.py event --mission-dir {mission-dir} --type <event_type> ...` for state changes (task completions, blockers, hull threshold crossings, standing order violations). See `references/structured-data.md` for event types and arguments.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
     - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
@@ -171,14 +190,14 @@ Reference `references/tool-mapping.md` for coordination tools, `references/admir
     - Agent idle with unverified outputs.
     - Before final synthesis.
 - For crewed tasks, verify crew outputs align with role boundaries (consult `references/crew-roles.md` and the Standing Orders table below if role violations are detected).
-- Marine deployments follow station-tier rules in `references/royal-marines.md`. Station 2+ marine deployments require admiral approval.
+- Marine deployments follow station-tier rules in `references/royal-marines.md`. Station 2+ marine deployments require admiral approval. Captains use `references/admiralty-templates/marine-deployment-brief.md` when deploying a marine.
 
 Reference `references/admiralty-templates/red-cell-review.md` for the red-cell review template. Consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
 
 ## 6. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
-- Write the captain's log to `{mission-dir}/captains-log.md`. Before writing, if `captains-log.md` already exists in `{mission-dir}`, find all files matching `captains-log-N.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `captains-log-N.md`, then write the new report. This keeps the latest log at the canonical path while preserving history. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
+- Write the captain's log to `{mission-dir}/captains-log.md`. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
     - Decisions and rationale.
     - Diffs or artifacts.
     - Validation evidence.

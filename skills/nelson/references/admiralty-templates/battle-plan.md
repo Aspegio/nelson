@@ -3,8 +3,8 @@
 ```text
 Task ID:
 - Name:
-- Owner:
-- Ship (if crewed):
+- Owner: [assigned at Step 3 — Formation]
+- Ship (if crewed): [assigned at Step 3 — Formation]
 - Crew manifest (if crewed):
 - Deliverable:
 - Dependencies:

@@ -40,7 +40,7 @@ An analysis mission with 8 independent sections warrants 8 captains. An implemen
 ## Role Guide
 
 - `admiral`: Defines sailing orders, delegates, tracks dependencies, resolves blockers. Coordinates final synthesis but MUST NOT perform it directly — assign a captain or dedicate a synthesis task.
-- `captain`: Commands a ship. Breaks task into sub-tasks, crews roles, coordinates crew, verifies outputs. Implements directly only when the task is atomic (0 crew).
+- `captain`: Commands a ship. Breaks task into sub-tasks, coordinates crew, verifies outputs. Implements directly only when the task is atomic (0 crew). Initial crew composition is set by the admiral at formation; captains may request mid-task adjustments with admiral approval.
   - Crew roles: Executive Officer (XO), Principal Warfare Officer (PWO), Navigating Officer (NO), Marine Engineering Officer (MEO), Weapon Engineering Officer (WEO), Logistics Officer (LOGO), Coxswain (COX). See `references/crew-roles.md` for role definitions and crewing rules.
 - `red-cell navigator`: Challenges assumptions, validates outputs, checks rollback readiness.
 

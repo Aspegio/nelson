@@ -539,15 +539,18 @@ class TestLifecycle:
         assert (mission_dir / "sailing-orders.json").exists()
         assert (mission_dir / "mission-log.json").exists()
 
-        # Step 2: Squadron
+        # Step 2: Tasks + plan-approved
+        add_task(mission_dir, task_id=1, name="Code review", owner="HMS Daring", station_tier=1)
+        add_task(mission_dir, task_id=2, name="Doc review", owner="HMS Argyll", deps="")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+
+        # Step 3: Squadron
         add_squadron(mission_dir, captains=[
             "HMS Daring:destroyer:sonnet:1",
             "HMS Argyll:frigate:sonnet:2",
         ])
         assert (mission_dir / "battle-plan.json").exists()
         assert (mission_dir / "fleet-status.json").exists()
-
-        # Step 3: Tasks + plan-approved
         add_task(mission_dir, task_id=1, name="Code review", owner="HMS Daring", station_tier=1)
         add_task(mission_dir, task_id=2, name="Doc review", owner="HMS Argyll", deps="")
         run("plan-approved", "--mission-dir", str(mission_dir))

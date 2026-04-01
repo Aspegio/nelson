@@ -56,7 +56,7 @@ No hard bounds are set. The admiral uses judgment.
 
 ## Briefing Enhancements (haiku agents only)
 
-When the tasking agent assigns haiku to an agent, add three blocks to that agent's crew briefing:
+These requirements apply whenever any tasking agent — admiral, captain, or crew — assigns haiku to a subordinate. When assigning haiku, add three blocks to that agent's briefing:
 
 ### 1. Identity Anchor (top of briefing)
 
@@ -76,13 +76,13 @@ These three blocks are **conditional on haiku assignment**. Do not include them 
 
 ## Tasking Agent Discipline (haiku agents only)
 
-When writing a task for a haiku agent, the tasking agent must compensate for reduced inferencing capacity by making the task itself precise. Vague instructions are not rescued by the briefing enhancement blocks above.
+Whoever writes the task — admiral, captain, or crew — must compensate for reduced inferencing capacity by making the task itself precise. Vague instructions are not rescued by the briefing enhancement blocks above.
 
 Each haiku task description must include:
 
 ### Explicit Constraints
 
-State what the agent must not do, must not touch, and must stay within. Do not rely on the agent to in fer scope limits from context.
+State what the agent must not do, must not touch, and must stay within. Do not rely on the agent to infer scope limits from context.
 
 > Example: "Only read files under `src/auth/`. Do not modify any file. Do not follow imports outside that directory."
 
