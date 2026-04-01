@@ -28,6 +28,7 @@ A Claude Code skill that organises multi-agent work into structured naval operat
 - [Installation](#installation)
 - [Usage](#usage)
 - [Customisation](#customisation)
+- [Fleet Dashboard](#fleet-dashboard)
 - [Plugin file structure](#plugin-file-structure)
 - [Mission artifacts](#mission-artifacts)
 - [Compatibility notes](#compatibility-notes)
@@ -368,6 +369,33 @@ Edit `references/action-stations.md` to change what controls are required at eac
 
 Edit `references/squadron-composition.md` to adjust the decision matrix or default team sizes.
 
+## Fleet Dashboard
+
+Nelson includes a live web dashboard that visualises mission state in the browser. It polls `fleet-status.json` every 3 seconds and renders ship cards, task progress, budget consumption, events, and blockers in real time.
+
+To launch it during a mission, include "with dashboard" in your request:
+
+```
+Use Nelson with dashboard to refactor the auth module
+```
+
+Nelson will start a local HTTP server and open the dashboard automatically. The dashboard is read-only — it reads the JSON files that `nelson-data.py` writes during the mission and requires no dependencies.
+
+You can also launch it manually against any mission directory:
+
+```bash
+python3 -m http.server 8420 &
+open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission=.nelson/missions/{YYYY-MM-DD_HHMMSS}"
+```
+
+Or test it with the bundled fixture:
+
+```bash
+open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission=skills/nelson/fleet-dashboard/test"
+```
+
+**Keyboard shortcuts:** `r` force refresh, `p` pause/resume polling, `Escape` dismiss overlay and blocker banner.
+
 ## Plugin file structure
 
 ```
@@ -422,7 +450,7 @@ skills/nelson/
     ├── squadron-composition.md              # Mode selection and team sizing rules
     ├── structured-data.md                    # Structured fleet data capture reference
     ├── tool-mapping.md                       # Nelson-to-Claude Code tool reference
-    └── standing-orders/                      # Individual anti-pattern files
+    ├── standing-orders/                      # Individual anti-pattern files
         ├── admiral-at-the-helm.md
         ├── all-hands-on-deck.md
         ├── awaiting-admiralty.md
@@ -438,6 +466,15 @@ skills/nelson/
         ├── skeleton-crew.md
         ├── split-keel.md
         └── unclassified-engagement.md
+    └── fleet-dashboard/                     # Live web dashboard for mission visualisation
+        ├── index.html
+        ├── css/main.css
+        ├── css/components.css
+        ├── js/utils.js
+        ├── js/data-loader.js
+        ├── js/renderer.js
+        ├── js/app.js
+        └── test/fixture.json
 agents/
 └── nelson.md                                # Agent definition with skill binding
 scripts/
