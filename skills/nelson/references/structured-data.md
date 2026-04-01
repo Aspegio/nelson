@@ -355,3 +355,7 @@ Fleet: 3/5 done | Budget: 62% | Hull: 3G 1A 0R | Blockers: 0
 ```
 
 This stdout line (~20 tokens) replaces a ~200-token JSON Write call. The full JSON is already on disk.
+
+## Schema Coupling
+
+The `_build_mission_record` and `_extract_fleet_details` functions in `nelson-data.py` depend on the JSON schemas defined above. If you rename or restructure fields in the schemas (e.g. `stand-down.json`, `battle-plan.json`, `sailing-orders.json`, `mission-log.json`), you must update those functions to match. `_compute_analytics` also depends on the field names produced by `_build_mission_record`.

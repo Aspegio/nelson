@@ -110,7 +110,7 @@ def _write_json(path: Path, data: Any) -> None:
         if existing_mode is not None:
             os.chmod(tmp, existing_mode)
         os.replace(tmp, path)
-    except BaseException:
+    except Exception:
         try:
             os.unlink(tmp)
         except OSError:
@@ -368,7 +368,7 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
         "success_metric_result": stand_down.get("success_metric_result", ""),
         "created_at": created_at,
         "completed_at": completed_at,
-        "duration_minutes": stand_down.get("duration_minutes", 0),
+        "duration_minutes": stand_down.get("duration_minutes"),
         "budget": stand_down.get("budget", {}),
         "fleet": fleet,
         "tasks": tasks,
@@ -1159,7 +1159,12 @@ def _resolve_fleet_paths(args: argparse.Namespace) -> tuple[Path, Path]:
 
 
 def cmd_index(args: argparse.Namespace) -> None:
-    """Build or update the fleet intelligence index."""
+    """Build or update the fleet intelligence index.
+
+    Note: not safe for concurrent execution — the read-modify-write on
+    fleet-intelligence.json has no file-level locking.  Acceptable for a
+    single-agent CLI tool; add locking if parallel indexers are ever needed.
+    """
     missions_dir, index_path = _resolve_fleet_paths(args)
     rebuild = bool(getattr(args, "rebuild", False))
 
