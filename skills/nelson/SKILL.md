@@ -128,7 +128,7 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 **Display and Permission Gate:**
 1. Display the complete battle plan to the user if `becalmed-fleet.md` is in effect.
-2. Display the complete squadron formation to the user if `bacalmed-fleet.md` is not in effect. The battle plan (drafted in Step 2) should also be available for review.
+2. Display the complete squadron formation to the user if `becalmed-fleet.md` is not in effect. The battle plan (drafted in Step 2) should also be available for review.
 3. You are REQUIRED to wait for explicit permission to proceed.
 
 ## 5. Run Quarterdeck Rhythm

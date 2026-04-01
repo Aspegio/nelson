@@ -551,9 +551,6 @@ class TestLifecycle:
         ])
         assert (mission_dir / "battle-plan.json").exists()
         assert (mission_dir / "fleet-status.json").exists()
-        add_task(mission_dir, task_id=1, name="Code review", owner="HMS Daring", station_tier=1)
-        add_task(mission_dir, task_id=2, name="Doc review", owner="HMS Argyll", deps="")
-        run("plan-approved", "--mission-dir", str(mission_dir))
 
         # Step 4: Events + checkpoint
         run(

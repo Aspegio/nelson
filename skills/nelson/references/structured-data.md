@@ -127,9 +127,10 @@ python3 scripts/nelson-data.py status \
 | Step 1: Sailing Orders | `init` | `sailing-orders.json`, `mission-log.json` | (conversation-only) |
 | Step 2: Battle Plan | (none — owners not yet assigned) | — | (conversation-only) |
 | Step 3: Form Squadron | `task` (per task), then `plan-approved`, then `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
-| Step 4: Each Checkpoint | `checkpoint` | `mission-log.json`, `fleet-status.json` | `quarterdeck-report.md` |
-| Step 4: Between Checkpoints | `event` | `mission-log.json` | -- |
-| Step 4: Relief on Station | `event --type relief_on_station` | `mission-log.json` | `turnover-briefs/{ship}.md` |
+| Step 4: Get Permission to Sail | (none) | — | (conversation-only) |
+| Step 5: Each Checkpoint | `checkpoint` | `mission-log.json`, `fleet-status.json` | `quarterdeck-report.md` |
+| Step 5: Between Checkpoints | `event` | `mission-log.json` | -- |
+| Step 5: Relief on Station | `event --type relief_on_station` | `mission-log.json` | `turnover-briefs/{ship}.md` |
 | Step 5: Action Stations | `event --type task_completed` | `mission-log.json` | -- |
 | Step 6: Stand Down | `stand-down` | `mission-log.json`, `fleet-status.json`, `stand-down.json` | `captains-log.md` |
 
@@ -138,7 +139,7 @@ python3 scripts/nelson-data.py status \
 | Event Type | Trigger | Key Data Fields |
 |---|---|---|
 | `squadron_formed` | Step 3 complete | captain_count, has_red_cell, execution_mode, standing_order_check |
-| `battle_plan_approved` | Step 2 complete | task_count, parallel_tracks, critical_path_length, standing_order_check |
+| `battle_plan_approved` | Step 3 complete | task_count, parallel_tracks, critical_path_length, standing_order_check |
 | `task_started` | Captain begins work | task_id, task_name, owner |
 | `task_completed` | Task verified complete | task_id, task_name, owner, station_tier, verification |
 | `checkpoint` | Each quarterdeck checkpoint | progress, budget, hull_summary, blockers, admiral_decision |
