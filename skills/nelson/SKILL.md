@@ -116,13 +116,13 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 2. `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
 3. `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
 
-**Fleet Dashboard:** After `nelson-data.py squadron` completes, output the dashboard launch command:
+**Fleet Dashboard:** After `nelson-data.py squadron` completes, launch the dashboard automatically:
 
-```
-Fleet Dashboard available:
-  python3 -m http.server 8420 &
-  open "http://localhost:8420/skills/nelson/fleet-dashboard/index.html?mission={mission-dir}"
-```
+1. Check if port 8420 is already in use: `lsof -ti :8420`
+2. If not, start the server in the background: `python3 -m http.server 8420 &`
+3. Open the dashboard in the default browser: `open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission={mission-dir}"`
+
+Use `127.0.0.1` instead of `localhost` to avoid IPv6 binding issues in some browsers.
 
 The dashboard polls `fleet-status.json` every 3 seconds and renders live mission state in the browser. It is read-only and requires no additional setup beyond the HTTP server.
 
