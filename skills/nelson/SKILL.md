@@ -119,10 +119,10 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 **Fleet Dashboard (opt-in):** Only launch the dashboard if the user explicitly requests it (e.g. "with dashboard", "launch dashboard", "mission control"). If requested, after `nelson-data.py squadron` completes:
 
 1. Check if port 8420 is already in use: `lsof -ti :8420`
-2. If not, start the server in the background: `python3 -m http.server 8420 &`
-3. Open the dashboard in the default browser: `open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission={mission-dir}"`
+2. If not, start the server: `nohup python3 -m http.server 8420 > /dev/null 2>&1 &`
+3. Open the dashboard: `open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission={mission-dir}"`
 
-Use `127.0.0.1` instead of `localhost` to avoid IPv6 binding issues in some browsers. The dashboard polls `fleet-status.json` every 3 seconds and is read-only.
+Use `127.0.0.1` (not `localhost`) to avoid IPv6 binding issues. Use `nohup` so the server survives after the shell call returns. The dashboard polls `fleet-status.json` every 3 seconds and is read-only.
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
