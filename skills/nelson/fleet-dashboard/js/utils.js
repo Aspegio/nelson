@@ -35,7 +35,7 @@
 
   /**
    * Format an ISO date string to HH:MM:SS local time.
-   * Returns '—' if the input is falsy or unparseable.
+   * Returns '—' if the input is falsy or unparsable.
    *
    * @param {string} iso
    * @returns {string}
