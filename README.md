@@ -418,6 +418,7 @@ skills/nelson/
     │   ├── scuttle-and-reform.md
     │   ├── session-hygiene.md
     │   └── session-resumption.md
+    ├── model-selection.md                    # Cost-optimized model assignment for agents
     ├── royal-marines.md                      # Royal Marines deployment rules
     ├── squadron-composition.md              # Mode selection and team sizing rules
     ├── structured-data.md                    # Structured fleet data capture reference
