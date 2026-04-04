@@ -28,7 +28,6 @@ A Claude Code skill that organises multi-agent work into structured naval operat
 - [Installation](#installation)
 - [Usage](#usage)
 - [Customisation](#customisation)
-- [Fleet Dashboard](#fleet-dashboard)
 - [Plugin file structure](#plugin-file-structure)
 - [Mission artifacts](#mission-artifacts)
 - [Compatibility notes](#compatibility-notes)
@@ -369,42 +368,11 @@ Edit `references/action-stations.md` to change what controls are required at eac
 
 Edit `references/squadron-composition.md` to adjust the decision matrix or default team sizes.
 
-## Fleet Dashboard
-
-Nelson includes a live web dashboard that visualises mission state in the browser. It polls `fleet-status.json` every 3 seconds and renders ship cards, task progress, budget consumption, events, and blockers in real time.
-
-<img width="1193" height="771" alt="nelson_dashboard" src="https://github.com/user-attachments/assets/4e6241ad-19b8-4c81-8ea7-a8cd3ee26838" />
-
-To use it, include "with dashboard" in your request:
-
-```
-Use Nelson with dashboard to refactor the auth module
-```
-
-Nelson will print the launch commands for you to run in a **separate terminal** (the HTTP server's access logs would bloat the Claude Code context window if run in-session):
-
-```bash
-python3 -m http.server 8420
-open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission=.nelson/missions/{YYYY-MM-DD_HHMMSS}"
-```
-
-The dashboard is read-only — it reads the JSON files that `nelson-data.py` writes during the mission and requires no dependencies.
-
-To test it with the bundled fixture:
-
-```bash
-python3 -m http.server 8420
-open "http://127.0.0.1:8420/skills/nelson/fleet-dashboard/index.html?mission=skills/nelson/fleet-dashboard/test"
-```
-
-**Keyboard shortcuts:** `r` force refresh, `p` pause/resume polling, `Escape` dismiss overlay and blocker banner.
-
 ## Plugin file structure
 
 ```
 skills/nelson/
 ├── SKILL.md              # Main skill instructions (entrypoint)
-├── fleet-dashboard/      # Live web dashboard for mission visualisation
 └── references/           # Supporting docs loaded on demand
     ├── action-stations.md        # Risk tier definitions
     ├── admiralty-templates/       # 10 structured templates
@@ -424,15 +392,6 @@ skills/nelson/
 settings.json                                 # Plugin default settings (enables agent teams)
 skills/nelson/
 ├── SKILL.md                                  # Main skill instructions (entrypoint)
-├── fleet-dashboard/                         # Live web dashboard for mission visualisation
-│   ├── index.html
-│   ├── css/main.css
-│   ├── css/components.css
-│   ├── js/utils.js
-│   ├── js/data-loader.js
-│   ├── js/renderer.js
-│   ├── js/app.js
-│   └── test/fixture.json
 └── references/
     ├── action-stations.md                    # Risk tier definitions and controls
     ├── admiralty-templates/                  # Individual template files
@@ -459,7 +418,6 @@ skills/nelson/
     │   ├── scuttle-and-reform.md
     │   ├── session-hygiene.md
     │   └── session-resumption.md
-    ├── model-selection.md                    # Cost-optimized model assignment for agents
     ├── royal-marines.md                      # Royal Marines deployment rules
     ├── squadron-composition.md              # Mode selection and team sizing rules
     ├── structured-data.md                    # Structured fleet data capture reference
