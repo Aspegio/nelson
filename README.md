@@ -476,7 +476,7 @@ scripts/
 
 ## Mission artifacts
 
-Each mission creates a timestamped directory for its runtime artifacts. Previous missions are preserved — each run gets its own directory.
+Each mission creates a timestamped directory for its runtime artifacts. Previous missions are preserved — each run gets its own directory. The `SESSION_ID` suffix is an 8-character hex string generated at session start via `uuidgen`, ensuring concurrent Nelson sessions in the same repository create distinct directories.
 
 <details>
 <summary>Artifact directory structure</summary>
