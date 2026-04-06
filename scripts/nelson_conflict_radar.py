@@ -2,11 +2,21 @@
 """
 Conflict Radar for Nelson Missions.
 
-This script runs during the quarterdeck rhythm (via PostToolUse hook)
-to monitor for file conflicts. It compares active file changes
-(via `git status` / `git diff --name-only`) against the `battle-plan.md`
-file ownership to raise an alert if multiple ships write to the same file
-or write to a file they don't own.
+This script monitors for file conflicts by comparing active git changes
+against the `battle-plan.md` file ownership declarations. It raises an
+alert if a changed file has no registered owner in the battle plan.
+
+Usage (manual invocation):
+  python scripts/nelson_conflict_radar.py --plan .nelson/missions/<your-mission-dir>/battle-plan.md
+
+Opt-in hook configuration (add to settings.json PostToolUse hooks if desired):
+  Recommended guard to only run during active Nelson missions:
+    if [ -d .nelson/missions ]; then python scripts/nelson_conflict_radar.py --plan <path>; fi
+
+  Note: Running this as a default PostToolUse hook is NOT recommended — it is
+  too expensive to run on every tool use and will cause issues in non-Nelson
+  projects. Opt in manually by adding the hook command to your settings.json
+  and supplying the explicit --plan path.
 """
 
 import sys
@@ -36,8 +46,11 @@ def get_git_changes(project_root: Path) -> set:
         if len(line) < 4:
             continue
         # Status format is usually 'XY filename'
-        status = line[:2]
         filename = line[3:].strip()
+
+        # Handle quoted paths (git quotes paths with special chars)
+        if filename.startswith('"') and filename.endswith('"'):
+            filename = filename[1:-1].encode('utf-8').decode('unicode_escape')
 
         # Handle renames 'R  old -> new'
         if "->" in filename:
@@ -65,18 +78,12 @@ def radar_scan(ownership: dict, changed_files: set) -> list:
 
     # For now, we will flag any changed file that has no registered owner
     for changed in changed_files:
-        # Ignore common non-code files
-        if (
-            changed.endswith(".md")
-            or changed.endswith(".json")
-            or changed.startswith(".claude")
-        ):
-            continue
-
         # Is the changed file owned by anyone?
         found_owner = False
+        changed_path = Path(changed)
         for f in file_to_owner:
-            if f in changed or changed in f:
+            owned_path = Path(f)
+            if changed_path == owned_path or str(changed_path).endswith(str(owned_path)):
                 found_owner = True
                 break
 
