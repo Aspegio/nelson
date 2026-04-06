@@ -109,6 +109,18 @@ Plugin installs are cached snapshots — they do not auto-update. Users must re-
 /plugin install harrymunro/nelson
 ```
 
+## Development tooling
+
+This repo uses [beads](https://github.com/gastownhall/beads) (`bd`) for development task tracking. Beads is a contributor-side tool only — it is not a dependency of the Nelson skill and must not appear in any user-facing files under `skills/nelson/` or `.claude-plugin/`.
+
+- `.beads/` is gitignored — task data stays local
+- `bd init --stealth` initializes without touching git hooks
+- `bd setup claude` configures session hooks in `.claude/settings.local.json`
+- `bd ready` shows unblocked development tasks
+- `bd prime` injects task context into dev sessions
+
+Contributors who don't have beads installed are unaffected.
+
 ## Environment
 
 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` must be set to enable the `agent-team` execution mode (configured in `.claude/settings.local.json`).

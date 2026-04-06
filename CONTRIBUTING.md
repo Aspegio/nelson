@@ -20,6 +20,27 @@ The skill lives in `.claude/skills/nelson/`. The key files:
 - `references/` — Supporting docs loaded on demand (risk tiers, templates, team sizing)
 - `agents/` — Agent interface definitions
 
+## Development tooling (optional)
+
+Nelson's development uses [beads](https://github.com/gastownhall/beads) for dependency-aware task tracking across agent sessions. Beads is **not required** — you can contribute without it.
+
+If you'd like to use it:
+
+```bash
+# Install beads CLI (global, one-time)
+brew install beads
+
+# Initialize in your local clone
+bd init --stealth
+
+# Set up Claude Code integration
+bd setup claude
+```
+
+`--stealth` keeps beads local-only — no files are committed to the repo. The `.beads/` directory is gitignored.
+
+Beads is a development aid for Nelson contributors. It is not a dependency of the Nelson skill and Nelson users are never exposed to it.
+
 ## Guidelines
 
 - Keep things simple and clear
