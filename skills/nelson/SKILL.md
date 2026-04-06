@@ -56,7 +56,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 **Battle Plan Gate — Standing Order Check:** You MUST NOT finalize task assignments until each question below is answered in writing and any triggered standing order remedy has been applied. Show your reasoning — a bare yes/no is not sufficient.
 - `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent? If yes, skip Step 3 — single-session has no squadron to form.
 - `light-squadron.md`: Is the task count equal to the number of independent work units, or have tasks been under-split?
-- `split-keel.md`: Does each task have exclusive file ownership with no conflicts?
+- `split-keel.md`: Does each task have exclusive file ownership with no conflicts? (This will be automatically verified in Step 3).
 - `unclassified-engagement.md`: Does every task have a risk tier?
 - `all-hands-on-deck.md`: Has each task been crewed only with roles its work actually demands?
 - `skeleton-crew.md`: Would any task deploy exactly one crew member for an atomic task the captain should handle directly?
@@ -117,10 +117,11 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 > **Note:** Nelson requires an interactive session for formation approval. Headless and CI invocation are not supported at this time.
 
-**Structured Data Capture:** Once formation is approved, run these three commands in order:
+**Structured Data Capture:** Once formation is approved, run these commands in order:
 1. `python3 scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task (owners are now known from formation). See `references/structured-data.md` for task arguments.
 2. `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
 3. `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
+4. `python3 scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json` to verify there are no file ownership conflicts. If conflicts are found, you MUST resolve them and update the battle plan before proceeding.
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
@@ -188,7 +189,7 @@ Hull: All ships green
 
 Reference `references/tool-mapping.md` for coordination tools, `references/admiralty-templates/quarterdeck-report.md` for the report template, and `references/admiralty-templates/damage-report.md` for damage report format. Use `references/commendations.md` for recognition signals and graduated correction. Consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
 
-## 5. Set Action Stations
+## 6. Set Action Stations
 
 - You MUST read and apply station tiers from `references/action-stations.md`.
 - Require verification evidence before marking tasks complete:
@@ -204,7 +205,7 @@ Reference `references/tool-mapping.md` for coordination tools, `references/admir
 
 Reference `references/admiralty-templates/red-cell-review.md` for the red-cell review template. Consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
 
-## 6. Stand Down And Log Action
+## 7. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
 - Write the captain's log to `{mission-dir}/captains-log.md`. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:

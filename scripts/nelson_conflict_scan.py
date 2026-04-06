@@ -20,34 +20,117 @@ For production use, consider AST-based parsers or tools like madge/pydeps.
 
 import sys
 import re
+import json
 import argparse
 from pathlib import Path
 
 # Common Python stdlib modules that should never be treated as local dependencies
-PYTHON_STDLIB = frozenset({
-    'abc', 'argparse', 'ast', 'asyncio', 'base64', 'bisect', 'calendar',
-    'collections', 'configparser', 'contextlib', 'copy', 'csv', 'ctypes',
-    'dataclasses', 'datetime', 'decimal', 'difflib', 'email', 'enum',
-    'errno', 'fnmatch', 'fractions', 'functools', 'gc', 'getpass', 'glob',
-    'gzip', 'hashlib', 'heapq', 'hmac', 'html', 'http', 'importlib',
-    'inspect', 'io', 'itertools', 'json', 'keyword', 'logging', 'math',
-    'mimetypes', 'multiprocessing', 'operator', 'os', 'pathlib',
-    'platform', 'pprint', 'queue', 're', 'secrets', 'select', 'shelve',
-    'shlex', 'shutil', 'signal', 'socket', 'sqlite3', 'ssl', 'statistics',
-    'string', 'struct', 'subprocess', 'sys', 'tempfile', 'textwrap',
-    'threading', 'time', 'timeit', 'traceback', 'typing', 'unittest',
-    'urllib', 'uuid', 'warnings', 'weakref', 'xml', 'zipfile', 'zlib',
-})
+PYTHON_STDLIB = frozenset(
+    {
+        "abc",
+        "argparse",
+        "ast",
+        "asyncio",
+        "base64",
+        "bisect",
+        "calendar",
+        "collections",
+        "configparser",
+        "contextlib",
+        "copy",
+        "csv",
+        "ctypes",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "difflib",
+        "email",
+        "enum",
+        "errno",
+        "fnmatch",
+        "fractions",
+        "functools",
+        "gc",
+        "getpass",
+        "glob",
+        "gzip",
+        "hashlib",
+        "heapq",
+        "hmac",
+        "html",
+        "http",
+        "importlib",
+        "inspect",
+        "io",
+        "itertools",
+        "json",
+        "keyword",
+        "logging",
+        "math",
+        "mimetypes",
+        "multiprocessing",
+        "operator",
+        "os",
+        "pathlib",
+        "platform",
+        "pprint",
+        "queue",
+        "re",
+        "secrets",
+        "select",
+        "shelve",
+        "shlex",
+        "shutil",
+        "signal",
+        "socket",
+        "sqlite3",
+        "ssl",
+        "statistics",
+        "string",
+        "struct",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "textwrap",
+        "threading",
+        "time",
+        "timeit",
+        "traceback",
+        "typing",
+        "unittest",
+        "urllib",
+        "uuid",
+        "warnings",
+        "weakref",
+        "xml",
+        "zipfile",
+        "zlib",
+    }
+)
 
 
 def parse_battle_plan(path: Path) -> dict:
-    """Parse battle-plan.md to extract file ownership per captain."""
+    """Parse battle-plan.md or battle-plan.json to extract file ownership per captain."""
     if not path.exists():
         raise FileNotFoundError(f"Battle plan not found at {path}")
 
     content = path.read_text(encoding="utf-8")
-
     ownership = {}  # Map of captain/ship -> set of files
+
+    try:
+        data = json.loads(content)
+        for task in data.get("tasks", []):
+            owner = task.get("owner")
+            files = task.get("files", [])
+            if owner and files:
+                if owner not in ownership:
+                    ownership[owner] = set()
+                ownership[owner].update(files)
+        if ownership:
+            return ownership
+    except json.JSONDecodeError:
+        pass
+
     current_ship = None
 
     # We look for lines like "- Ship (if crewed): HMS Victory"
@@ -104,10 +187,9 @@ def parse_imports(filepath: Path) -> set[str]:
             )
             if match:
                 module = match.group(1) or match.group(2).split(",")[0].strip()
-                root_module = module.split(".")[0]
                 # Skip empty strings (e.g. from relative imports like "from . import x")
-                if root_module:
-                    imports.add(root_module)
+                if module:
+                    imports.add(module)
 
     elif filepath.suffix in (".js", ".ts", ".jsx", ".tsx"):
         # import ... from 'foo'
@@ -115,6 +197,7 @@ def parse_imports(filepath: Path) -> set[str]:
         for match in re.finditer(
             r'(?:import.*from\s+[\'"]([^\'"]+)[\'"]|require\([\'"]([^\'"]+)[\'"]\))',
             content,
+            re.DOTALL,
         ):
             module = match.group(1) or match.group(2)
             if module:
@@ -180,7 +263,14 @@ def detect_conflicts(
                 # Skip Python stdlib modules — they cannot refer to project files
                 if imp in PYTHON_STDLIB:
                     continue
-                if imp == other_stem or imp == other_no_ext or imp == other_full:
+                imp_path = imp.replace(".", "/")
+                if (
+                    imp == other_stem
+                    or imp == other_no_ext
+                    or imp == other_full
+                    or imp_path == other_no_ext
+                    or imp_path == other_full
+                ):
                     conflicts.append((owner, file, other_owner, other_file))
 
     return conflicts
@@ -225,9 +315,7 @@ def main():
         for c in conflicts:
             if c[1] == c[3]:
                 # Duplicate ownership — two captains claim the same file
-                print(
-                    f"  {c[0]} and {c[2]} both claim ownership of {c[1]}."
-                )
+                print(f"  {c[0]} and {c[2]} both claim ownership of {c[1]}.")
             else:
                 print(
                     f"  Captain {c[0]} owns {c[1]} which appears to import {c[3]} owned by Captain {c[2]}."
