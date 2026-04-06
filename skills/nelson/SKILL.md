@@ -34,7 +34,7 @@ Out of scope: Migration script for existing sessions
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
 
-**Structured Data Capture:** After establishing the mission directory, run `python3 scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."` to create `sailing-orders.json` and initialise `mission-log.json`. See `references/structured-data.md` for the full argument list.
+**Structured Data Capture:** After establishing the mission directory, run the `nelson-data.py` script located in the skill's directory (e.g., `python3 .claude/skills/nelson/scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."`). If installed globally, it may be in `~/.claude/skills/nelson/scripts/`. This creates `sailing-orders.json` and initialises `mission-log.json`. See `references/structured-data.md` for the full argument list.
 
 **Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
@@ -56,7 +56,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 **Battle Plan Gate — Standing Order Check:** You MUST NOT finalize task assignments until each question below is answered in writing and any triggered standing order remedy has been applied. Show your reasoning — a bare yes/no is not sufficient.
 - `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent? If yes, skip Step 3 — single-session has no squadron to form.
 - `light-squadron.md`: Is the task count equal to the number of independent work units, or have tasks been under-split?
-- `split-keel.md`: Does each task have exclusive file ownership with no conflicts?
+- `split-keel.md`: Does each task have exclusive file ownership with no conflicts? (This will be automatically verified in Step 3).
 - `unclassified-engagement.md`: Does every task have a risk tier?
 - `all-hands-on-deck.md`: Has each task been crewed only with roles its work actually demands?
 - `skeleton-crew.md`: Would any task deploy exactly one crew member for an atomic task the captain should handle directly?
@@ -117,10 +117,11 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 > **Note:** Nelson requires an interactive session for formation approval. Headless and CI invocation are not supported at this time.
 
-**Structured Data Capture:** Once formation is approved, run these three commands in order:
-1. `python3 scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task (owners are now known from formation). See `references/structured-data.md` for task arguments.
-2. `python3 scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
-3. `python3 scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
+**Structured Data Capture:** Once formation is approved, run these commands in order:
+1. `python3 .claude/skills/nelson/scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task (owners are now known from formation). See `references/structured-data.md` for task arguments.
+2. `python3 .claude/skills/nelson/scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
+3. `python3 .claude/skills/nelson/scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
+4. `python3 .claude/skills/nelson/scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json` to verify there are no file ownership conflicts. If conflicts are found, you MUST resolve them and update the battle plan before proceeding.
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
@@ -170,7 +171,7 @@ If the task is complete and no pending task depends on it, proceed to shutdown p
         - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
         - `wrong-ensign.md`: Is the admiral or any captain using tools from the wrong execution mode?
     - **Write the quarterdeck report to disk** at `{mission-dir}/quarterdeck-report.md` at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in `{mission-dir}`, find all files matching glob pattern `quarterdeck-report-[0-9]*.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
-    - **Structured data capture:** Run `python3 scripts/nelson-data.py checkpoint --mission-dir {mission-dir} --pending N --in-progress N --completed N ...` with current progress, budget, hull, and decision data. Between checkpoints, run `python3 scripts/nelson-data.py event --mission-dir {mission-dir} --type <event_type> ...` for state changes (task completions, blockers, hull threshold crossings, standing order violations). See `references/structured-data.md` for event types and arguments.
+    - **Structured data capture:** Run `python3 .claude/skills/nelson/scripts/nelson-data.py checkpoint --mission-dir {mission-dir} --pending N --in-progress N --completed N ...` with current progress, budget, hull, and decision data. Between checkpoints, run `python3 .claude/skills/nelson/scripts/nelson-data.py event --mission-dir {mission-dir} --type <event_type> ...` for state changes (task completions, blockers, hull threshold crossings, standing order violations). See `references/structured-data.md` for event types and arguments.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
     - Cross-reference the battle plan against `TaskList`: for any task marked `admiralty-action-required: yes` in the battle plan that shows status `completed`, confirm there is a quarterdeck log entry recording admiralty sign-off. If no such entry exists, flag to Admiralty for manual verification — the task may have completed without the intended human step.
 - Re-scope early when a task drifts from mission metric.
@@ -188,7 +189,7 @@ Hull: All ships green
 
 Reference `references/tool-mapping.md` for coordination tools, `references/admiralty-templates/quarterdeck-report.md` for the report template, and `references/admiralty-templates/damage-report.md` for damage report format. Use `references/commendations.md` for recognition signals and graduated correction. Consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
 
-## 5. Set Action Stations
+## 6. Set Action Stations
 
 - You MUST read and apply station tiers from `references/action-stations.md`.
 - Require verification evidence before marking tasks complete:
@@ -204,7 +205,7 @@ Reference `references/tool-mapping.md` for coordination tools, `references/admir
 
 Reference `references/admiralty-templates/red-cell-review.md` for the red-cell review template. Consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
 
-## 6. Stand Down And Log Action
+## 7. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
 - Write the captain's log to `{mission-dir}/captains-log.md`. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
@@ -217,7 +218,7 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
 
 Reference `references/admiralty-templates/captains-log.md` for the captain's log template and `references/commendations.md` for Mentioned in Despatches criteria.
 
-**Structured Data Capture:** Before writing the captain's log, run `python3 scripts/nelson-data.py stand-down --mission-dir {mission-dir} --outcome-achieved --actual-outcome "..." --metric-result "..."` to capture the structured mission summary. See `references/structured-data.md` for the full argument list.
+**Structured Data Capture:** Before writing the captain's log, run `python3 .claude/skills/nelson/scripts/nelson-data.py stand-down --mission-dir {mission-dir} --outcome-achieved --actual-outcome "..." --metric-result "..."` to capture the structured mission summary. See `references/structured-data.md` for the full argument list.
 
 **Session State Cleanup:** Remove the session state file by deleting `.nelson/.active-{SESSION_ID}`.
 

@@ -31,6 +31,11 @@ import os
 import stat
 import sys
 import tempfile
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -40,19 +45,21 @@ from typing import Any
 # Constants
 # ---------------------------------------------------------------------------
 
-VALID_EVENT_TYPES = frozenset({
-    "task_started",
-    "task_completed",
-    "blocker_raised",
-    "blocker_resolved",
-    "hull_threshold_crossed",
-    "relief_on_station",
-    "standing_order_violation",
-    "commendation",
-    "admiralty_action_required",
-    "admiralty_action_completed",
-    "battle_plan_amended",
-})
+VALID_EVENT_TYPES = frozenset(
+    {
+        "task_started",
+        "task_completed",
+        "blocker_raised",
+        "blocker_resolved",
+        "hull_threshold_crossed",
+        "relief_on_station",
+        "standing_order_violation",
+        "commendation",
+        "admiralty_action_required",
+        "admiralty_action_completed",
+        "battle_plan_amended",
+    }
+)
 
 VALID_DECISIONS = frozenset({"continue", "rescope", "stop"})
 VALID_MODES = frozenset({"single-session", "subagents", "agent-team"})
@@ -62,6 +69,7 @@ JSON_INDENT = 2
 # ---------------------------------------------------------------------------
 # Helpers — pure functions (no side effects)
 # ---------------------------------------------------------------------------
+
 
 def _now_iso() -> str:
     """Return the current UTC time as an ISO 8601 string."""
@@ -81,8 +89,13 @@ def _read_json(path: Path) -> dict | list:
     except json.JSONDecodeError:
         # Back up the corrupt file and return a fresh structure
         backup = path.with_suffix(".json.bak")
-        path.rename(backup)
-        _err(f"Warning: corrupt JSON at {path}, backed up to {backup}")
+        try:
+            if backup.exists():
+                backup.unlink()
+            path.rename(backup)
+            _err(f"Warning: corrupt JSON at {path}, backed up to {backup}")
+        except OSError as e:
+            _err(f"Warning: corrupt JSON at {path}, could not back up: {e}")
         if "mission-log" in path.name:
             return {"version": 1, "events": []}
         return {}
@@ -121,10 +134,20 @@ def _write_json(path: Path, data: Any) -> None:
 def _append_event(mission_dir: Path, event: dict) -> None:
     """Append *event* to mission-log.json using read-modify-write."""
     log_path = mission_dir / "mission-log.json"
-    log = _read_json(log_path)
-    new_events = list(log.get("events", [])) + [event]
-    new_log = {**log, "events": new_events}
-    _write_json(log_path, new_log)
+    lock_path = mission_dir / ".mission-log.lock"
+
+    lock_file = open(lock_path, "w")
+    try:
+        if fcntl:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+        log = _read_json(log_path)
+        new_events = list(log.get("events", [])) + [event]
+        new_log = {**log, "events": new_events}
+        _write_json(log_path, new_log)
+    finally:
+        if fcntl:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
 
 
 def _err(msg: str) -> None:
@@ -225,11 +248,7 @@ def _count_events_of_type(events: list[dict], event_type: str) -> int:
 
 def _get_last_checkpoint_number(events: list[dict]) -> int:
     """Return the highest checkpoint number seen in events, or 0."""
-    nums = [
-        e.get("checkpoint", 0)
-        for e in events
-        if e.get("type") == "checkpoint"
-    ]
+    nums = [e.get("checkpoint", 0) for e in events if e.get("type") == "checkpoint"]
     return max(nums) if nums else 0
 
 
@@ -347,7 +366,9 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
     tasks = {
         "completed": sd_tasks.get("completed", 0),
         "total": sd_tasks.get("total", 0),
-        "by_station_tier": sd_tasks.get("by_station_tier", {"0": 0, "1": 0, "2": 0, "3": 0}),
+        "by_station_tier": sd_tasks.get(
+            "by_station_tier", {"0": 0, "1": 0, "2": 0, "3": 0}
+        ),
         "task_names": task_names,
         "file_ownership": file_ownership,
     }
@@ -373,7 +394,9 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
         "fleet": fleet,
         "tasks": tasks,
         "quality": stand_down.get("quality", {}),
-        "reusable_patterns": stand_down.get("reusable_patterns", {"adopt": [], "avoid": []}),
+        "reusable_patterns": stand_down.get(
+            "reusable_patterns", {"adopt": [], "avoid": []}
+        ),
         "event_types": event_types,
     }
 
@@ -381,6 +404,7 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
 # ---------------------------------------------------------------------------
 # Subcommand: init
 # ---------------------------------------------------------------------------
+
 
 def cmd_init(args: argparse.Namespace) -> None:
     """Create mission directory and write sailing-orders.json."""
@@ -425,30 +449,31 @@ def cmd_init(args: argparse.Namespace) -> None:
 # Subcommand: squadron
 # ---------------------------------------------------------------------------
 
+
 def cmd_squadron(args: argparse.Namespace) -> None:
     """Record squadron formation in battle-plan.json and mission-log.json."""
     mission_dir = _require_mission_dir(args)
 
     # Parse captain specs: "name:class:model:task_id"
     captains: list[dict[str, Any]] = []
-    for spec in (args.captain or []):
+    for spec in args.captain or []:
         parts = spec.split(":")
         if len(parts) != 4:
-            _die(
-                f"Error: captain spec must be 'name:class:model:task_id', got: {spec}"
-            )
+            _die(f"Error: captain spec must be 'name:class:model:task_id', got: {spec}")
         ship_name, ship_class, model, task_id_str = parts
         try:
             task_id = int(task_id_str)
         except ValueError:
             _die(f"Error: task_id must be an integer, got: {task_id_str}")
             return  # unreachable but helps type checkers
-        captains.append({
-            "ship_name": ship_name,
-            "ship_class": ship_class,
-            "model": model,
-            "task_id": task_id,
-        })
+        captains.append(
+            {
+                "ship_name": ship_name,
+                "ship_class": ship_class,
+                "model": model,
+                "task_id": task_id,
+            }
+        )
 
     squadron: dict[str, Any] = {
         "admiral": {
@@ -494,17 +519,19 @@ def cmd_squadron(args: argparse.Namespace) -> None:
     # Write initial fleet-status.json
     squadron_list: list[dict[str, Any]] = []
     for cap in captains:
-        squadron_list.append({
-            "ship_name": cap["ship_name"],
-            "ship_class": cap["ship_class"],
-            "role": "captain",
-            "hull_integrity_pct": 100,
-            "hull_integrity_status": "Green",
-            "relief_requested": False,
-            "task_id": cap["task_id"],
-            "task_name": None,
-            "task_status": "pending",
-        })
+        squadron_list.append(
+            {
+                "ship_name": cap["ship_name"],
+                "ship_class": cap["ship_class"],
+                "role": "captain",
+                "hull_integrity_pct": 100,
+                "hull_integrity_status": "Green",
+                "relief_requested": False,
+                "task_id": cap["task_id"],
+                "task_name": None,
+                "task_status": "pending",
+            }
+        )
 
     fleet_status = {
         "version": 1,
@@ -557,6 +584,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # Subcommand: task
 # ---------------------------------------------------------------------------
+
 
 def cmd_task(args: argparse.Namespace) -> None:
     """Add a task to battle-plan.json."""
@@ -618,15 +646,13 @@ def _recompute_dependents(tasks: list[dict]) -> list[dict]:
             if t["id"] not in dependents_map[dep_id]:
                 dependents_map[dep_id].append(t["id"])
 
-    return [
-        {**t, "dependents": sorted(dependents_map.get(t["id"], []))}
-        for t in tasks
-    ]
+    return [{**t, "dependents": sorted(dependents_map.get(t["id"], []))} for t in tasks]
 
 
 # ---------------------------------------------------------------------------
 # Subcommand: plan-approved
 # ---------------------------------------------------------------------------
+
 
 def cmd_plan_approved(args: argparse.Namespace) -> None:
     """Finalize the battle plan — compute DAG metrics and log event."""
@@ -707,9 +733,7 @@ def _compute_dag_metrics(tasks: list[dict]) -> tuple[int, int]:
     task_map = {t["id"]: t for t in tasks}
 
     # Parallel tracks = tasks with empty dependencies
-    parallel_tracks = sum(
-        1 for t in tasks if not t.get("dependencies")
-    )
+    parallel_tracks = sum(1 for t in tasks if not t.get("dependencies"))
 
     # Critical path = longest path in DAG via DFS with memoisation
     memo: dict[int, int] = {}
@@ -720,7 +744,9 @@ def _compute_dag_metrics(tasks: list[dict]) -> tuple[int, int]:
             return memo[task_id]
         if task_id in visiting:
             cycle_members = ", ".join(str(t) for t in sorted(visiting))
-            _die(f"Cycle detected in task dependencies (task IDs involved: {cycle_members})")
+            _die(
+                f"Cycle detected in task dependencies (task IDs involved: {cycle_members})"
+            )
         visiting.add(task_id)
         task = task_map.get(task_id)
         if task is None:
@@ -746,6 +772,7 @@ def _compute_dag_metrics(tasks: list[dict]) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 # Subcommand: event
 # ---------------------------------------------------------------------------
+
 
 def cmd_event(args: argparse.Namespace, extra: list[str]) -> None:
     """Log a mission event to mission-log.json."""
@@ -780,6 +807,7 @@ def cmd_event(args: argparse.Namespace, extra: list[str]) -> None:
 # ---------------------------------------------------------------------------
 # Subcommand: checkpoint
 # ---------------------------------------------------------------------------
+
 
 def cmd_checkpoint(args: argparse.Namespace) -> None:
     """Record a quarterdeck checkpoint."""
@@ -847,33 +875,37 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
     # Build squadron status from damage reports if available
     squadron_status: list[dict[str, Any]] = []
     for report in damage_reports:
-        squadron_status.append({
-            "ship_name": report.get("ship_name", "unknown"),
-            "ship_class": None,
-            "role": "captain",
-            "hull_integrity_pct": report.get("hull_integrity_pct", 100),
-            "hull_integrity_status": report.get("hull_integrity_status", "Green"),
-            "relief_requested": report.get("relief_requested", False),
-            "task_id": None,
-            "task_name": None,
-            "task_status": None,
-        })
+        squadron_status.append(
+            {
+                "ship_name": report.get("ship_name", "unknown"),
+                "ship_class": None,
+                "role": "captain",
+                "hull_integrity_pct": report.get("hull_integrity_pct", 100),
+                "hull_integrity_status": report.get("hull_integrity_status", "Green"),
+                "relief_requested": report.get("relief_requested", False),
+                "task_id": None,
+                "task_name": None,
+                "task_status": None,
+            }
+        )
 
     # If no damage reports, try to carry forward squadron from battle plan
     if not squadron_status and battle_plan.get("squadron"):
         bp_squadron = battle_plan["squadron"]
         for cap in bp_squadron.get("captains", []):
-            squadron_status.append({
-                "ship_name": cap.get("ship_name"),
-                "ship_class": cap.get("ship_class"),
-                "role": "captain",
-                "hull_integrity_pct": 100,
-                "hull_integrity_status": "Green",
-                "relief_requested": False,
-                "task_id": cap.get("task_id"),
-                "task_name": None,
-                "task_status": None,
-            })
+            squadron_status.append(
+                {
+                    "ship_name": cap.get("ship_name"),
+                    "ship_class": cap.get("ship_class"),
+                    "role": "captain",
+                    "hull_integrity_pct": 100,
+                    "hull_integrity_status": "Green",
+                    "relief_requested": False,
+                    "task_id": cap.get("task_id"),
+                    "task_name": None,
+                    "task_status": None,
+                }
+            )
 
     # Read sailing orders for outcome
     so_path = mission_dir / "sailing-orders.json"
@@ -925,8 +957,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
     _write_json(fs_path, fleet_status)
 
     hull_summary = (
-        f"{args.hull_green}G {args.hull_amber}A "
-        f"{args.hull_red}R {args.hull_critical}C"
+        f"{args.hull_green}G {args.hull_amber}A {args.hull_red}R {args.hull_critical}C"
     )
     print(
         f"[nelson-data] Checkpoint {checkpoint_num} recorded\n"
@@ -940,6 +971,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # Subcommand: stand-down
 # ---------------------------------------------------------------------------
+
 
 def cmd_stand_down(args: argparse.Namespace) -> None:
     """Record mission completion and write stand-down.json."""
@@ -971,8 +1003,11 @@ def cmd_stand_down(args: argparse.Namespace) -> None:
     duration_minutes = 0
     if len(timestamps) >= 2:
         try:
-            first = datetime.fromisoformat(timestamps[0].replace("Z", "+00:00"))
-            last = datetime.fromisoformat(timestamps[-1].replace("Z", "+00:00"))
+            parsed_times = [
+                datetime.fromisoformat(ts.replace("Z", "+00:00")) for ts in timestamps
+            ]
+            first = min(parsed_times)
+            last = max(parsed_times)
             duration_minutes = int((last - first).total_seconds() / 60)
         except (ValueError, TypeError):
             pass
@@ -1095,6 +1130,7 @@ def cmd_stand_down(args: argparse.Namespace) -> None:
 # Subcommand: status
 # ---------------------------------------------------------------------------
 
+
 def cmd_status(args: argparse.Namespace) -> None:
     """Print current fleet status from fleet-status.json (read-only)."""
     raw = getattr(args, "mission_dir", None)
@@ -1153,48 +1189,84 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 def _resolve_fleet_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     """Return (missions_dir, index_path) from parsed arguments."""
-    missions_dir = Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
+    missions_dir = (
+        Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
+    )
     index_path = missions_dir.parent / "fleet-intelligence.json"
     return missions_dir, index_path
 
 
 def cmd_index(args: argparse.Namespace) -> None:
-    """Build or update the fleet intelligence index.
-
-    Note: not safe for concurrent execution — the read-modify-write on
-    fleet-intelligence.json has no file-level locking.  Acceptable for a
-    single-agent CLI tool; add locking if parallel indexers are ever needed.
-    """
+    """Build or update the fleet intelligence index."""
     missions_dir, index_path = _resolve_fleet_paths(args)
     rebuild = bool(getattr(args, "rebuild", False))
 
-    # Load existing index or start fresh
-    if rebuild:
-        index = _build_empty_index()
-    else:
-        index = _read_json_optional(index_path) or _build_empty_index()
+    lock_path = index_path.with_suffix(".lock")
+    lock_file = open(lock_path, "w")
+    try:
+        if fcntl:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
 
-    # Guard against future version bumps
-    if not rebuild and index.get("version") is not None and index["version"] != 1:
-        _err(f"Warning: index version {index['version']} != 1, rebuilding")
-        index = _build_empty_index()
-        rebuild = True
+        # Load existing index or start fresh
+        if rebuild:
+            index = _build_empty_index()
+        else:
+            index = _read_json_optional(index_path) or _build_empty_index()
 
-    indexed_ids = {m["mission_id"] for m in index.get("missions", [])}
+        # Guard against future version bumps
+        if not rebuild and index.get("version") is not None and index["version"] != 1:
+            _err(f"Warning: index version {index['version']} != 1, rebuilding")
+            index = _build_empty_index()
+            rebuild = True
 
-    # Discover completed missions
-    completed = _find_completed_missions(missions_dir)
+        indexed_ids = {m["mission_id"] for m in index.get("missions", [])}
 
-    # Filter to new missions only (unless rebuilding)
-    new_dirs = completed if rebuild else [d for d in completed if d.name not in indexed_ids]
+        # Discover completed missions
+        completed = _find_completed_missions(missions_dir)
+
+        # Filter to new missions only (unless rebuilding)
+        new_dirs = (
+            completed
+            if rebuild
+            else [d for d in completed if d.name not in indexed_ids]
+        )
+
+        # Build records (skip missions with unreadable stand-down.json)
+        new_records = [
+            r for r in (_build_mission_record(d) for d in new_dirs) if r is not None
+        ]
+
+        # Merge and sort
+        all_missions = (
+            new_records if rebuild else list(index.get("missions", [])) + new_records
+        )
+        all_missions.sort(key=lambda m: m["mission_id"])
+
+        updated_index = {
+            "version": 1,
+            "indexed_at": _now_iso(),
+            "mission_count": len(all_missions),
+            "missions": all_missions,
+        }
+        _write_json(index_path, updated_index)
+    finally:
+        if fcntl:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
+
+    print(
+        f"[nelson-data] Fleet intelligence indexed: "
+        f"{len(all_missions)} missions ({len(new_records)} new)"
+    )
 
     # Build records (skip missions with unreadable stand-down.json)
-    new_records = [r for r in (_build_mission_record(d) for d in new_dirs) if r is not None]
+    new_records = [
+        r for r in (_build_mission_record(d) for d in new_dirs) if r is not None
+    ]
 
     # Merge and sort
     all_missions = (
-        new_records if rebuild
-        else list(index.get("missions", [])) + new_records
+        new_records if rebuild else list(index.get("missions", [])) + new_records
     )
     all_missions.sort(key=lambda m: m["mission_id"])
 
@@ -1262,15 +1334,35 @@ def _compute_analytics(missions: list[dict]) -> dict:
     not_achieved = len(missions) - achieved
     win_rate = round(achieved / len(missions) * 100, 1)
 
-    durations = [m["duration_minutes"] for m in missions
-                 if m.get("duration_minutes") is not None]
-    tokens = [v for m in missions if (v := m.get("budget", {}).get("tokens_consumed")) is not None]
-    budget_pcts = [v for m in missions if (v := m.get("budget", {}).get("pct_consumed")) is not None]
-    ships = [v for m in missions if (v := m.get("fleet", {}).get("ships_used")) is not None]
-    task_totals = [v for m in missions if (v := m.get("tasks", {}).get("total")) is not None]
-    violations = [v for m in missions
-                  if (v := m.get("quality", {}).get("standing_order_violations")) is not None]
-    blockers = [v for m in missions if (v := m.get("quality", {}).get("blockers_raised")) is not None]
+    durations = [
+        m["duration_minutes"] for m in missions if m.get("duration_minutes") is not None
+    ]
+    tokens = [
+        v
+        for m in missions
+        if (v := m.get("budget", {}).get("tokens_consumed")) is not None
+    ]
+    budget_pcts = [
+        v
+        for m in missions
+        if (v := m.get("budget", {}).get("pct_consumed")) is not None
+    ]
+    ships = [
+        v for m in missions if (v := m.get("fleet", {}).get("ships_used")) is not None
+    ]
+    task_totals = [
+        v for m in missions if (v := m.get("tasks", {}).get("total")) is not None
+    ]
+    violations = [
+        v
+        for m in missions
+        if (v := m.get("quality", {}).get("standing_order_violations")) is not None
+    ]
+    blockers = [
+        v
+        for m in missions
+        if (v := m.get("quality", {}).get("blockers_raised")) is not None
+    ]
 
     ship_class_counts = _collect_ship_class_counts(missions)
     station_tier_totals = _collect_station_tier_totals(missions)
@@ -1429,6 +1521,7 @@ def cmd_history(args: argparse.Namespace) -> None:
 # Argument parser
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
@@ -1441,13 +1534,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_init = subs.add_parser("init", help="Create mission directory and sailing orders")
     p_init.add_argument("--outcome", required=True, help="Mission outcome statement")
     p_init.add_argument("--metric", required=True, help="Success metric")
-    p_init.add_argument("--deadline", required=True, help="Deadline (e.g. this_session)")
+    p_init.add_argument(
+        "--deadline", required=True, help="Deadline (e.g. this_session)"
+    )
     p_init.add_argument("--token-budget", type=int, default=None, help="Token budget")
-    p_init.add_argument("--time-limit", type=int, default=None, help="Time limit in minutes")
-    p_init.add_argument("--constraints", action="append", help="Constraint (repeatable)")
-    p_init.add_argument("--out-of-scope", action="append", help="Out of scope item (repeatable)")
-    p_init.add_argument("--stop-criteria", action="append", help="Stop criterion (repeatable)")
-    p_init.add_argument("--handoff-artifacts", action="append", help="Handoff artifact (repeatable)")
+    p_init.add_argument(
+        "--time-limit", type=int, default=None, help="Time limit in minutes"
+    )
+    p_init.add_argument(
+        "--constraints", action="append", help="Constraint (repeatable)"
+    )
+    p_init.add_argument(
+        "--out-of-scope", action="append", help="Out of scope item (repeatable)"
+    )
+    p_init.add_argument(
+        "--stop-criteria", action="append", help="Stop criterion (repeatable)"
+    )
+    p_init.add_argument(
+        "--handoff-artifacts", action="append", help="Handoff artifact (repeatable)"
+    )
 
     # --- squadron ---
     p_sq = subs.add_parser("squadron", help="Record squadron formation")
@@ -1455,13 +1560,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_sq.add_argument("--admiral", required=True, help="Admiral ship name")
     p_sq.add_argument("--admiral-model", required=True, help="Admiral model")
     p_sq.add_argument(
-        "--captain", action="append",
+        "--captain",
+        action="append",
         help="Captain spec: name:class:model:task_id (repeatable)",
     )
     p_sq.add_argument("--red-cell", default=None, help="Red cell ship name")
     p_sq.add_argument("--red-cell-model", default=None, help="Red cell model")
     p_sq.add_argument(
-        "--mode", default="subagents",
+        "--mode",
+        default="subagents",
         help="Execution mode: single-session, subagents, agent-team",
     )
 
@@ -1474,13 +1581,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_task.add_argument("--deliverable", required=True, help="Task deliverable")
     p_task.add_argument("--deps", default="", help="Comma-separated dependency IDs")
     p_task.add_argument(
-        "--station-tier", required=True, type=int, choices=[0, 1, 2, 3],
+        "--station-tier",
+        required=True,
+        type=int,
+        choices=[0, 1, 2, 3],
         help="Station tier (0-3)",
     )
-    p_task.add_argument("--files", default="", help="Comma-separated file glob patterns")
+    p_task.add_argument(
+        "--files", default="", help="Comma-separated file glob patterns"
+    )
     p_task.add_argument("--validation", default=None, help="Validation criteria")
-    p_task.add_argument("--rollback-note", action="store_true", help="Rollback note required")
-    p_task.add_argument("--admiralty-action", action="store_true", help="Admiralty action required")
+    p_task.add_argument(
+        "--rollback-note", action="store_true", help="Rollback note required"
+    )
+    p_task.add_argument(
+        "--admiralty-action", action="store_true", help="Admiralty action required"
+    )
 
     # --- plan-approved ---
     p_pa = subs.add_parser("plan-approved", help="Finalize battle plan")
@@ -1497,17 +1613,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_cp = subs.add_parser("checkpoint", help="Record a quarterdeck checkpoint")
     p_cp.add_argument("--mission-dir", required=True, help="Mission directory path")
     p_cp.add_argument("--pending", required=True, type=int, help="Pending task count")
-    p_cp.add_argument("--in-progress", required=True, type=int, help="In-progress task count")
-    p_cp.add_argument("--completed", required=True, type=int, help="Completed task count")
-    p_cp.add_argument("--blocked", type=int, default=0, help="Blocked task count")
-    p_cp.add_argument("--tokens-spent", required=True, type=int, help="Tokens spent so far")
-    p_cp.add_argument("--tokens-remaining", required=True, type=int, help="Tokens remaining")
-    p_cp.add_argument("--hull-green", required=True, type=int, help="Ships at green hull")
-    p_cp.add_argument("--hull-amber", required=True, type=int, help="Ships at amber hull")
-    p_cp.add_argument("--hull-red", required=True, type=int, help="Ships at red hull")
-    p_cp.add_argument("--hull-critical", required=True, type=int, help="Ships at critical hull")
     p_cp.add_argument(
-        "--decision", required=True,
+        "--in-progress", required=True, type=int, help="In-progress task count"
+    )
+    p_cp.add_argument(
+        "--completed", required=True, type=int, help="Completed task count"
+    )
+    p_cp.add_argument("--blocked", type=int, default=0, help="Blocked task count")
+    p_cp.add_argument(
+        "--tokens-spent", required=True, type=int, help="Tokens spent so far"
+    )
+    p_cp.add_argument(
+        "--tokens-remaining", required=True, type=int, help="Tokens remaining"
+    )
+    p_cp.add_argument(
+        "--hull-green", required=True, type=int, help="Ships at green hull"
+    )
+    p_cp.add_argument(
+        "--hull-amber", required=True, type=int, help="Ships at amber hull"
+    )
+    p_cp.add_argument("--hull-red", required=True, type=int, help="Ships at red hull")
+    p_cp.add_argument(
+        "--hull-critical", required=True, type=int, help="Ships at critical hull"
+    )
+    p_cp.add_argument(
+        "--decision",
+        required=True,
         help="Admiral decision: continue, rescope, or stop",
     )
     p_cp.add_argument("--rationale", required=True, help="Decision rationale")
@@ -1515,7 +1646,9 @@ def build_parser() -> argparse.ArgumentParser:
     # --- stand-down ---
     p_sd = subs.add_parser("stand-down", help="Record mission completion")
     p_sd.add_argument("--mission-dir", required=True, help="Mission directory path")
-    p_sd.add_argument("--outcome-achieved", action="store_true", help="Was the outcome achieved?")
+    p_sd.add_argument(
+        "--outcome-achieved", action="store_true", help="Was the outcome achieved?"
+    )
     p_sd.add_argument("--actual-outcome", default="", help="Actual outcome description")
     p_sd.add_argument("--metric-result", default="", help="Success metric result")
 
@@ -1536,7 +1669,9 @@ def build_parser() -> argparse.ArgumentParser:
     # Alias: --mission-dir accepted for consistency with other subcommands
     p_hist.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
     p_hist.add_argument(
-        "--json", dest="json_output", action="store_true",
+        "--json",
+        dest="json_output",
+        action="store_true",
         help="Output as JSON",
     )
     p_hist.add_argument("--last", type=int, default=10, help="Recent missions to show")
@@ -1547,6 +1682,7 @@ def build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Parse arguments and dispatch to the correct subcommand."""
