@@ -2,7 +2,7 @@
 
 Use when a session is interrupted (context limit, crash, timeout) and work must continue.
 
-1. List `.nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`.
+1. If you know the SESSION_ID for this session, read `.nelson/.active-{SESSION_ID}` to recover the mission directory path and set it as `{mission-dir}`. If you cannot determine your SESSION_ID (e.g., after a full restart), list `.nelson/missions/` and present the options to the user for selection. Set the chosen directory as `{mission-dir}`.
 2. **Recover state from structured data (preferred):**
    - If `{mission-dir}/fleet-status.json` exists, read it for quick state recovery (task progress, hull status, budget, blockers).
    - If `{mission-dir}/mission-log.json` exists, read it for full event history — task completions, relief chains, standing order violations, and admiral decisions.
