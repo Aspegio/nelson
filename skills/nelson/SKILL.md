@@ -63,7 +63,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 - `crew-without-canvas.md`: Is every agent justified by actual task scope?
 - `captain-at-the-capstan.md`: For each task with crew, is the captain's role coordination, not implementation?
 - `press-ganged-navigator.md`: Is the red-cell navigator being assigned implementation work?
-- `admiral-at-the-helm.md`: Does the battle plan assign any implementation work to the admiral?
+- `admiral-at-the-helm.md`: Does the battle plan assign any implementation work (excluding final synthesis) to the admiral?
 - `wrong-ensign.md`: Do the planned coordination tools match the selected execution mode?
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
@@ -161,7 +161,7 @@ If the task is complete and no pending task depends on it, proceed to shutdown p
     - Track burn against token/time budget.
     - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint. **Every ship must file a damage report at every checkpoint** to `{mission-dir}/damage-reports/{ship-name}.json` using the schema in `references/admiralty-templates/damage-report.md` — do not skip this when hull is Green.
     - Standing order scan: For each order below, ask "Has this situation arisen since the last checkpoint?" If yes, apply the corrective action now — do not defer.
-        - `admiral-at-the-helm.md`: Has the admiral drifted into implementation work?
+        - `admiral-at-the-helm.md`: Has the admiral drifted into implementation work (excluding final synthesis)?
         - `drifting-anchorage.md`: Has any task scope crept beyond the sailing orders?
         - `captain-at-the-capstan.md`: Has any captain started implementing instead of coordinating crew?
         - `pressed-crew.md`: Has any crew member been assigned work outside their role?
@@ -234,7 +234,7 @@ Consult the specific standing order that matches the situation.
 | Deciding whether to add another agent | `references/standing-orders/crew-without-canvas.md` |
 | Assigning files to agents in the battle plan | `references/standing-orders/split-keel.md` |
 | Task scope drifting from sailing orders | `references/standing-orders/drifting-anchorage.md` |
-| Admiral doing implementation instead of coordinating | `references/standing-orders/admiral-at-the-helm.md` |
+| Admiral doing implementation instead of coordinating (excluding final synthesis) | `references/standing-orders/admiral-at-the-helm.md` |
 | Assigning work to the red-cell navigator | `references/standing-orders/press-ganged-navigator.md` |
 | Tasks proceeding without a risk tier classification | `references/standing-orders/unclassified-engagement.md` |
 | Captain implementing instead of coordinating crew | `references/standing-orders/captain-at-the-capstan.md` |

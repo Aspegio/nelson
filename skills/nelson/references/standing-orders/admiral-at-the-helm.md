@@ -1,15 +1,16 @@
 # Standing Order: Admiral at the Helm
 
-The admiral MUST NOT perform implementation work. This includes any action that produces mission deliverables: writing code, editing files, running tests, synthesising outputs into reports, or creating artifacts.
+The admiral MUST NOT perform implementation work. Implementation work (writing code, editing files, running tests) remains strictly delegated to ships.
 
-**The synthesis boundary:** Coordination means issuing orders, tracking progress, resolving blockers, and running checkpoints. Synthesis — combining captain outputs into a final deliverable — is implementation, not coordination. Assign synthesis to a dedicated captain or as a final task in the battle plan. The only exception is writing the captain's log (Step 6), which is an admiral duty.
+**The synthesis boundary:** Coordination means issuing orders, tracking progress, resolving blockers, and running checkpoints. **Synthesis work** (combining ship reports, summarising findings, producing the final deliverable) is permitted for the admiral **only once all ships have reported**.
 
-**Symptoms:**
+Do not dispatch additional sub-agents just to combine data you already have in context. Once the ships have completed their individual implementation tasks and reported back, the admiral may synthesize those results into the final output. The admiral is also permitted to write the captain's log (Step 6) and other coordination artifacts.
+
+**Symptoms of a violation:**
 - Admiral writes code, edits files, or runs tests directly.
-- Admiral consolidates captain outputs into a final report or deliverable instead of delegating this to a captain.
-- Captains sit idle waiting for direction while admiral is heads-down.
+- Captains sit idle waiting for direction while admiral is heads-down on implementation.
 - Quarterdeck rhythm breaks because admiral is unavailable for checkpoint reviews.
 - Blockers accumulate without resolution.
-- Battle plan assigns "final synthesis" or "consolidation" to the admiral.
+- Admiral spawns a sub-agent purely to concatenate or summarize text already present in the context window.
 
-**Remedy:** Admiral MUST delegate all implementation — including synthesis — to captains and stay focused on coordination. If a synthesis task exists, assign it to a captain. If all captains are busy, spawn an additional captain for synthesis.
+**Remedy:** Admiral MUST delegate all implementation to captains. If the admiral is doing implementation, stop immediately, spawn a captain, and delegate. If the work is pure synthesis of completed reports, the admiral may proceed without delegation.
