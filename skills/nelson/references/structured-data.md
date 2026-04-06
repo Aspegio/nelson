@@ -13,7 +13,7 @@ Run at Step 1 after sailing orders are agreed.
 Creates `sailing-orders.json` and empty `mission-log.json`. Prints the mission directory path to stdout.
 
 ```bash
-python3 scripts/nelson-data.py init \
+python3 .claude/skills/nelson/scripts/nelson-data.py init \
   --outcome "Refactor auth module to use JWT tokens" \
   --metric "All 47 auth tests pass, no new dependencies" \
   --deadline "this_session" \
@@ -27,7 +27,7 @@ Run at Step 3 after the squadron is formed.
 Updates `battle-plan.json` with the squadron section. Appends `squadron_formed` event to `mission-log.json`. Writes initial `fleet-status.json`.
 
 ```bash
-python3 scripts/nelson-data.py squadron \
+python3 .claude/skills/nelson/scripts/nelson-data.py squadron \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --admiral "HMS Victory" --admiral-model opus \
   --captain "HMS Argyll:frigate:sonnet:1" \
@@ -45,7 +45,7 @@ Run at Step 3 once per task, after owners are assigned during squadron formation
 Appends task to `battle-plan.json`.
 
 ```bash
-python3 scripts/nelson-data.py task \
+python3 .claude/skills/nelson/scripts/nelson-data.py task \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --id 1 --name "Auth module refactor" --owner "HMS Argyll" \
   --deliverable "Refactored auth module with JWT support" \
@@ -60,7 +60,7 @@ Run at Step 3 after all tasks are added, before the `squadron` call.
 Computes `parallel_tracks` and `critical_path_length` from the dependency graph. Appends `battle_plan_approved` event to `mission-log.json`. Updates `fleet-status.json`.
 
 ```bash
-python3 scripts/nelson-data.py plan-approved \
+python3 .claude/skills/nelson/scripts/nelson-data.py plan-approved \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
 ```
 
@@ -71,7 +71,7 @@ Run at Step 4 between checkpoints for state changes.
 Appends an event to `mission-log.json`. Accepts type-specific key-value pairs validated by the script.
 
 ```bash
-python3 scripts/nelson-data.py event \
+python3 .claude/skills/nelson/scripts/nelson-data.py event \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --type task_completed \
   --checkpoint 2 \
@@ -86,7 +86,7 @@ Run at Step 4 at each checkpoint, alongside the prose quarterdeck report.
 Appends a `checkpoint` event to `mission-log.json`. Overwrites `fleet-status.json` with current state.
 
 ```bash
-python3 scripts/nelson-data.py checkpoint \
+python3 .claude/skills/nelson/scripts/nelson-data.py checkpoint \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --pending 2 --in-progress 2 --completed 1 --blocked 0 \
   --tokens-spent 45000 --tokens-remaining 155000 \
@@ -102,7 +102,7 @@ Run at Step 6 alongside the prose captain's log.
 Auto-computes duration, budget consumption, ship counts, relief counts, violation counts, and blocker statistics from `mission-log.json` and `battle-plan.json`. Writes `stand-down.json`. Appends `mission_complete` event. Writes final `fleet-status.json`.
 
 ```bash
-python3 scripts/nelson-data.py stand-down \
+python3 .claude/skills/nelson/scripts/nelson-data.py stand-down \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --outcome-achieved \
   --actual-outcome "Auth module refactored with JWT support, all tests passing" \
@@ -116,7 +116,7 @@ Run at any time for a quick status check. Useful for session resumption and hook
 Reads `fleet-status.json` and prints a compact summary. Silent no-op if no mission data exists.
 
 ```bash
-python3 scripts/nelson-data.py status \
+python3 .claude/skills/nelson/scripts/nelson-data.py status \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
 ```
 

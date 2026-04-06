@@ -195,7 +195,7 @@ def parse_imports(filepath: Path) -> set[str]:
         # import ... from 'foo'
         # require('foo')
         for match in re.finditer(
-            r'(?:import.*from\s+[\'"]([^\'"]+)[\'"]|require\([\'"]([^\'"]+)[\'"]\))',
+            r'(?:import.*?from\s+[\'"]([^\'"]+)[\'"]|require\([\'"]([^\'"]+)[\'"]\))',
             content,
             re.DOTALL,
         ):
