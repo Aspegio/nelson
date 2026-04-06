@@ -6,17 +6,24 @@ This script monitors for file conflicts by comparing active git changes
 against the `battle-plan.md` file ownership declarations. It raises an
 alert if a changed file has no registered owner in the battle plan.
 
+Limitation: This script uses ``git status`` to detect changed files globally.
+It cannot determine which agent made a change, so it can only flag files that
+have no registered owner — not cross-ship violations (Ship A writing to Ship B's
+files). For true cross-ship detection, per-agent change tracking would be needed.
+
 Usage (manual invocation):
-  python scripts/nelson_conflict_radar.py --plan .nelson/missions/<your-mission-dir>/battle-plan.md
+  python3 scripts/nelson_conflict_radar.py --plan .nelson/missions/<your-mission-dir>/battle-plan.md
 
 Opt-in hook configuration (add to settings.json PostToolUse hooks if desired):
   Recommended guard to only run during active Nelson missions:
-    if [ -d .nelson/missions ]; then python scripts/nelson_conflict_radar.py --plan <path>; fi
+    if [ -d .nelson/missions ]; then python3 scripts/nelson_conflict_radar.py --plan <path>; fi
 
   Note: Running this as a default PostToolUse hook is NOT recommended — it is
   too expensive to run on every tool use and will cause issues in non-Nelson
   projects. Opt in manually by adding the hook command to your settings.json
   and supplying the explicit --plan path.
+
+Depends on: nelson_conflict_scan.py (shared parse_battle_plan logic from PR #73).
 """
 
 import sys
@@ -26,12 +33,17 @@ from pathlib import Path
 from nelson_conflict_scan import parse_battle_plan
 
 
-def get_git_changes(project_root: Path) -> set:
-    """Get a list of currently modified/untracked files using git."""
+def get_git_changes(project_root: Path) -> set[str]:
+    """Get modified/staged files from git, excluding untracked files.
+
+    Uses ``git status --porcelain -z`` for NUL-separated output, which avoids
+    quoting issues with paths containing spaces or special characters.
+    Untracked files (``??``) are excluded because they are typically scratch
+    files or temp outputs that should not trigger ownership alerts.
+    """
     try:
-        # Get unstaged and staged changes
         result = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "status", "--porcelain", "-z"],
             cwd=project_root,
             capture_output=True,
             text=True,
@@ -41,52 +53,73 @@ def get_git_changes(project_root: Path) -> set:
         print(f"Error running git status: {e}", file=sys.stderr)
         return set()
 
-    changed_files = set()
-    for line in result.stdout.splitlines():
-        if len(line) < 4:
+    changed_files: set[str] = set()
+    # -z output is NUL-separated; split and filter empty strings
+    entries = [e for e in result.stdout.split("\0") if e]
+
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        if len(entry) < 4:
+            i += 1
             continue
-        # Status format is usually 'XY filename'
-        filename = line[3:].strip()
 
-        # Handle quoted paths (git quotes paths with special chars)
-        if filename.startswith('"') and filename.endswith('"'):
-            filename = filename[1:-1].encode('utf-8').decode('unicode_escape')
+        status = entry[:2]
+        filename = entry[3:]
 
-        # Handle renames 'R  old -> new'
-        if "->" in filename:
-            filename = filename.split("->")[1].strip()
+        # Skip untracked files
+        if status == "??":
+            i += 1
+            continue
 
+        # Renames/copies have a second entry for the original path
+        if status[0] in ("R", "C"):
+            # With -z, rename format is: "R  new\0old"
+            # We want the new (destination) filename
+            i += 1  # skip the old path entry
         changed_files.add(filename)
+        i += 1
 
     return changed_files
 
 
-def radar_scan(ownership: dict, changed_files: set) -> list:
-    """Scan changed files against ownership to detect violations."""
-    alerts = []
+def _paths_match(changed: Path, owned: Path) -> bool:
+    """Check if a changed file path matches an owned file path.
 
-    # Create reverse map of files to their owners
-    file_to_owner = {}
+    Supports exact matches and suffix matches where the owned path is a
+    trailing sub-path of the changed path (aligned on path components).
+    For example, ``src/utils/app.py`` matches owned path ``src/utils/app.py``
+    and ``utils/app.py`` but NOT ``app.py`` matching ``webapp/application.py``.
+    """
+    if changed == owned:
+        return True
+    # Suffix match: owned parts must align with the tail of changed parts
+    changed_parts = changed.parts
+    owned_parts = owned.parts
+    if len(owned_parts) > len(changed_parts):
+        return False
+    return changed_parts[-len(owned_parts):] == owned_parts
+
+
+def radar_scan(ownership: dict[str, set[str]], changed_files: set[str]) -> list[str]:
+    """Scan changed files against ownership to detect unowned modifications.
+
+    Flags any changed file that has no registered owner in the battle plan.
+    Cannot detect cross-ship violations (Ship A editing Ship B's files)
+    because ``git status`` reports global working-tree state without
+    per-agent attribution.
+    """
+    file_to_owner: dict[str, str] = {}
     for owner, files in ownership.items():
         for f in files:
             file_to_owner[f] = owner
 
-    # Note: In a real multi-agent hook, we would need to know WHICH agent is making the change
-    # to flag "writing to unowned file". Since this runs globally via git status, we can only
-    # reliably flag if a changed file is owned by multiple agents in the battle plan (which shouldn't
-    # happen due to the pre-flight scan) OR if we check the git reflog/blame, which is complex.
-
-    # For now, we will flag any changed file that has no registered owner
+    alerts: list[str] = []
     for changed in changed_files:
-        # Is the changed file owned by anyone?
-        found_owner = False
         changed_path = Path(changed)
-        for f in file_to_owner:
-            owned_path = Path(f)
-            if changed_path == owned_path or str(changed_path).endswith(str(owned_path)):
-                found_owner = True
-                break
-
+        found_owner = any(
+            _paths_match(changed_path, Path(f)) for f in file_to_owner
+        )
         if not found_owner:
             alerts.append(
                 f"File '{changed}' was modified but has no owner in the battle plan."
