@@ -493,6 +493,24 @@ Each mission creates a timestamped directory for its runtime artifacts. Previous
 
 ## Compatibility notes
 
+### Platform support
+
+Nelson requires **agent-team coordination primitives** — shared task lists, peer messaging between agents, and team lifecycle management. These are the foundation of Nelson's squadron model: captains coordinating in parallel, the admiral running quarterdeck checkpoints, and damage control procedures that depend on live communication between agents.
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| **Claude Code** | Supported | Full support for all three execution modes (single-session, subagents, agent-team) |
+| **Cursor** | Experimental | See installation instructions above |
+| **Codex CLI** | Not yet supported | Lacks agent-team primitives. [Agents SDK](https://openai.github.io/openai-agents-python/) orchestration may provide a path — monitoring |
+| **OpenCode** | Not yet supported | Agent-team feature exists on dev branch but has not reached stable release |
+| **Gemini CLI** | Not yet supported | No multi-agent coordination primitives. Subagent support is single-level only |
+
+**Why not degrade gracefully?** Nelson's value is the coordination layer — quarterdeck rhythm, peer messaging, shared task lists, damage control, crew hierarchy. On a platform without agent teams, Nelson would degrade to "subagents with Royal Navy naming", which doesn't justify the complexity. When these platforms add agent-team support, Nelson will follow.
+
+We are actively tracking multi-agent developments across these platforms. If you're interested in helping bring Nelson to a new platform, [open an issue](https://github.com/harrymunro/nelson/issues).
+
+### Claude Code specifics
+
 - **Subagents** are a stable Claude Code feature and work out of the box.
 - **Agent teams** are experimental and disabled by default. See [Prerequisites](#prerequisites) above for setup. Without agent teams enabled, Nelson falls back to `single-session` or `subagents` mode. Full details: [Agent teams documentation](https://code.claude.com/docs/en/agent-teams).
 
