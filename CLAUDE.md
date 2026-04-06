@@ -43,5 +43,3 @@ scripts/                  — Maintenance & utility scripts
   nelson-data.py            — Structured data capture for Nelson missions
   test_nelson_data.py       — Python tests for nelson-data.py
 ```
-
-Use 'bd' for task tracking
