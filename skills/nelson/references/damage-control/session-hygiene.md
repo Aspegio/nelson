@@ -7,7 +7,7 @@ Use at the start of a new Nelson session to prepare the mission directory before
 Nelson stores each mission's data in a timestamped directory under `.nelson/missions/`:
 
 ```
-.nelson/missions/{YYYY-MM-DD_HHMMSS}/
+.nelson/missions/{YYYY-MM-DD_HHMMSS}_{PID}/
   captains-log.md         — Written at stand-down
   quarterdeck-report.md   — Updated at every checkpoint
   damage-reports/         — Ship damage reports (JSON)
@@ -42,7 +42,7 @@ Within each mission directory, rotated checkpoint files may be present:
 
 These are intentionally preserved as checkpoint history — they record the state of the reports at each checkpoint within that mission. They do not require cleanup because:
 
-1. Each mission has its own timestamped directory (`.nelson/missions/{YYYY-MM-DD_HHMMSS}/`)
+1. Each mission has its own timestamped directory (`.nelson/missions/{YYYY-MM-DD_HHMMSS}_{PID}/`)
 2. Rotated files within a mission directory are historical artifacts of that mission's execution
 3. Previous missions are preserved automatically, so the checkpoint history is part of the permanent record for that mission
 
