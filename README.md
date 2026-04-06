@@ -271,20 +271,18 @@ Then commit `.claude/skills/nelson/` to version control so your team can use it.
 <details>
 <summary>Updating</summary>
 
-Plugin installs are cached snapshots — they do not auto-update. To pick up a new release, refresh the marketplace and reinstall:
+If you have used `/plugin marketplace add` to install you can run `/plugin`, arrow over to "Marketplaces", select "nelson-marketplace" and then "Enable auto-updates".
+
+If you not enabled auto-updates you can update the marketplace with: "Marketplaces" -> "nelson-marketplace" -> "Update marketplace".
+
+If those steps don't seem to be working it is best to remove the marketplace ("Marketplaces" -> "nelson-marketplace" -> "Remove marketplace") and re-install so Claude updates the other files it keeps track of concerning marketplaces and plugins.
 
 ```
 /plugin marketplace update nelson-marketplace
 /plugin install nelson@nelson-marketplace
 ```
 
-If that reports you're already at the latest version, the local marketplace cache may be stale. Refresh it manually:
-
-```bash
-cd ~/.claude/plugins/marketplaces/nelson-marketplace && git fetch origin && git reset --hard origin/main
-```
-
-Then reinstall via `/plugin install nelson@nelson-marketplace` or re-enable via `/plugin`.
+If you have installed by copying into skills/ at user or project level then you will need to remove the skills/nelson/ directory and run a `Manual install` again.
 
 </details>
 
@@ -298,6 +296,27 @@ What skills are available?
 ```
 
 You should see `nelson` listed. You can also test it by saying "Use Nelson to..." followed by a task.
+
+</details>
+
+<details>
+<summary>Installation for Cursor (Experimental)</summary>
+
+If you have a Team Marketplace for your Cursor you can add nelson there. See [Add a team marketplace](https://cursor.com/docs/plugins#add-a-team-marketplac://cursor.com/docs/plugins#add-a-team-marketplace) in the cursor documentation.  The needed gihub repository url is https://github.com/harrymunro/nelson.git. Once the marketplace is installed you can install nelson from it.
+
+If you do not have access to a Team Marketplace you can still install locally for Linux and MacOS.
+
+```bash
+cd ~/.cursor/plugins/local
+git clone -b main --depth 1 https://github.com/harrymunro/nelson.git
+```
+
+To update the plugin after that:
+
+```bash
+cd ~/.cursor/plugins/local/nelson
+git pull
+```
 
 </details>
 
