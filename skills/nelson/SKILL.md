@@ -29,8 +29,8 @@ Out of scope: Migration script for existing sessions
 ```
 
 **Establish Mission Directory:**
-- **New session:** Create a mission directory at `.nelson/missions/{YYYY-MM-DD_HHMMSS}/` using the current date and time (24-hour format, including seconds). Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission.
-- **Resumed session:** List `.nelson/missions/` sorted by name. The most recent directory is the active mission. Set it as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose).
+- **New session:** Generate a short session identifier by running `uuidgen | cut -d- -f1` (produces an 8-character hex string). This identifier is stable for the duration of the mission. Create a mission directory at `.nelson/missions/{YYYY-MM-DD_HHMMSS}_{SESSION_ID}/` using the current date and time (24-hour format, including seconds) and the SESSION_ID generated above. Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission. After creating the mission directory, write its path to `.nelson/.active-{SESSION_ID}`. This file persists the mission directory for this session.
+- **Resumed session:** If you have previously created a mission directory in this session and know the SESSION_ID, read `.nelson/.active-{SESSION_ID}` to recover the mission path. Set that path as `{mission-dir}`. If you cannot determine your SESSION_ID (e.g., after a full restart), list `.nelson/missions/` and present the options to the user for selection. Set the chosen directory as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose).
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
 
@@ -219,6 +219,8 @@ Reference `references/admiralty-templates/captains-log.md` for the captain's log
 
 **Structured Data Capture:** Before writing the captain's log, run `python3 scripts/nelson-data.py stand-down --mission-dir {mission-dir} --outcome-achieved --actual-outcome "..." --metric-result "..."` to capture the structured mission summary. See `references/structured-data.md` for the full argument list.
 
+**Session State Cleanup:** Remove the session state file by deleting `.nelson/.active-{SESSION_ID}`.
+
 **Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
 
 ## Standing Orders
@@ -263,7 +265,7 @@ Consult the specific procedure that matches the situation.
 
 ## Admiralty Doctrine
 
-- Include this instruction in any admiral's compaction summary: Re-read the quarterdeck report at the mission directory path to recover `{mission-dir}`. If the path is unknown, list `.nelson/missions/` and use the most recent directory. Then re-read `references/standing-orders/admiral-at-the-helm.md` to confirm you are in coordination role.
+- Include this instruction in any admiral's compaction summary: Re-read the quarterdeck report at the mission directory path to recover `{mission-dir}`. If the path is unknown, read `.nelson/.active-{SESSION_ID}` if you know the SESSION_ID, otherwise list `.nelson/missions/` and present the options to the user for selection. Then re-read `references/standing-orders/admiral-at-the-helm.md` to confirm you are in coordination role.
 - Optimize for mission throughput, not equal work distribution.
 - Prefer replacing stalled agents over waiting on undefined blockers.
 - Recognise strong performance; motivation compounds across missions.

@@ -28,7 +28,7 @@ Updates `battle-plan.json` with the squadron section. Appends `squadron_formed` 
 
 ```bash
 python3 scripts/nelson-data.py squadron \
-  --mission-dir .nelson/missions/2026-03-27_120000 \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --admiral "HMS Victory" --admiral-model opus \
   --captain "HMS Argyll:frigate:sonnet:1" \
   --captain "HMS Kent:destroyer:sonnet:2" \
@@ -46,7 +46,7 @@ Appends task to `battle-plan.json`.
 
 ```bash
 python3 scripts/nelson-data.py task \
-  --mission-dir .nelson/missions/2026-03-27_120000 \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --id 1 --name "Auth module refactor" --owner "HMS Argyll" \
   --deliverable "Refactored auth module with JWT support" \
   --deps "" --station-tier 1 \
@@ -61,7 +61,7 @@ Computes `parallel_tracks` and `critical_path_length` from the dependency graph.
 
 ```bash
 python3 scripts/nelson-data.py plan-approved \
-  --mission-dir .nelson/missions/2026-03-27_120000
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
 ```
 
 ### `event` — Log a mission event
@@ -72,7 +72,7 @@ Appends an event to `mission-log.json`. Accepts type-specific key-value pairs va
 
 ```bash
 python3 scripts/nelson-data.py event \
-  --mission-dir .nelson/missions/2026-03-27_120000 \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --type task_completed \
   --checkpoint 2 \
   --task-id 1 --task-name "Auth module refactor" --owner "HMS Argyll" \
@@ -87,7 +87,7 @@ Appends a `checkpoint` event to `mission-log.json`. Overwrites `fleet-status.jso
 
 ```bash
 python3 scripts/nelson-data.py checkpoint \
-  --mission-dir .nelson/missions/2026-03-27_120000 \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --pending 2 --in-progress 2 --completed 1 --blocked 0 \
   --tokens-spent 45000 --tokens-remaining 155000 \
   --hull-green 3 --hull-amber 1 --hull-red 0 --hull-critical 0 \
@@ -103,7 +103,7 @@ Auto-computes duration, budget consumption, ship counts, relief counts, violatio
 
 ```bash
 python3 scripts/nelson-data.py stand-down \
-  --mission-dir .nelson/missions/2026-03-27_120000 \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --outcome-achieved \
   --actual-outcome "Auth module refactored with JWT support, all tests passing" \
   --metric-result "47/47 auth tests pass, 0 new dependencies"
@@ -117,7 +117,7 @@ Reads `fleet-status.json` and prints a compact summary. Silent no-op if no missi
 
 ```bash
 python3 scripts/nelson-data.py status \
-  --mission-dir .nelson/missions/2026-03-27_120000
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
 ```
 
 ## Write Timing

@@ -476,13 +476,13 @@ scripts/
 
 ## Mission artifacts
 
-Each mission creates a timestamped directory for its runtime artifacts. Previous missions are preserved — each run gets its own directory.
+Each mission creates a timestamped directory for its runtime artifacts. Previous missions are preserved — each run gets its own directory. The `SESSION_ID` suffix is an 8-character hex string generated at session start via `uuidgen`, ensuring concurrent Nelson sessions in the same repository create distinct directories.
 
 <details>
 <summary>Artifact directory structure</summary>
 
 ```
-.nelson/missions/{YYYY-MM-DD_HHMMSS}/
+.nelson/missions/{YYYY-MM-DD_HHMMSS}_{SESSION_ID}/
   captains-log.md         — Written at stand-down
   quarterdeck-report.md   — Updated at every checkpoint
   damage-reports/         — Ship damage reports (JSON)
