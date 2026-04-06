@@ -64,6 +64,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 - `captain-at-the-capstan.md`: For each task with crew, is the captain's role coordination, not implementation?
 - `press-ganged-navigator.md`: Is the red-cell navigator being assigned implementation work?
 - `admiral-at-the-helm.md`: Does the battle plan assign any implementation work to the admiral?
+- `wrong-ensign.md`: Do the planned coordination tools match the selected execution mode?
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
@@ -75,6 +76,11 @@ If any answer triggers a standing order, you MUST apply the corrective action an
     - `single-session`: sequential tasks, low complexity, or heavy same-file editing.
     - `subagents`: parallel, fully independent tasks that report only to the admiral.
     - `agent-team`: captains benefit from a shared task list, peer messaging, or coordinated deliverables; or 4+ captains are needed.
+
+**Mode-Tool Consistency Gate:** Before assigning ships, confirm your tool usage matches the selected mode by reviewing `references/tool-mapping.md`:
+- **`subagents` mode:** Do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only.
+- **`agent-team` mode:** Do NOT use `Agent` with `subagent_type` to spawn captains (marines still use `subagent_type`). Use `TeamCreate` first, then `Agent` with `team_name` + `name`. Coordinate via `TaskList` and `SendMessage`.
+
 - Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
 - Add `1 red-cell navigator` for medium/high threat work. Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
@@ -162,6 +168,7 @@ If the task is complete and no pending task depends on it, proceed to shutdown p
         - `press-ganged-navigator.md`: Has the red-cell navigator been assigned implementation work?
         - `all-hands-on-deck.md`: Has any ship mustered crew roles that are idle or unjustified?
         - `battalion-ashore.md`: Has any captain deployed marines for crew work or sustained tasks?
+        - `wrong-ensign.md`: Is the admiral or any captain using tools from the wrong execution mode?
     - **Write the quarterdeck report to disk** at `{mission-dir}/quarterdeck-report.md` at every checkpoint using `references/admiralty-templates/quarterdeck-report.md`. Do not skip this when hull is Green — compaction can occur at any time and the on-disk report is the only recovery point. Before writing, if `quarterdeck-report.md` already exists in `{mission-dir}`, find all files matching glob pattern `quarterdeck-report-[0-9]*.md`, determine N as one greater than the highest N found (0 if none exist), rename the existing file to `quarterdeck-report-N.md`, then write the new report. This keeps the latest report at the canonical path while preserving history.
     - **Structured data capture:** Run `python3 scripts/nelson-data.py checkpoint --mission-dir {mission-dir} --pending N --in-progress N --completed N ...` with current progress, budget, hull, and decision data. Between checkpoints, run `python3 scripts/nelson-data.py event --mission-dir {mission-dir} --type <event_type> ...` for state changes (task completions, blockers, hull threshold crossings, standing order violations). See `references/structured-data.md` for event types and arguments.
     - Check `TaskList` for any tasks with description prefixed `[AWAITING-ADMIRALTY]:`. If any exist, surface the ask to Admiralty immediately — do not batch to the next checkpoint.
@@ -235,6 +242,7 @@ Consult the specific standing order that matches the situation.
 | Captain deploying marines for crew work or sustained tasks | `references/standing-orders/battalion-ashore.md` |
 | Captain completed autonomous work and needs human action to continue | `references/standing-orders/awaiting-admiralty.md` |
 | Agent completed task with no remaining work in the dependency graph | `references/standing-orders/paid-off.md` |
+| Using tools from the wrong execution mode | `references/standing-orders/wrong-ensign.md` |
 
 ## Damage Control
 
