@@ -1,7 +1,11 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
 import unittest
 import tempfile
 import os
-from pathlib import Path
 from nelson_conflict_scan import parse_battle_plan, parse_imports, detect_conflicts
 
 
@@ -50,6 +54,51 @@ Task ID: 2
             conflicts[0],
             ("HMS Victory", "src/api.py", "HMS Enterprise", "src/models.py"),
         )
+
+    def test_stdlib_re_does_not_conflict_with_app_py(self):
+        """Importing 're' must NOT flag a conflict with src/core/app.py."""
+        ownership = {
+            "HMS Victory": {"src/core/app.py"},
+            "HMS Enterprise": {"src/main.py"},
+        }
+        # src/main.py imports 're' — this should never be flagged against app.py
+        graph = {
+            "src/main.py": {"re"},
+            "src/core/app.py": set(),
+        }
+        conflicts = detect_conflicts(ownership, graph)
+        self.assertEqual(conflicts, [])
+
+    def test_stdlib_os_does_not_conflict_with_button_js(self):
+        """Importing 'os' must NOT flag a conflict with src/components/button.js."""
+        ownership = {
+            "HMS Victory": {"src/components/button.js"},
+            "HMS Enterprise": {"src/server.py"},
+        }
+        graph = {
+            "src/server.py": {"os"},
+            "src/components/button.js": set(),
+        }
+        conflicts = detect_conflicts(ownership, graph)
+        self.assertEqual(conflicts, [])
+
+    def test_stdlib_json_does_not_conflict_with_data_json(self):
+        """Importing 'json' must NOT flag a conflict with config/data.json."""
+        ownership = {
+            "HMS Victory": {"config/data.json"},
+            "HMS Enterprise": {"src/parser.py"},
+        }
+        graph = {
+            "src/parser.py": {"json"},
+            "config/data.json": set(),
+        }
+        conflicts = detect_conflicts(ownership, graph)
+        self.assertEqual(conflicts, [])
+
+    def test_parse_battle_plan_missing_file_raises(self):
+        """parse_battle_plan should raise FileNotFoundError for a missing file."""
+        with self.assertRaises(FileNotFoundError):
+            parse_battle_plan(self.root / "nonexistent.md")
 
 
 if __name__ == "__main__":

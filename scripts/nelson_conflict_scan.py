@@ -13,12 +13,27 @@ import re
 import argparse
 from pathlib import Path
 
+# Common Python stdlib modules that should never be treated as local dependencies
+PYTHON_STDLIB = frozenset({
+    'abc', 'argparse', 'ast', 'asyncio', 'base64', 'bisect', 'calendar',
+    'collections', 'configparser', 'contextlib', 'copy', 'csv', 'ctypes',
+    'dataclasses', 'datetime', 'decimal', 'difflib', 'email', 'enum',
+    'errno', 'fnmatch', 'fractions', 'functools', 'gc', 'getpass', 'glob',
+    'gzip', 'hashlib', 'heapq', 'hmac', 'html', 'http', 'importlib',
+    'inspect', 'io', 'itertools', 'json', 'keyword', 'logging', 'math',
+    'mimetypes', 'multiprocessing', 'operator', 'os', 'pathlib',
+    'platform', 'pprint', 'queue', 're', 'secrets', 'select', 'shelve',
+    'shlex', 'shutil', 'signal', 'socket', 'sqlite3', 'ssl', 'statistics',
+    'string', 'struct', 'subprocess', 'sys', 'tempfile', 'textwrap',
+    'threading', 'time', 'timeit', 'traceback', 'typing', 'unittest',
+    'urllib', 'uuid', 'warnings', 'weakref', 'xml', 'zipfile', 'zlib',
+})
+
 
 def parse_battle_plan(path: Path) -> dict:
     """Parse battle-plan.md to extract file ownership per captain."""
     if not path.exists():
-        print(f"Error: Battle plan not found at {path}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"Battle plan not found at {path}")
 
     content = path.read_text(encoding="utf-8")
 
@@ -121,17 +136,17 @@ def detect_conflicts(ownership: dict, graph: dict) -> list:
                 continue
 
             # Check if `file` imports `other_file`.
-            # This is a very simplistic check that tries to match the module name
-            # to the file name. It's language-dependent and brittle, but a start.
+            # Match the import against the other file's stem, relative path
+            # without extension, or full relative path — exact matches only.
+            other_stem = Path(other_file).stem
+            other_no_ext = str(Path(other_file).with_suffix(""))
+            other_full = str(Path(other_file))
 
-            # Extract basic module names from the paths
-            file_module = Path(file).stem
-            other_module = Path(other_file).stem
-
-            # Simple heuristic: if the module name is in the imports
-            # OR if it's a relative path match for JS/TS
             for imp in imports:
-                if other_module in imp or imp in str(Path(other_file)):
+                # Skip Python stdlib modules — they cannot refer to project files
+                if imp in PYTHON_STDLIB:
+                    continue
+                if imp == other_stem or imp == other_no_ext or imp == other_full:
                     conflicts.append((owner, file, other_owner, other_file))
 
     return conflicts
@@ -148,7 +163,11 @@ def main():
     plan_path = Path(args.plan)
     project_root = Path(args.root)
 
-    ownership = parse_battle_plan(plan_path)
+    try:
+        ownership = parse_battle_plan(plan_path)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     if not ownership:
         print("No file ownership declarations found in battle plan.")
