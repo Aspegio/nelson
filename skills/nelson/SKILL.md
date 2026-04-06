@@ -133,11 +133,12 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 ## 5. Run Quarterdeck Rhythm
 
-**Idle notification rule (immediate — do not defer to checkpoint):** Every time an idle notification arrives from a ship, ask two questions before doing anything else:
+**Idle notification rule (immediate — do not defer to checkpoint):** Every time an idle notification arrives from a ship, ask three questions before doing anything else:
 1. Is this ship's task marked complete?
 2. Does any remaining pending task depend on this ship's output?
+3. **Agent-team mode only:** Has the admiral received and processed this ship's results?
 
-If the task is complete and no pending task depends on it, send `shutdown_request` immediately — in the same response. Do not wait for the next checkpoint cadence. Check the current `TaskList` state at the moment the idle notification arrives; each notification is evaluated independently against current state. This applies even when other ships are still running and even when a captain's results were delivered inline (not as a separate artifact). The `paid-off.md` standing order governs this; consult it if uncertain.
+If the task is complete and no pending task depends on it, proceed to shutdown per `references/standing-orders/paid-off.md`. In agent-team mode, the admiral must confirm receipt of the captain's results before sending `shutdown_request` — retrieve them via `SendMessage` or by reading output files if not already received. In subagents mode, results are returned synchronously by the `Agent` tool, so no additional confirmation is needed. Do not wait for the next checkpoint cadence. Check the current `TaskList` state at the moment the idle notification arrives; each notification is evaluated independently against current state. This applies even when other ships are still running.
 
 **Shutdown attempt ceiling:** If a `shutdown_request` to a ship goes unacknowledged, do not loop indefinitely. After 3 failed attempts to the same agent, abandon the shutdown attempt, note the failure in the captain's log, and continue the mission. If `TeamDelete` is blocked by stuck agents, manual cleanup is available — see `references/damage-control/man-overboard.md` for the procedure.
 
@@ -150,7 +151,7 @@ If the task is complete and no pending task depends on it, send `shutdown_reques
     - Use `SendMessage` to unblock captains or redirect their approach.
     - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
     - Check for active marine deployments; verify marines have returned and outputs are incorporated.
-    - Safety net: if any idle ship with a complete task was missed between checkpoints, send `shutdown_request` now before continuing.
+    - Safety net: if any idle ship with a complete task was missed between checkpoints, apply the `references/standing-orders/paid-off.md` shutdown procedure now before continuing.
     - Track burn against token/time budget.
     - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint. **Every ship must file a damage report at every checkpoint** to `{mission-dir}/damage-reports/{ship-name}.json` using the schema in `references/admiralty-templates/damage-report.md` — do not skip this when hull is Green.
     - Standing order scan: For each order below, ask "Has this situation arisen since the last checkpoint?" If yes, apply the corrective action now — do not defer.
