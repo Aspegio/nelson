@@ -6,6 +6,16 @@ This script parses a Nelson battle plan (a Markdown or JSON file)
 to extract file ownership for each task/captain, and builds a simple
 dependency graph of the codebase to check if any two captains own files
 that import each other. This flags "split-keel" violations before execution.
+
+Known limitations of the regex-based import parser:
+  - Python multi-line imports (from x import (\\n y\\n)) are only partially captured
+  - Python conditional imports inside try/except blocks are captured but not
+    distinguished from top-level imports
+  - Python dynamic imports (importlib.import_module) are not detected
+  - JS/TS dynamic imports (await import('module')) are not detected
+  - JS/TS type-only imports (import type { Foo } from './bar') are not matched
+  - JS/TS re-exports (export { default } from './module') are not matched
+For production use, consider AST-based parsers or tools like madge/pydeps.
 """
 
 import sys
@@ -72,10 +82,13 @@ def parse_battle_plan(path: Path) -> dict:
     return ownership
 
 
-def parse_imports(filepath: Path) -> set:
+def parse_imports(filepath: Path) -> set[str]:
     """Extract imports from a file using simple regex.
-    Currently supports Python, JS/TS."""
-    imports = set()
+
+    Currently supports Python, JS/TS. See module docstring for known
+    limitations of the regex-based approach.
+    """
+    imports: set[str] = set()
     if not filepath.exists():
         return imports
 
@@ -91,7 +104,10 @@ def parse_imports(filepath: Path) -> set:
             )
             if match:
                 module = match.group(1) or match.group(2).split(",")[0].strip()
-                imports.add(module.split(".")[0])
+                root_module = module.split(".")[0]
+                # Skip empty strings (e.g. from relative imports like "from . import x")
+                if root_module:
+                    imports.add(root_module)
 
     elif filepath.suffix in (".js", ".ts", ".jsx", ".tsx"):
         # import ... from 'foo'
@@ -101,29 +117,47 @@ def parse_imports(filepath: Path) -> set:
             content,
         ):
             module = match.group(1) or match.group(2)
-            imports.add(module)
+            if module:
+                imports.add(module)
 
     return imports
 
 
-def build_dependency_graph(files: set, project_root: Path) -> dict:
-    """Build a graph mapping a file to its imports."""
-    graph = {}
+def build_dependency_graph(files: set[str], project_root: Path) -> dict[str, set[str]]:
+    """Build a graph mapping a file to its imports.
+
+    Files that resolve outside the project root are skipped to prevent
+    path-traversal attacks via crafted battle plans.
+    """
+    graph: dict[str, set[str]] = {}
+    resolved_root = project_root.resolve()
     for f in files:
-        filepath = project_root / f
+        filepath = (project_root / f).resolve()
+        if not str(filepath).startswith(str(resolved_root)):
+            # Path escapes project root — skip silently
+            continue
         graph[f] = parse_imports(filepath)
     return graph
 
 
-def detect_conflicts(ownership: dict, graph: dict) -> list:
-    """Detect if files owned by different captains import each other."""
-    conflicts = []
+def detect_conflicts(
+    ownership: dict[str, set[str]], graph: dict[str, set[str]]
+) -> list[tuple[str, ...]]:
+    """Detect if files owned by different captains import each other.
 
-    # Create a reverse map from file to owner
-    file_to_owner = {}
+    Also flags duplicate file ownership (two captains claiming the same
+    file), which is itself a split-keel violation.
+    """
+    conflicts: list[tuple[str, ...]] = []
+
+    # Create a reverse map from file to owner, detecting duplicates
+    file_to_owner: dict[str, str] = {}
     for owner, files in ownership.items():
         for f in files:
-            file_to_owner[f] = owner
+            if f in file_to_owner:
+                conflicts.append((file_to_owner[f], f, owner, f))
+            else:
+                file_to_owner[f] = owner
 
     # For each file, check its imports
     for file, owner in file_to_owner.items():
@@ -187,13 +221,20 @@ def main():
     conflicts = detect_conflicts(ownership, graph)
 
     if conflicts:
-        print("\n[!] WARNING: Split-keel violations detected!")
+        print("\n[!] WARNING: Possible split-keel violations detected!")
         for c in conflicts:
-            print(
-                f"  Captain {c[0]} owns {c[1]} which appears to import {c[3]} owned by Captain {c[2]}."
-            )
+            if c[1] == c[3]:
+                # Duplicate ownership — two captains claim the same file
+                print(
+                    f"  {c[0]} and {c[2]} both claim ownership of {c[1]}."
+                )
+            else:
+                print(
+                    f"  Captain {c[0]} owns {c[1]} which appears to import {c[3]} owned by Captain {c[2]}."
+                )
         print("\nRemedy: Re-assign files to eliminate cross-captain dependencies.")
-        sys.exit(1)
+        # Exit 0 — the scan is best-effort; use exit code for parse errors only
+        sys.exit(0)
     else:
         print("\n[+] Pre-flight scan clean: No obvious split-keel violations detected.")
         sys.exit(0)

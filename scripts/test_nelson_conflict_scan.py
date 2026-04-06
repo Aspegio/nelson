@@ -6,7 +6,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 import unittest
 import tempfile
 import os
-from nelson_conflict_scan import parse_battle_plan, parse_imports, detect_conflicts
+from nelson_conflict_scan import (
+    parse_battle_plan,
+    parse_imports,
+    build_dependency_graph,
+    detect_conflicts,
+)
 
 
 class TestConflictScan(unittest.TestCase):
@@ -99,6 +104,42 @@ Task ID: 2
         """parse_battle_plan should raise FileNotFoundError for a missing file."""
         with self.assertRaises(FileNotFoundError):
             parse_battle_plan(self.root / "nonexistent.md")
+
+    def test_relative_import_does_not_produce_empty_string(self):
+        """'from . import sibling' must not add empty string to imports."""
+        py_file = self.root / "pkg" / "child.py"
+        py_file.parent.mkdir(parents=True)
+        py_file.write_text("from . import sibling\nfrom .sub import helper\n")
+
+        imports = parse_imports(py_file)
+        self.assertNotIn("", imports)
+
+    def test_duplicate_file_ownership_detected(self):
+        """Two captains claiming the same file is itself a split-keel violation."""
+        ownership = {
+            "HMS Victory": {"src/shared.py"},
+            "HMS Enterprise": {"src/shared.py"},
+        }
+        graph = {"src/shared.py": set()}
+
+        conflicts = detect_conflicts(ownership, graph)
+        self.assertEqual(len(conflicts), 1)
+        # Both entries reference the same file
+        self.assertEqual(conflicts[0][1], "src/shared.py")
+        self.assertEqual(conflicts[0][3], "src/shared.py")
+
+    def test_path_traversal_skipped(self):
+        """Files that escape the project root should be skipped."""
+        # Create a file inside the root so we have at least one valid entry
+        valid_file = self.root / "src" / "app.py"
+        valid_file.parent.mkdir(parents=True)
+        valid_file.write_text("import json\n")
+
+        files = {"src/app.py", "../../../etc/passwd"}
+        graph = build_dependency_graph(files, self.root)
+
+        self.assertIn("src/app.py", graph)
+        self.assertNotIn("../../../etc/passwd", graph)
 
 
 if __name__ == "__main__":
