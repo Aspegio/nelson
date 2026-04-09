@@ -195,6 +195,7 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py set \
 | `admiralty_action_completed` | Human completed action | task_id, resolution |
 | `battle_plan_amended` | Admiral rescopes | changes, rationale |
 | `phase_transition` | Phase engine advances | from_phase, to_phase |
+| `phase_override` | Manual phase set (recovery) | from_phase, to_phase |
 | `permission_granted` | User approves formation | (empty data) |
 | `mission_complete` | Step 6 | outcome_achieved, tasks_completed, total_tokens_consumed, duration_minutes |
 

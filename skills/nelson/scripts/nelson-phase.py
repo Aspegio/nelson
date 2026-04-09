@@ -53,6 +53,8 @@ PHASES = (
 PHASE_SET = frozenset(PHASES)
 
 # Tools blocked per phase.  Tools not listed here are always allowed.
+# FORMATION allows TaskCreate so captains can register tasks during squadron
+# formation, but blocks Agent/TeamCreate since the squadron isn't ready yet.
 BLOCKED_TOOLS: dict[str, frozenset[str]] = {
     "SAILING_ORDERS": frozenset({"Agent", "TeamCreate", "TaskCreate"}),
     "BATTLE_PLAN": frozenset({"Agent", "TeamCreate", "TaskCreate"}),
@@ -161,6 +163,10 @@ def _append_event(mission_dir: Path, event: dict) -> None:
         if fcntl:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
         lock_file.close()
+        try:
+            lock_path.unlink()
+        except OSError:
+            pass
 
 
 def _find_active_mission() -> Path | None:
@@ -390,7 +396,7 @@ def cmd_advance(args: argparse.Namespace) -> None:
     """Validate exit criteria and advance to the next phase."""
     mission_dir = _resolve_mission_dir(args)
     if mission_dir is None:
-        _die("Error: no active mission found")
+        _die("Error: no active mission found. Provide --mission-dir or create a .nelson/.active-* file.")
 
     current = _get_phase(mission_dir)
     if current is None:
@@ -490,6 +496,18 @@ def cmd_set(args: argparse.Namespace) -> None:
 
     old_phase = _get_phase(mission_dir)
     _set_phase(mission_dir, phase)
+
+    # Log a phase_override event so the mission log records the manual change.
+    event = {
+        "type": "phase_override",
+        "checkpoint": 0,
+        "timestamp": _now_iso(),
+        "data": {
+            "from_phase": old_phase,
+            "to_phase": phase,
+        },
+    }
+    _append_event(mission_dir, event)
 
     old_label = old_phase or "(none)"
     print(f"[nelson-phase] Phase set: {old_label} -> {phase}")

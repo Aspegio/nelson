@@ -401,9 +401,10 @@ class TestAdvance:
         assert transition_events[0]["data"]["to_phase"] == "BATTLE_PLAN"
 
     def test_no_active_mission_fails(self, tmp_path: Path) -> None:
-        """Advance with no active mission fails with an error."""
+        """Advance with no active mission fails with a helpful error."""
         result = run_phase("advance", cwd=tmp_path, expect_fail=True)
         assert "no active mission" in result.stderr
+        assert "--mission-dir" in result.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -601,6 +602,18 @@ class TestSet:
         # argparse should reject missing required arg
         assert result.returncode != 0
 
+    def test_logs_phase_override_event(self, tmp_path: Path) -> None:
+        """Set logs a phase_override event to mission-log.json."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("set", "--mission-dir", str(mission_dir), "--phase", "UNDERWAY")
+
+        log = read_json(mission_dir / "mission-log.json")
+        events = log.get("events", [])
+        override_events = [e for e in events if e.get("type") == "phase_override"]
+        assert len(override_events) == 1
+        assert override_events[0]["data"]["from_phase"] == "SAILING_ORDERS"
+        assert override_events[0]["data"]["to_phase"] == "UNDERWAY"
+
 
 # ---------------------------------------------------------------------------
 # TestBackwardCompatibility
@@ -751,6 +764,59 @@ class TestPhasePreservation:
         # Phase should be preserved
         fs = read_json(mission_dir / "fleet-status.json")
         assert fs["mission"]["phase"] == "UNDERWAY"
+
+
+# ---------------------------------------------------------------------------
+# TestFullLifecycle
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# TestCorruptJSON
+# ---------------------------------------------------------------------------
+
+
+class TestCorruptJSON:
+    """Tests for corrupt JSON recovery in the phase engine."""
+
+    def test_corrupt_fleet_status_backs_up(self, tmp_path: Path) -> None:
+        """Corrupt fleet-status.json is backed up and treated as empty."""
+        mission_dir = tmp_path / "corrupt-mission"
+        mission_dir.mkdir(parents=True)
+        fs_path = mission_dir / "fleet-status.json"
+        fs_path.write_text("{invalid json", encoding="utf-8")
+
+        result = run_phase("current", "--mission-dir", str(mission_dir))
+        # Corrupt file is backed up, so phase is None -> silent no-op
+        assert result.stdout.strip() == ""
+        assert (mission_dir / "fleet-status.json.bak").exists()
+
+    def test_corrupt_mission_log_during_advance(self, tmp_path: Path) -> None:
+        """Corrupt mission-log.json is backed up during advance."""
+        mission_dir = init_mission(tmp_path)
+        # Corrupt the mission log
+        log_path = mission_dir / "mission-log.json"
+        log_path.write_text("not json!", encoding="utf-8")
+
+        # Advance should still succeed (corrupt log is backed up, fresh one created)
+        result = run_phase("advance", "--mission-dir", str(mission_dir))
+        assert "SAILING_ORDERS -> BATTLE_PLAN" in result.stdout
+        assert (mission_dir / "mission-log.json.bak").exists()
+
+
+# ---------------------------------------------------------------------------
+# TestLockFileCleanup
+# ---------------------------------------------------------------------------
+
+
+class TestLockFileCleanup:
+    """Tests that lock files are cleaned up after operations."""
+
+    def test_advance_cleans_up_lock_file(self, tmp_path: Path) -> None:
+        """Lock file is removed after advance completes."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("advance", "--mission-dir", str(mission_dir))
+        assert not (mission_dir / ".mission-log.lock").exists()
 
 
 # ---------------------------------------------------------------------------

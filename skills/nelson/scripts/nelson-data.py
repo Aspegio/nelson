@@ -150,6 +150,10 @@ def _append_event(mission_dir: Path, event: dict) -> None:
         if fcntl:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
         lock_file.close()
+        try:
+            lock_path.unlink()
+        except OSError:
+            pass
 
 
 def _err(msg: str) -> None:
