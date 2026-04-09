@@ -648,7 +648,7 @@ class TestFormatElapsed:
         fn, _ = self._import_format_elapsed()
         assert fn(None) == ""
 
-    def test_unparseable_returns_empty(self) -> None:
+    def test_unparsable_returns_empty(self) -> None:
         fn, _ = self._import_format_elapsed()
         assert fn("not-a-date") == ""
 
