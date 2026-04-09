@@ -106,8 +106,13 @@ python3 .claude/skills/nelson/scripts/nelson-data.py stand-down \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
   --outcome-achieved \
   --actual-outcome "Auth module refactored with JWT support, all tests passing" \
-  --metric-result "47/47 auth tests pass, 0 new dependencies"
+  --metric-result "47/47 auth tests pass, 0 new dependencies" \
+  --adopt "Station tier 1 for schema migrations worked well" \
+  --adopt "Dedicated destroyer for DB-heavy tasks" \
+  --avoid "Assigning DB work to a frigate"
 ```
+
+Repeat `--adopt` and `--avoid` for each pattern. These are optional — omitting them produces empty lists. After writing `stand-down.json`, the script automatically updates the cross-mission memory store (`.nelson/memory/patterns.json` and `.nelson/memory/standing-order-stats.json`).
 
 ### `status` — Print current fleet status (read-only)
 
@@ -118,6 +123,41 @@ Reads `fleet-status.json` and prints a compact summary. Silent no-op if no missi
 ```bash
 python3 .claude/skills/nelson/scripts/nelson-data.py status \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
+```
+
+### `brief` — Mission intelligence brief (read-only)
+
+Run before Step 1 to surface relevant patterns from past missions.
+
+Reads `fleet-intelligence.json`, `.nelson/memory/patterns.json`, and `.nelson/memory/standing-order-stats.json`. Outputs a compact brief suitable for context injection. Use `--context` to surface precedents from similar past missions.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py brief \
+  --missions-dir .nelson/missions \
+  --context "auth module refactor"
+```
+
+Add `--json` for machine-readable output.
+
+### `analytics` — Cross-mission analytics (read-only)
+
+Run at any time for focused metric analysis across completed missions.
+
+Reads `fleet-intelligence.json` and `.nelson/memory/standing-order-stats.json`. Supports four metrics:
+
+- `success-rate` — Win rate, trend, outcome by fleet size
+- `standing-orders` — Violation frequency, top offenders, failure correlation
+- `efficiency` — Tokens per task, duration per task, budget utilization
+- `all` — All three analyses combined
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py analytics \
+  --missions-dir .nelson/missions \
+  --metric success-rate
+
+python3 .claude/skills/nelson/scripts/nelson-data.py analytics \
+  --missions-dir .nelson/missions \
+  --metric all --json --last 10
 ```
 
 ## Write Timing
@@ -132,7 +172,10 @@ python3 .claude/skills/nelson/scripts/nelson-data.py status \
 | Step 5: Between Checkpoints | `event` | `mission-log.json` | -- |
 | Step 5: Relief on Station | `event --type relief_on_station` | `mission-log.json` | `turnover-briefs/{ship}.md` |
 | Step 5: Action Stations | `event --type task_completed` | `mission-log.json` | -- |
-| Step 6: Stand Down | `stand-down` | `mission-log.json`, `fleet-status.json`, `stand-down.json` | `captains-log.md` |
+| Step 6: Stand Down | `stand-down` | `mission-log.json`, `fleet-status.json`, `stand-down.json`, `.nelson/memory/patterns.json`, `.nelson/memory/standing-order-stats.json` | `captains-log.md` |
+| Post-mission | `index` | `fleet-intelligence.json`, `.nelson/memory/patterns.json`, `.nelson/memory/standing-order-stats.json` | — |
+| Pre-mission | `brief` | (read-only) | — |
+| Any time | `analytics` | (read-only) | — |
 
 ## Event Types
 
@@ -336,6 +379,70 @@ Auto-computed from `mission-log.json` and `battle-plan.json` by the `stand-down`
 }
 ```
 
+## Memory Store
+
+Cross-mission data is stored in `.nelson/memory/`. This directory is created automatically by `stand-down` and `index`.
+
+### patterns.json (Append-Only)
+
+Accumulated pattern library from all completed missions. Updated automatically at stand-down.
+
+```json
+{
+  "version": 1,
+  "updated_at": "2026-04-08T14:30:00Z",
+  "pattern_count": 5,
+  "patterns": [
+    {
+      "mission_id": "2026-04-08_120000",
+      "completed_at": "2026-04-08T14:30:00Z",
+      "outcome_achieved": true,
+      "planned_outcome": "Refactor auth module",
+      "adopt": ["Station tier 1 for schema migrations worked well"],
+      "avoid": ["Assigning DB work to a frigate"],
+      "standing_order_violations": [
+        {
+          "order": "split-keel",
+          "description": "File ownership overlap",
+          "severity": "medium",
+          "corrective_action": "Reassigned file ownership"
+        }
+      ],
+      "damage_control_events": 1,
+      "quality": {
+        "violations": 1,
+        "blockers_raised": 2,
+        "blockers_resolved": 2,
+        "task_completion_rate": 1.0
+      }
+    }
+  ]
+}
+```
+
+### standing-order-stats.json (Overwritten)
+
+Aggregate violation statistics across all missions. Updated at stand-down and index.
+
+```json
+{
+  "version": 1,
+  "updated_at": "2026-04-08T14:30:00Z",
+  "total_missions": 5,
+  "total_violations": 3,
+  "violations_per_mission": 0.6,
+  "by_order": {
+    "split-keel": { "count": 2, "missions": ["2026-04-08_120000", "2026-04-07_100000"] },
+    "skeleton-crew": { "count": 1, "missions": ["2026-04-06_090000"] }
+  },
+  "correlation": {
+    "missions_with_violations": 2,
+    "failures_with_violations": 1,
+    "successes_with_violations": 1
+  }
+}
+```
+
 ## Error Handling
 
 The script handles errors and prints clear messages to stderr:
@@ -359,4 +466,4 @@ This stdout line (~20 tokens) replaces a ~200-token JSON Write call. The full JS
 
 ## Schema Coupling
 
-The `_build_mission_record` and `_extract_fleet_details` functions in `nelson-data.py` depend on the JSON schemas defined above. If you rename or restructure fields in the schemas (e.g. `stand-down.json`, `battle-plan.json`, `sailing-orders.json`, `mission-log.json`), you must update those functions to match. `_compute_analytics` also depends on the field names produced by `_build_mission_record`.
+The `_build_mission_record` and `_extract_fleet_details` functions in `nelson-data.py` depend on the JSON schemas defined above. If you rename or restructure fields in the schemas (e.g. `stand-down.json`, `battle-plan.json`, `sailing-orders.json`, `mission-log.json`), you must update those functions to match. `_compute_analytics` also depends on the field names produced by `_build_mission_record`. The memory store functions (`_extract_patterns_from_mission`, `_update_patterns_store`, `_update_standing_order_stats`, `_build_intelligence_brief`) depend on both the mission JSON schemas and the memory store schemas (`patterns.json`, `standing-order-stats.json`).

@@ -35,6 +35,9 @@ skills/nelson/
     structured-data.md      — Structured fleet data capture reference
     tool-mapping.md         — Nelson-to-Claude Code tool reference
     standing-orders/        — One file per anti-pattern, loaded on demand
+.nelson/memory/           — Cross-mission memory store (auto-created)
+  patterns.json             — Accumulated pattern library (adopt/avoid)
+  standing-order-stats.json — Violation frequency and correlation data
 agents/                   — Agent interface definitions
 demos/                    — Example applications built with Nelson
 scripts/                  — Maintenance & utility scripts

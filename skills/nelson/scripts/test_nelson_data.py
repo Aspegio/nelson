@@ -1264,3 +1264,463 @@ class TestHistoryCorruptIndex:
             cwd=tmp_path, expect_fail=True,
         )
         assert "corrupt" in result.stderr.lower() or "json" in result.stderr.lower() or "error" in result.stderr.lower()
+
+
+# ---------------------------------------------------------------------------
+# Stand-Down Patterns (--adopt / --avoid)
+# ---------------------------------------------------------------------------
+
+
+class TestStandDownPatterns:
+    def test_adopt_avoid_args(self, tmp_path: Path) -> None:
+        """--adopt and --avoid flags populate reusable_patterns in stand-down.json."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Done",
+            "--metric-result", "Pass",
+            "--adopt", "Station tier 1 for migrations",
+            "--adopt", "Dedicated destroyer for DB work",
+            "--avoid", "Assigning DB work to frigates",
+        )
+        sd = read_json(mission_dir / "stand-down.json")
+        assert sd["reusable_patterns"]["adopt"] == [
+            "Station tier 1 for migrations",
+            "Dedicated destroyer for DB work",
+        ]
+        assert sd["reusable_patterns"]["avoid"] == [
+            "Assigning DB work to frigates",
+        ]
+
+    def test_adopt_avoid_default_empty(self, tmp_path: Path) -> None:
+        """No --adopt/--avoid args produce empty lists (regression check)."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Done",
+            "--metric-result", "Pass",
+        )
+        sd = read_json(mission_dir / "stand-down.json")
+        assert sd["reusable_patterns"]["adopt"] == []
+        assert sd["reusable_patterns"]["avoid"] == []
+
+
+# ---------------------------------------------------------------------------
+# Memory Store
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryStore:
+    def test_stand_down_creates_patterns_json(self, tmp_path: Path) -> None:
+        """Completing a mission creates .nelson/memory/patterns.json."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Done",
+            "--metric-result", "Pass",
+            "--adopt", "Good pattern",
+        )
+        patterns_path = tmp_path / ".nelson" / "memory" / "patterns.json"
+        assert patterns_path.exists()
+        data = read_json(patterns_path)
+        assert data["version"] == 1
+        assert data["pattern_count"] == 1
+        assert data["patterns"][0]["adopt"] == ["Good pattern"]
+        assert data["patterns"][0]["outcome_achieved"] is True
+
+    def test_patterns_accumulate(self, tmp_path: Path) -> None:
+        """Two missions produce two pattern entries."""
+        for i in range(2):
+            mission_dir = init_mission(tmp_path)
+            add_squadron(mission_dir)
+            add_task(mission_dir)
+            run("plan-approved", "--mission-dir", str(mission_dir))
+            run(
+                "stand-down",
+                "--mission-dir", str(mission_dir),
+                "--outcome-achieved",
+                "--actual-outcome", f"Mission {i}",
+                "--metric-result", "Pass",
+                "--adopt", f"Pattern {i}",
+            )
+        patterns_path = tmp_path / ".nelson" / "memory" / "patterns.json"
+        data = read_json(patterns_path)
+        assert data["pattern_count"] == 2
+
+    def test_standing_order_stats_updated(self, tmp_path: Path) -> None:
+        """Logging a standing_order_violation event updates stats on stand-down."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "event",
+            "--mission-dir", str(mission_dir),
+            "--type", "standing_order_violation",
+            "--order", "split-keel",
+            "--description", "File overlap",
+            "--severity", "medium",
+            "--corrective-action", "Reassigned",
+        )
+        run(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Done",
+            "--metric-result", "Pass",
+        )
+        stats_path = tmp_path / ".nelson" / "memory" / "standing-order-stats.json"
+        assert stats_path.exists()
+        stats = read_json(stats_path)
+        assert stats["total_violations"] == 1
+        assert stats["total_missions"] == 1
+        assert "split-keel" in stats["by_order"]
+        assert stats["by_order"]["split-keel"]["count"] == 1
+
+    def test_memory_store_failure_non_fatal(self, tmp_path: Path) -> None:
+        """If memory dir is read-only, stand-down still succeeds."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+
+        # Create a read-only memory directory to force failure
+        memory_dir = tmp_path / ".nelson" / "memory"
+        memory_dir.mkdir(parents=True)
+        memory_dir.chmod(stat.S_IRUSR | stat.S_IXUSR)
+        try:
+            result = run(
+                "stand-down",
+                "--mission-dir", str(mission_dir),
+                "--outcome-achieved",
+                "--actual-outcome", "Done",
+                "--metric-result", "Pass",
+            )
+            # Stand-down should succeed despite memory store failure
+            sd = read_json(mission_dir / "stand-down.json")
+            assert sd["outcome_achieved"] is True
+            assert "Warning" in result.stderr or "memory" in result.stderr.lower()
+        finally:
+            memory_dir.chmod(stat.S_IRWXU)
+
+    def test_extract_patterns_captures_violations(self, tmp_path: Path) -> None:
+        """Pattern extraction includes standing order violation details."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "event",
+            "--mission-dir", str(mission_dir),
+            "--type", "standing_order_violation",
+            "--order", "skeleton-crew",
+            "--description", "Too few agents",
+            "--severity", "low",
+            "--corrective-action", "Added crew",
+        )
+        run(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Done",
+            "--metric-result", "Pass",
+            "--avoid", "Under-crewing ships",
+        )
+        patterns_path = tmp_path / ".nelson" / "memory" / "patterns.json"
+        data = read_json(patterns_path)
+        p = data["patterns"][0]
+        assert len(p["standing_order_violations"]) == 1
+        assert p["standing_order_violations"][0]["order"] == "skeleton-crew"
+        assert p["avoid"] == ["Under-crewing ships"]
+
+
+# ---------------------------------------------------------------------------
+# Brief
+# ---------------------------------------------------------------------------
+
+
+class TestBrief:
+    def _missions_dir(self, tmp_path: Path) -> str:
+        return str(tmp_path / ".nelson" / "missions")
+
+    def _setup_missions(
+        self, tmp_path: Path, count: int = 2, adopt: list[str] | None = None,
+    ) -> None:
+        """Create, index, and populate memory for *count* missions."""
+        for i in range(count):
+            adopt_args: list[str] = []
+            for a in (adopt or []):
+                adopt_args.extend(["--adopt", a])
+            mission_dir = init_mission(tmp_path)
+            add_squadron(mission_dir)
+            add_task(mission_dir)
+            run("plan-approved", "--mission-dir", str(mission_dir))
+            run(
+                "checkpoint",
+                "--mission-dir", str(mission_dir),
+                "--pending", "0", "--in-progress", "0", "--completed", "1",
+                "--blocked", "0",
+                "--tokens-spent", "50000", "--tokens-remaining", "50000",
+                "--hull-green", "1", "--hull-amber", "0",
+                "--hull-red", "0", "--hull-critical", "0",
+                "--decision", "continue", "--rationale", "OK",
+            )
+            run(
+                "stand-down",
+                "--mission-dir", str(mission_dir),
+                "--outcome-achieved",
+                "--actual-outcome", f"Mission {i} done",
+                "--metric-result", "Pass",
+                *adopt_args,
+            )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+    def test_brief_no_missions(self, tmp_path: Path) -> None:
+        """Brief with no data shows empty state."""
+        missions_dir = tmp_path / ".nelson" / "missions"
+        missions_dir.mkdir(parents=True)
+        result = run("brief", "--missions-dir", str(missions_dir), cwd=tmp_path)
+        assert "0 missions" in result.stdout
+
+    def test_brief_with_missions(self, tmp_path: Path) -> None:
+        """Brief with indexed missions shows win rate."""
+        self._setup_missions(tmp_path, count=3, adopt=["Use TDD"])
+        result = run(
+            "brief", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path,
+        )
+        assert "Intelligence Brief" in result.stdout
+        assert "win rate" in result.stdout
+        assert "Use TDD" in result.stdout
+
+    def test_brief_json_output(self, tmp_path: Path) -> None:
+        """--json outputs valid JSON with expected keys."""
+        self._setup_missions(tmp_path, count=2, adopt=["Good pattern"])
+        result = run(
+            "brief", "--missions-dir", self._missions_dir(tmp_path),
+            "--json", cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert "total_missions" in data
+        assert "win_rate" in data
+        assert "top_adopt" in data
+        assert "top_avoid" in data
+        assert "standing_order_hot_spots" in data
+
+    def test_brief_with_context_matching(self, tmp_path: Path) -> None:
+        """--context surfaces relevant precedents."""
+        # Create a mission with a specific outcome
+        mission_dir = init_mission(
+            tmp_path, **{"--outcome": "Refactor auth module to use JWT tokens"}
+        )
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "0", "--completed", "1",
+            "--blocked", "0",
+            "--tokens-spent", "50000", "--tokens-remaining", "50000",
+            "--hull-green", "1", "--hull-amber", "0",
+            "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "OK",
+        )
+        run(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Auth module refactored with JWT",
+            "--metric-result", "All tests pass",
+            "--adopt", "JWT rotation tested separately",
+        )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        result = run(
+            "brief",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--context", "auth module refactor",
+            cwd=tmp_path,
+        )
+        assert "Relevant precedents" in result.stdout
+        assert "auth" in result.stdout.lower()
+
+
+# ---------------------------------------------------------------------------
+# Analytics
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyticsCommand:
+    def _missions_dir(self, tmp_path: Path) -> str:
+        return str(tmp_path / ".nelson" / "missions")
+
+    def _setup_indexed(self, tmp_path: Path, count: int = 3) -> None:
+        """Create and index *count* completed missions."""
+        for i in range(count):
+            create_completed_mission(
+                tmp_path,
+                mission_id=f"2026-04-{i + 1:02d}_100000",
+                outcome_achieved=(i % 3 != 2),
+            )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+    def test_success_rate_metric(self, tmp_path: Path) -> None:
+        self._setup_indexed(tmp_path, count=3)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "success-rate",
+            cwd=tmp_path,
+        )
+        assert "Success Rate" in result.stdout
+        assert "Win rate" in result.stdout
+
+    def test_standing_orders_metric(self, tmp_path: Path) -> None:
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "standing-orders",
+            cwd=tmp_path,
+        )
+        assert "Standing Orders" in result.stdout
+
+    def test_efficiency_metric(self, tmp_path: Path) -> None:
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "efficiency",
+            cwd=tmp_path,
+        )
+        assert "Efficiency" in result.stdout
+
+    def test_all_metrics(self, tmp_path: Path) -> None:
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "all",
+            cwd=tmp_path,
+        )
+        assert "Success Rate" in result.stdout
+        assert "Standing Orders" in result.stdout
+        assert "Efficiency" in result.stdout
+
+    def test_analytics_json_output(self, tmp_path: Path) -> None:
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "success-rate",
+            "--json",
+            cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert "total" in data
+        assert "win_rate" in data
+
+    def test_analytics_all_json(self, tmp_path: Path) -> None:
+        """--metric all --json returns all three metric groups."""
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "all",
+            "--json",
+            cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert "success_rate" in data
+        assert "standing_orders" in data
+        assert "efficiency" in data
+
+    def test_analytics_last_flag(self, tmp_path: Path) -> None:
+        """--last limits the number of missions analyzed."""
+        self._setup_indexed(tmp_path, count=4)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "success-rate",
+            "--json",
+            "--last", "2",
+            cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert data["total"] == 2
+
+    def test_analytics_no_index_fails(self, tmp_path: Path) -> None:
+        """analytics without an index fails gracefully."""
+        missions_dir = tmp_path / ".nelson" / "missions"
+        missions_dir.mkdir(parents=True)
+        result = run(
+            "analytics",
+            "--missions-dir", str(missions_dir),
+            "--metric", "success-rate",
+            cwd=tmp_path,
+            expect_fail=True,
+        )
+        assert "No fleet intelligence index" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Index Memory Sync
+# ---------------------------------------------------------------------------
+
+
+class TestIndexMemorySync:
+    def _missions_dir(self, tmp_path: Path) -> str:
+        return str(tmp_path / ".nelson" / "missions")
+
+    def test_index_populates_memory_store(self, tmp_path: Path) -> None:
+        """Running index backfills the memory store from completed missions.
+
+        Note: stand-down already creates pattern entries, but the dir rename
+        used by create_completed_mission changes the mission_id, so index
+        sync adds entries for the renamed IDs. This test verifies the memory
+        store is populated (by stand-down + index sync).
+        """
+        create_completed_mission(tmp_path, mission_id="2026-04-01_100000")
+        create_completed_mission(tmp_path, mission_id="2026-04-02_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        patterns_path = tmp_path / ".nelson" / "memory" / "patterns.json"
+        assert patterns_path.exists()
+        data = read_json(patterns_path)
+        # 2 from stand-down (original IDs) + 2 from index sync (renamed IDs)
+        assert data["pattern_count"] >= 2
+        # Verify both renamed mission IDs are present
+        mission_ids = {p["mission_id"] for p in data["patterns"]}
+        assert "2026-04-01_100000" in mission_ids
+        assert "2026-04-02_100000" in mission_ids
+
+    def test_index_incremental_sync(self, tmp_path: Path) -> None:
+        """Re-indexing after new missions only adds new patterns for unseen IDs."""
+        create_completed_mission(tmp_path, mission_id="2026-04-01_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        patterns = read_json(tmp_path / ".nelson" / "memory" / "patterns.json")
+        count_after_first = patterns["pattern_count"]
+
+        create_completed_mission(tmp_path, mission_id="2026-04-02_100000")
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        patterns = read_json(tmp_path / ".nelson" / "memory" / "patterns.json")
+        # At least one more pattern added for the new mission
+        assert patterns["pattern_count"] > count_after_first
+        mission_ids = {p["mission_id"] for p in patterns["patterns"]}
+        assert "2026-04-02_100000" in mission_ids
