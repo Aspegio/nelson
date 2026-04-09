@@ -115,9 +115,22 @@ Actions marked `timing: before task starts` require your sign-off before the rel
 
 Do not spawn any agents or create any tasks until the user approves. If the user requests changes, revise and redisplay before proceeding.
 
-> **Note:** Nelson requires an interactive session for formation approval. Headless and CI invocation are not supported at this time.
+> **Note:** For headless and CI invocation, use `nelson-data.py headless --auto-approve` which combines Steps 1-3 and skips the interactive approval gate. See `references/structured-data.md` for details.
 
-**Structured Data Capture:** Once formation is approved, run these commands in order:
+**Structured Data Capture:** Once formation is approved, use the composite `form` command (recommended) or the individual commands below.
+
+**Recommended — composite `form` command:** Write a plan JSON file with the task and squadron definitions, then run a single command:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py form \
+  --mission-dir {mission-dir} \
+  --plan {mission-dir}/plan-input.json \
+  --mode [mode]
+```
+
+This registers all tasks, records the squadron, computes DAG metrics, and runs the conflict scan in one step. See `references/structured-data.md` for the plan JSON schema and output format.
+
+**Alternative — individual commands:**
 1. `python3 .claude/skills/nelson/scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task (owners are now known from formation). See `references/structured-data.md` for task arguments.
 2. `python3 .claude/skills/nelson/scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
 3. `python3 .claude/skills/nelson/scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.

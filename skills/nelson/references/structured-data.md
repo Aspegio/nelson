@@ -109,6 +109,84 @@ python3 .claude/skills/nelson/scripts/nelson-data.py stand-down \
   --metric-result "47/47 auth tests pass, 0 new dependencies"
 ```
 
+### `form` — Composite formation (recommended)
+
+Run at Step 3 instead of individual `task`, `squadron`, and `plan-approved` calls. Consolidates the entire formation phase into a single command.
+
+Reads a plan JSON file containing tasks and squadron definitions. Registers all tasks, records the squadron, computes DAG metrics, and runs the conflict scan. Outputs a structured JSON summary to stdout; progress messages go to stderr.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py form \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
+  --plan battle-plan-input.json \
+  --mode subagents
+```
+
+The plan JSON file must contain `squadron` and `tasks` keys:
+
+```json
+{
+  "squadron": {
+    "admiral": { "ship_name": "HMS Victory", "model": "opus" },
+    "captains": [
+      { "ship_name": "HMS Argyll", "ship_class": "frigate", "model": "sonnet", "task_id": 1 }
+    ],
+    "red_cell": { "ship_name": "HMS Astute", "model": "haiku" }
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "name": "Auth module refactor",
+      "owner": "HMS Argyll",
+      "deliverable": "Refactored auth module with JWT support",
+      "dependencies": [],
+      "station_tier": 1,
+      "file_ownership": ["src/auth/**"]
+    }
+  ]
+}
+```
+
+Output summary (stdout):
+
+```json
+{
+  "status": "ok",
+  "mission_dir": ".nelson/missions/2026-03-27_120000_a1b2c3d4",
+  "tasks_registered": 1,
+  "squadron": { "admiral": "HMS Victory", "captains": 1, "mode": "subagents", "has_red_cell": true },
+  "dag_metrics": { "parallel_tracks": 1, "critical_path_length": 1 },
+  "conflict_scan": { "clean": true, "exit_code": 0, "stdout": "..." }
+}
+```
+
+### `headless` — Headless mission (init + form)
+
+Run to create a mission and complete formation in a single command. Reads sailing orders and battle plan from JSON files. Designed for CI/CD pipeline integration.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py headless \
+  --sailing-orders sailing-orders.json \
+  --battle-plan battle-plan.json \
+  --mode subagents \
+  --auto-approve
+```
+
+The sailing orders JSON uses the same fields as `sailing-orders.json`:
+
+```json
+{
+  "outcome": "Refactor auth module to use JWT tokens",
+  "metric": "All 47 auth tests pass, no new dependencies",
+  "deadline": "this_session",
+  "budget": { "token_limit": 200000 },
+  "constraints": ["Do not modify the public API surface"],
+  "out_of_scope": ["Migration script for existing sessions"]
+}
+```
+
+Outputs a combined JSON summary to stdout containing `mission_dir`, `sailing_orders`, and `formation` sections.
+
 ### `status` — Print current fleet status (read-only)
 
 Run at any time for a quick status check. Useful for session resumption and hooks.
@@ -126,7 +204,8 @@ python3 .claude/skills/nelson/scripts/nelson-data.py status \
 |---|---|---|---|
 | Step 1: Sailing Orders | `init` | `sailing-orders.json`, `mission-log.json` | (conversation-only) |
 | Step 2: Battle Plan | (none — owners not yet assigned) | — | (conversation-only) |
-| Step 3: Form Squadron | `task` (per task), then `plan-approved`, then `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
+| Step 3: Form Squadron | `form` (recommended), or individual `task` + `plan-approved` + `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
+| Step 1-3: Headless | `headless` (CI/CD) | all of the above in one step | — |
 | Step 4: Get Permission to Sail | (none) | — | (conversation-only) |
 | Step 5: Each Checkpoint | `checkpoint` | `mission-log.json`, `fleet-status.json` | `quarterdeck-report.md` |
 | Step 5: Between Checkpoints | `event` | `mission-log.json` | -- |
