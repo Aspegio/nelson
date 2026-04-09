@@ -623,6 +623,86 @@ class TestStatus:
 
 
 # ---------------------------------------------------------------------------
+# _format_elapsed unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestFormatElapsed:
+    """Direct unit tests for _format_elapsed() helper."""
+
+    @staticmethod
+    def _import_format_elapsed():
+        """Import _format_elapsed from nelson-data.py."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("nelson_data", str(SCRIPT))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod._format_elapsed, mod
+
+    def test_empty_string_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn("") == ""
+
+    def test_none_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn(None) == ""
+
+    def test_unparseable_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn("not-a-date") == ""
+
+    def test_future_timestamp_returns_empty(self) -> None:
+        fn, mod = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        assert fn(future) == ""
+
+    def test_seconds_ago(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+        result = fn(ts)
+        assert "sec ago" in result
+
+    def test_minutes_ago(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        result = fn(ts)
+        assert "min ago" in result
+        assert "5 min ago" == result
+
+    def test_hours_exact(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        result = fn(ts)
+        assert result == "2 hr ago"
+
+    def test_hours_and_minutes(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(hours=1, minutes=30)).isoformat()
+        result = fn(ts)
+        assert result == "1 hr 30 min ago"
+
+    def test_zulu_suffix_parsed(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        dt = datetime.now(timezone.utc) - timedelta(minutes=10)
+        ts = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        result = fn(ts)
+        assert "10 min ago" == result
+
+
+# ---------------------------------------------------------------------------
 # Full Lifecycle Integration
 # ---------------------------------------------------------------------------
 

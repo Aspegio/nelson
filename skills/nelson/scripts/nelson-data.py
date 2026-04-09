@@ -1229,7 +1229,7 @@ def cmd_status(args: argparse.Namespace) -> None:
         f"Progress: {progress_str}\n"
         f"Ships: {ships_str}\n"
         f"{checkpoint_str}\n"
-        f"Budget: {pct}% consumed"
+        f"Budget: {pct:.0f}% consumed"
     )
 
 
