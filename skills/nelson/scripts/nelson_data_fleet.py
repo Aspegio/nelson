@@ -23,16 +23,12 @@ from nelson_data_utils import (
     JSON_INDENT,
     _die,
     _err,
+    _file_lock,
     _now_iso,
     _read_json_optional,
     _safe_mean,
     _write_json,
 )
-
-try:
-    import fcntl
-except ImportError:
-    fcntl = None
 
 
 VALID_METRICS = frozenset({"success-rate", "standing-orders", "efficiency", "all"})
@@ -58,11 +54,7 @@ def cmd_index(args: argparse.Namespace) -> None:
     rebuild = bool(getattr(args, "rebuild", False))
 
     lock_path = index_path.with_suffix(".lock")
-    lock_file = open(lock_path, "w")
-    try:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
-
+    with _file_lock(lock_path):
         # Load existing index or start fresh
         if rebuild:
             index = _build_empty_index()
@@ -105,10 +97,6 @@ def cmd_index(args: argparse.Namespace) -> None:
             "missions": all_missions,
         }
         _write_json(index_path, updated_index)
-    finally:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-        lock_file.close()
 
     print(
         f"[nelson-data] Fleet intelligence indexed: "

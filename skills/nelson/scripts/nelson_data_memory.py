@@ -9,14 +9,11 @@ No external dependencies — stdlib only.
 
 from __future__ import annotations
 
-try:
-    import fcntl
-except ImportError:
-    fcntl = None
 from pathlib import Path
 
 from nelson_data_utils import (
     _err,
+    _file_lock,
     _now_iso,
     _read_json_optional,
     _write_json,
@@ -125,11 +122,7 @@ def _update_patterns_store(mission_dir: Path) -> None:
     if record is None:
         return
 
-    lock_file = open(lock_path, "w")
-    try:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
-
+    with _file_lock(lock_path):
         existing = _read_json_optional(patterns_path) or {
             "version": 1,
             "updated_at": None,
@@ -150,10 +143,6 @@ def _update_patterns_store(mission_dir: Path) -> None:
             "patterns": new_patterns,
         }
         _write_json(patterns_path, updated)
-    finally:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-        lock_file.close()
 
 
 def _update_standing_order_stats(mission_dir: Path) -> None:
@@ -184,11 +173,7 @@ def _update_standing_order_stats(mission_dir: Path) -> None:
             order = ev.get("data", {}).get("order", "unknown")
             mission_violations.append(order)
 
-    lock_file = open(lock_path, "w")
-    try:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
-
+    with _file_lock(lock_path):
         existing = _read_json_optional(stats_path) or {
             "version": 1,
             "updated_at": None,
@@ -251,10 +236,6 @@ def _update_standing_order_stats(mission_dir: Path) -> None:
             "_tracked_missions": tracked + [mission_id],
         }
         _write_json(stats_path, updated)
-    finally:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-        lock_file.close()
 
 
 def _rebuild_standing_order_stats(all_patterns: list[dict]) -> dict:
@@ -327,11 +308,7 @@ def _sync_memory_from_index(missions_dir: Path) -> None:
     stats_lock_path = memory_dir / ".standing-order-stats.lock"
 
     # Lock patterns file for read-modify-write
-    patterns_lock = open(patterns_lock_path, "w")
-    try:
-        if fcntl:
-            fcntl.flock(patterns_lock, fcntl.LOCK_EX)
-
+    with _file_lock(patterns_lock_path):
         existing = _read_json_optional(patterns_path) or {
             "version": 1,
             "updated_at": None,
@@ -363,23 +340,11 @@ def _sync_memory_from_index(missions_dir: Path) -> None:
             "patterns": all_patterns,
         }
         _write_json(patterns_path, updated_patterns)
-    finally:
-        if fcntl:
-            fcntl.flock(patterns_lock, fcntl.LOCK_UN)
-        patterns_lock.close()
 
     # Lock stats file and rebuild from scratch for consistency
-    stats_lock = open(stats_lock_path, "w")
-    try:
-        if fcntl:
-            fcntl.flock(stats_lock, fcntl.LOCK_EX)
-
+    with _file_lock(stats_lock_path):
         updated_stats = _rebuild_standing_order_stats(all_patterns)
         _write_json(stats_path, updated_stats)
-    finally:
-        if fcntl:
-            fcntl.flock(stats_lock, fcntl.LOCK_UN)
-        stats_lock.close()
 
 
 # ---------------------------------------------------------------------------

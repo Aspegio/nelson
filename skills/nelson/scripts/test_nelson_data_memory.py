@@ -17,6 +17,7 @@ from conftest import (
     SCRIPT,
     add_squadron,
     add_task,
+    create_completed_mission,
     init_mission,
     read_json,
     run,
@@ -132,10 +133,6 @@ class TestReadJsonOptionalOSError:
             sd_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
-# Need to import create_completed_mission for TestReadJsonOptionalOSError
-from conftest import create_completed_mission
-
-
 # ---------------------------------------------------------------------------
 # Memory Store
 # ---------------------------------------------------------------------------
@@ -166,15 +163,13 @@ class TestMemoryStore:
 
     def test_patterns_accumulate(self, tmp_path: Path) -> None:
         """Two missions produce two pattern entries."""
-        mission_dirs: list[Path] = []
-        for i in range(2):
+        mission_ids = ["2026-01-01_000001", "2026-01-01_000002"]
+        for i, mission_id in enumerate(mission_ids):
             mission_dir = init_mission(tmp_path)
-            # Ensure unique directory names when iterations land in the same second
-            if mission_dirs and mission_dir == mission_dirs[-1]:
-                import time
-                time.sleep(1.1)
-                mission_dir = init_mission(tmp_path)
-            mission_dirs.append(mission_dir)
+            # Rename to deterministic ID to avoid timestamp collisions
+            target = mission_dir.parent / mission_id
+            mission_dir.rename(target)
+            mission_dir = target
             add_squadron(mission_dir)
             add_task(mission_dir)
             run("plan-approved", "--mission-dir", str(mission_dir))

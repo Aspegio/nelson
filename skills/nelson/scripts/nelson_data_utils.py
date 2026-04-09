@@ -15,6 +15,7 @@ import os
 import stat
 import sys
 import tempfile
+from contextlib import contextmanager
 
 try:
     import fcntl
@@ -22,7 +23,7 @@ except ImportError:
     fcntl = None
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 
 # ---------------------------------------------------------------------------
@@ -133,23 +134,33 @@ def _read_json_optional(path: Path) -> dict | None:
         return None
 
 
+@contextmanager
+def _file_lock(lock_path: Path) -> Generator[None, None, None]:
+    """Acquire an exclusive file lock, yielding while held.
+
+    Uses fcntl on Unix; no-ops gracefully on platforms without fcntl.
+    """
+    lock_file = open(lock_path, "w")
+    try:
+        if fcntl:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+        yield
+    finally:
+        if fcntl:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
+
+
 def _append_event(mission_dir: Path, event: dict) -> None:
     """Append *event* to mission-log.json using read-modify-write."""
     log_path = mission_dir / "mission-log.json"
     lock_path = mission_dir / ".mission-log.lock"
 
-    lock_file = open(lock_path, "w")
-    try:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
+    with _file_lock(lock_path):
         log = _read_json(log_path)
         new_events = list(log.get("events", [])) + [event]
         new_log = {**log, "events": new_events}
         _write_json(log_path, new_log)
-    finally:
-        if fcntl:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-        lock_file.close()
 
 
 def _err(msg: str) -> None:
