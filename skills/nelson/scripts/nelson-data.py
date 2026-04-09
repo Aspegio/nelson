@@ -476,6 +476,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
         )
 
     squadron: dict[str, Any] = {
+        "mode": args.mode or "subagents",
         "admiral": {
             "ship_name": args.admiral,
             "model": args.admiral_model,

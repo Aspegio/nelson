@@ -184,6 +184,7 @@ All artifacts are stored in `{mission-dir}/`.
 {
   "version": 1,
   "squadron": {
+    "mode": "subagents",
     "admiral": { "ship_name": "HMS Victory", "model": "opus" },
     "captains": [
       {

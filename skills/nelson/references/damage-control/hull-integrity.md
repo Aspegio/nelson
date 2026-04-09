@@ -68,25 +68,9 @@ Hull integrity monitoring works alongside existing damage control procedures:
 
 ## Advanced: TeammateIdle Hook
 
-An optional `TeammateIdle` hook can trigger an automatic hull integrity check when a captain goes idle unexpectedly. This supplements the quarterdeck checkpoint rhythm with event-driven monitoring.
-
-Example hook configuration in `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'Captain idle — check hull integrity and task status'"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-This is an opt-in enhancement. Hull integrity monitoring works without hooks via the quarterdeck checkpoint rhythm.
+Nelson ships a `TeammateIdle` hook in `hooks/hooks.json` that triggers an
+automatic check when a captain goes idle. The hook reads fleet status to
+determine whether the ship's task is complete and whether pending dependents
+remain. If the task is complete with no dependents, it advises executing the
+paid-off standing order. This supplements the quarterdeck checkpoint rhythm
+with event-driven monitoring.
