@@ -111,13 +111,24 @@ python3 .claude/skills/nelson/scripts/nelson-data.py stand-down \
 
 ### `status` — Print current fleet status (read-only)
 
-Run at any time for a quick status check. Useful for session resumption and hooks.
+Run at any time for a quick status check. Useful for session resumption, hooks, and dynamic context injection. Auto-invoked by SKILL.md's `!` block on skill activation.
 
-Reads `fleet-status.json` and prints a compact summary. Silent no-op if no mission data exists.
+Reads `fleet-status.json` and `mission-log.json` to produce a compact briefing with per-ship status and elapsed time. Silent no-op if no mission data exists. The `--mission-dir` argument is optional — omitting it is a silent no-op.
 
 ```bash
 python3 .claude/skills/nelson/scripts/nelson-data.py status \
   --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
+```
+
+Example output:
+
+```
+NELSON FLEET STATUS
+Mission: 2026-04-08_201214_a1b2c3d4 (underway)
+Progress: 3/5 tasks complete | 1 blocked
+Ships: HMS Argyll (Green 82%) | HMS Kent (Amber 65%) | HMS Daring (completed)
+Last checkpoint: 2 (12 min ago)
+Budget: 45% consumed
 ```
 
 ## Write Timing

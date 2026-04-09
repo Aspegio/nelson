@@ -252,6 +252,33 @@ def _get_last_checkpoint_number(events: list[dict]) -> int:
     return max(nums) if nums else 0
 
 
+def _format_elapsed(iso_timestamp: str) -> str:
+    """Format an ISO timestamp as a relative elapsed string, e.g. '12 min ago'.
+
+    Returns an empty string if the timestamp cannot be parsed.
+    """
+    if not iso_timestamp:
+        return ""
+    try:
+        then = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        delta_seconds = int((now - then).total_seconds())
+        if delta_seconds < 0:
+            return ""
+        if delta_seconds < 60:
+            return f"{delta_seconds} sec ago"
+        minutes = delta_seconds // 60
+        if minutes < 60:
+            return f"{minutes} min ago"
+        hours = minutes // 60
+        remaining_min = minutes % 60
+        if remaining_min == 0:
+            return f"{hours} hr ago"
+        return f"{hours} hr {remaining_min} min ago"
+    except (ValueError, TypeError):
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # Fleet Intelligence — Helpers
 # ---------------------------------------------------------------------------
@@ -1145,40 +1172,64 @@ def cmd_status(args: argparse.Namespace) -> None:
     mission = fs.get("mission", {})
     progress = fs.get("progress", {})
     budget = fs.get("budget", {})
+    squadron = fs.get("squadron", [])
 
+    # Mission identity
+    mission_name = mission_dir.name
     status = mission.get("status", "unknown")
-    cp = mission.get("checkpoint_number", 0)
+
+    # Progress
     completed = progress.get("completed", 0)
     total = progress.get("total", 0)
-    pct = budget.get("pct_consumed", 0.0)
-    spent = budget.get("tokens_spent", 0)
+    blocked = progress.get("blocked", 0)
 
-    squadron = fs.get("squadron", [])
-    hull_counts = {"G": 0, "A": 0, "R": 0, "C": 0}
+    # Determine completed ships from mission-log events
+    completed_ships: set[str] = set()
+    log_path = mission_dir / "mission-log.json"
+    if log_path.exists():
+        log = _read_json(log_path)
+        for event in log.get("events", []):
+            if event.get("type") == "task_completed":
+                owner = event.get("data", {}).get("owner", "")
+                if owner:
+                    completed_ships.add(owner)
+
+    # Per-ship status
+    ship_parts: list[str] = []
     for ship in squadron:
-        hull_status = ship.get("hull_integrity_status", "Green")
-        if hull_status == "Green":
-            hull_counts["G"] += 1
-        elif hull_status == "Amber":
-            hull_counts["A"] += 1
-        elif hull_status == "Red":
-            hull_counts["R"] += 1
-        elif hull_status == "Critical":
-            hull_counts["C"] += 1
+        name = ship.get("ship_name", "unknown")
+        if name in completed_ships:
+            ship_parts.append(f"{name} (completed)")
+        else:
+            hull_status = ship.get("hull_integrity_status", "Green")
+            hull_pct = ship.get("hull_integrity_pct", 100)
+            ship_parts.append(f"{name} ({hull_status} {hull_pct}%)")
+    ships_str = " | ".join(ship_parts) if ship_parts else "none"
 
-    blockers = len(fs.get("blockers", []))
+    # Checkpoint and time-since
+    cp = mission.get("checkpoint_number", 0)
+    elapsed_str = _format_elapsed(fs.get("last_updated", ""))
 
-    hull_str = (
-        f"{hull_counts['G']}G {hull_counts['A']}A "
-        f"{hull_counts['R']}R {hull_counts['C']}C"
-    )
+    # Budget
+    pct = budget.get("pct_consumed", 0.0)
+
+    # Format output
+    progress_parts = [f"{completed}/{total} tasks complete"]
+    if blocked > 0:
+        progress_parts.append(f"{blocked} blocked")
+    progress_str = " | ".join(progress_parts)
+
+    checkpoint_str = f"Last checkpoint: {cp}"
+    if elapsed_str:
+        checkpoint_str += f" ({elapsed_str})"
 
     print(
-        f"[nelson-data] Status: {status} (checkpoint {cp})\n"
-        f"Fleet: {completed}/{total} done | "
-        f"Budget: {pct}% ({spent} tokens) | "
-        f"Hull: {hull_str} | "
-        f"Blockers: {blockers}"
+        f"NELSON FLEET STATUS\n"
+        f"Mission: {mission_name} ({status})\n"
+        f"Progress: {progress_str}\n"
+        f"Ships: {ships_str}\n"
+        f"{checkpoint_str}\n"
+        f"Budget: {pct}% consumed"
     )
 
 
@@ -1654,7 +1705,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # --- status ---
     p_st = subs.add_parser("status", help="Print current fleet status")
-    p_st.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_st.add_argument("--mission-dir", default="", help="Mission directory path")
 
     # --- index ---
     p_idx = subs.add_parser("index", help="Build fleet intelligence index")
