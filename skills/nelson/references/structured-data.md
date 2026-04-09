@@ -178,6 +178,7 @@ python3 .claude/skills/nelson/scripts/nelson-data.py recover \
 Auto-discovery checks `.nelson/.active-*` files first, then falls back to the most recent mission directory without a `stand-down.json`.
 
 Output (JSON):
+
 ```json
 {
   "mission_dir": ".nelson/missions/2026-04-08_140000_a1b2c3d4",
