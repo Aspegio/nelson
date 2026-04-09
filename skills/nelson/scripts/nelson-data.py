@@ -58,6 +58,8 @@ VALID_EVENT_TYPES = frozenset(
         "admiralty_action_required",
         "admiralty_action_completed",
         "battle_plan_amended",
+        "phase_transition",
+        "permission_granted",
     }
 )
 
@@ -438,8 +440,37 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     mission_log = {"version": 1, "events": []}
 
+    fleet_status = {
+        "version": 1,
+        "mission": {
+            "outcome": args.outcome,
+            "status": "forming",
+            "phase": "SAILING_ORDERS",
+            "started_at": _now_iso(),
+            "checkpoint_number": 0,
+        },
+        "progress": {
+            "pending": 0,
+            "in_progress": 0,
+            "completed": 0,
+            "blocked": 0,
+            "total": 0,
+        },
+        "budget": {
+            "tokens_spent": 0,
+            "tokens_remaining": budget.get("token_limit"),
+            "pct_consumed": 0.0,
+            "burn_rate_per_checkpoint": 0,
+        },
+        "squadron": [],
+        "blockers": [],
+        "recent_events": ["Mission initialized"],
+        "last_updated": _now_iso(),
+    }
+
     _write_json(base / "sailing-orders.json", sailing_orders)
     _write_json(base / "mission-log.json", mission_log)
+    _write_json(base / "fleet-status.json", fleet_status)
 
     # Print the mission directory path (consumed by admiral)
     print(str(base))
@@ -533,12 +564,21 @@ def cmd_squadron(args: argparse.Namespace) -> None:
             }
         )
 
+    # Merge with existing fleet-status.json (created by init) or build fresh
+    fs_path = mission_dir / "fleet-status.json"
+    if fs_path.exists():
+        existing_fs = _read_json(fs_path)
+    else:
+        existing_fs = {"version": 1}
+
     fleet_status = {
+        **existing_fs,
         "version": 1,
         "mission": {
-            "outcome": None,
+            **existing_fs.get("mission", {}),
+            "outcome": existing_fs.get("mission", {}).get("outcome"),
             "status": "forming",
-            "started_at": _now_iso(),
+            "started_at": existing_fs.get("mission", {}).get("started_at", _now_iso()),
             "checkpoint_number": 0,
         },
         "progress": {
@@ -550,7 +590,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
         },
         "budget": {
             "tokens_spent": 0,
-            "tokens_remaining": None,
+            "tokens_remaining": existing_fs.get("budget", {}).get("tokens_remaining"),
             "pct_consumed": 0.0,
             "burn_rate_per_checkpoint": 0,
         },
@@ -572,7 +612,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
             },
         }
 
-    _write_json(mission_dir / "fleet-status.json", fleet_status)
+    _write_json(fs_path, fleet_status)
 
     print(
         f"[nelson-data] Squadron formed: admiral {args.admiral}, "
@@ -706,7 +746,8 @@ def cmd_plan_approved(args: argparse.Namespace) -> None:
         **fleet_status,
         "mission": {
             **fleet_status.get("mission", {}),
-            "status": "underway",
+            "status": "forming",
+            "phase": "BATTLE_PLAN",
         },
         "progress": {
             **fleet_status.get("progress", {}),
@@ -943,15 +984,20 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
         "last_updated": _now_iso(),
     }
 
-    # Carry forward started_at from existing fleet-status if available
+    # Carry forward started_at and phase from existing fleet-status if available
     fs_path = mission_dir / "fleet-status.json"
     if fs_path.exists():
         old_fs = _read_json(fs_path)
         old_started = old_fs.get("mission", {}).get("started_at")
+        old_phase = old_fs.get("mission", {}).get("phase", "UNDERWAY")
+        carryforward = {}
         if old_started:
+            carryforward["started_at"] = old_started
+        carryforward["phase"] = old_phase
+        if carryforward:
             fleet_status = {
                 **fleet_status,
-                "mission": {**fleet_status["mission"], "started_at": old_started},
+                "mission": {**fleet_status["mission"], **carryforward},
             }
 
     _write_json(fs_path, fleet_status)
@@ -1108,6 +1154,7 @@ def cmd_stand_down(args: argparse.Namespace) -> None:
         "mission": {
             **fleet_status.get("mission", {}),
             "status": "complete",
+            "phase": "STAND_DOWN",
             "checkpoint_number": _get_last_checkpoint_number(events) + 1,
         },
         "last_updated": _now_iso(),
@@ -1173,8 +1220,10 @@ def cmd_status(args: argparse.Namespace) -> None:
         f"{hull_counts['R']}R {hull_counts['C']}C"
     )
 
+    phase = mission.get("phase", "unknown")
+
     print(
-        f"[nelson-data] Status: {status} (checkpoint {cp})\n"
+        f"[nelson-data] Status: {status} | Phase: {phase} (checkpoint {cp})\n"
         f"Fleet: {completed}/{total} done | "
         f"Budget: {pct}% ({spent} tokens) | "
         f"Hull: {hull_str} | "

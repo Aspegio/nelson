@@ -522,11 +522,19 @@ class TestStatus:
 
     def test_status_no_fleet_data_is_silent(self, tmp_path: Path) -> None:
         """Status on a mission with no fleet-status.json is a silent no-op (rc=0)."""
-        mission_dir = init_mission(tmp_path)
-        # No squadron or checkpoint — no fleet-status.json exists
+        # Create a bare directory with no fleet-status.json
+        mission_dir = tmp_path / "bare-mission"
+        mission_dir.mkdir()
         result = run("status", "--mission-dir", str(mission_dir))
         # Silent no-op — no output, no error
         assert result.stdout.strip() == ""
+
+    def test_status_after_init_shows_phase(self, tmp_path: Path) -> None:
+        """Status after init shows the SAILING_ORDERS phase."""
+        mission_dir = init_mission(tmp_path)
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert "SAILING_ORDERS" in result.stdout
+        assert "forming" in result.stdout
 
 
 # ---------------------------------------------------------------------------
