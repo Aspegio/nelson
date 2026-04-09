@@ -35,14 +35,22 @@ skills/nelson/
     structured-data.md      — Structured fleet data capture reference
     tool-mapping.md         — Nelson-to-Claude Code tool reference
     standing-orders/        — One file per anti-pattern, loaded on demand
-.nelson/memory/           — Cross-mission memory store (auto-created)
-  patterns.json             — Accumulated pattern library (adopt/avoid)
-  standing-order-stats.json — Violation frequency and correlation data
+.nelson/
+  memory/                   — Cross-mission memory store (auto-created)
+    patterns.json             — Accumulated pattern library (adopt/avoid)
+    standing-order-stats.json — Violation frequency and correlation data
 agents/                   — Agent interface definitions
 demos/                    — Example applications built with Nelson
 scripts/                  — Maintenance & utility scripts
   check-references.sh       — Cross-reference validation for documentation links
   count-tokens.py           — Token counter for hull integrity damage reports
-  nelson-data.py            — Structured data capture for Nelson missions
-  test_nelson_data.py       — Python tests for nelson-data.py
+  nelson-data.py            — CLI entry point for Nelson data capture
+  nelson_data_utils.py      — Shared I/O, validation, and constants
+  nelson_data_memory.py     — Cross-mission memory store and pattern library
+  nelson_data_lifecycle.py  — Mission lifecycle commands (init through status)
+  nelson_data_fleet.py      — Fleet intelligence and analytics commands
+  conftest.py               — Shared test helpers (pytest auto-discovery)
+  test_nelson_data.py       — Lifecycle command tests
+  test_nelson_data_fleet.py — Fleet intelligence and analytics tests
+  test_nelson_data_memory.py — Memory store and I/O tests
 ```
