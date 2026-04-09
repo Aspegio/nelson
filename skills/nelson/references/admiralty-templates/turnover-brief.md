@@ -1,8 +1,16 @@
 # Turnover Brief Template
 
-Write this brief to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.md` before standing down. The replacement ship reads this file as its first action — include everything it needs to continue without asking clarifying questions.
+## Typed Handoff Packet (Primary)
 
-For flagship handovers, use the extended flagship section at the bottom of this template.
+The primary turnover format is a structured JSON handoff packet written by `nelson-data.py handoff`. See `references/structured-data.md` for the schema and command reference.
+
+The typed packet is written to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.json`. The replacement ship reads this JSON file as its first action.
+
+## Prose Turnover Brief (Companion)
+
+When a typed handoff packet has been written, the damaged ship may optionally also write a prose companion brief to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.md` using the template below. This prose version supplements the JSON packet with a human-readable narrative for manual review. It is not the primary recovery artifact.
+
+If `nelson-data.py handoff` is unavailable (e.g., script error, pre-upgrade missions), the prose brief below serves as the fallback format.
 
 ```text
 == TURNOVER BRIEF ==
