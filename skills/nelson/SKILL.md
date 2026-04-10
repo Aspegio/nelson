@@ -2,9 +2,14 @@
 name: nelson
 description: Orchestrates multi-agent task execution using a Royal Navy squadron metaphor — from mission planning through parallel work coordination to stand-down. Use when work needs parallel agent orchestration, tight task coordination with quality gates, structured delegation with progress checkpoints, or a documented decision log.
 argument-hint: "[mission description]"
+paths: [".nelson/**"]
 ---
 
 # Nelson
+
+```!
+python3 "{skill-dir}/scripts/nelson-data.py" status --mission-dir "$(ls -td .nelson/missions/*/ 2>/dev/null | head -1)" || echo "No active missions"
+```
 
 Execute this workflow for the user's mission.
 

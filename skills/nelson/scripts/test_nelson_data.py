@@ -518,7 +518,11 @@ class TestStatus:
             "--decision", "continue", "--rationale", "Test",
         )
         result = run("status", "--mission-dir", str(mission_dir))
-        assert "Status:" in result.stdout or "nelson-data" in result.stdout
+        assert "NELSON FLEET STATUS" in result.stdout
+        assert "underway" in result.stdout
+        assert "1/3 tasks complete" in result.stdout
+        assert "Budget:" in result.stdout
+        assert "Last checkpoint: 1" in result.stdout
 
     def test_status_no_fleet_data_is_silent(self, tmp_path: Path) -> None:
         """Status on a mission with no fleet-status.json is a silent no-op (rc=0)."""
@@ -527,6 +531,175 @@ class TestStatus:
         result = run("status", "--mission-dir", str(mission_dir))
         # Silent no-op — no output, no error
         assert result.stdout.strip() == ""
+
+    def test_status_shows_per_ship_status(self, tmp_path: Path) -> None:
+        """Status output includes per-ship hull status."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir, captains=[
+            "HMS Argyll:frigate:sonnet:1",
+            "HMS Kent:destroyer:sonnet:2",
+        ])
+        add_task(mission_dir, task_id=1, name="Task A", owner="HMS Argyll")
+        add_task(mission_dir, task_id=2, name="Task B", owner="HMS Kent")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "1", "--completed", "1", "--blocked", "0",
+            "--tokens-spent", "40000", "--tokens-remaining", "60000",
+            "--hull-green", "2", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert "HMS Argyll" in result.stdout
+        assert "HMS Kent" in result.stdout
+        assert "Ships:" in result.stdout
+
+    def test_status_shows_completed_ships(self, tmp_path: Path) -> None:
+        """Ships whose tasks are complete show (completed) in status."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir, captains=[
+            "HMS Argyll:frigate:sonnet:1",
+            "HMS Kent:destroyer:sonnet:2",
+        ])
+        add_task(mission_dir, task_id=1, name="Task A", owner="HMS Argyll")
+        add_task(mission_dir, task_id=2, name="Task B", owner="HMS Kent")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        # Record task completion event for HMS Argyll
+        run(
+            "event",
+            "--mission-dir", str(mission_dir),
+            "--type", "task_completed",
+            "--checkpoint", "1",
+            "--task-id", "1", "--task-name", "Task A", "--owner", "HMS Argyll",
+            "--station-tier", "0", "--verification", "passed",
+        )
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "1", "--completed", "1", "--blocked", "0",
+            "--tokens-spent", "50000", "--tokens-remaining", "50000",
+            "--hull-green", "1", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert "HMS Argyll (completed)" in result.stdout
+        assert "HMS Kent (Green" in result.stdout
+
+    def test_status_shows_mission_name(self, tmp_path: Path) -> None:
+        """Status output includes the mission directory name."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "0", "--completed", "1", "--blocked", "0",
+            "--tokens-spent", "10000", "--tokens-remaining", "90000",
+            "--hull-green", "1", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert f"Mission: {mission_dir.name}" in result.stdout
+
+    def test_status_no_mission_dir_is_silent(self, tmp_path: Path) -> None:
+        """Status without --mission-dir is a silent no-op."""
+        result = run("status", cwd=tmp_path)
+        assert result.stdout.strip() == ""
+
+    def test_status_shows_blocked_count(self, tmp_path: Path) -> None:
+        """Status shows blocked count when blockers exist."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "1", "--in-progress", "0", "--completed", "1", "--blocked", "1",
+            "--tokens-spent", "30000", "--tokens-remaining", "70000",
+            "--hull-green", "1", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert "1 blocked" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# _format_elapsed unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestFormatElapsed:
+    """Direct unit tests for _format_elapsed() helper."""
+
+    @staticmethod
+    def _import_format_elapsed():
+        """Import _format_elapsed from nelson-data.py."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("nelson_data", str(SCRIPT))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod._format_elapsed, mod
+
+    def test_empty_string_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn("") == ""
+
+    def test_none_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn(None) == ""
+
+    def test_unparsable_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn("not-a-date") == ""
+
+    def test_future_timestamp_returns_empty(self) -> None:
+        fn, mod = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        assert fn(future) == ""
+
+    def test_seconds_ago(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+        result = fn(ts)
+        assert "sec ago" in result
+
+    def test_minutes_ago(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        result = fn(ts)
+        assert "min ago" in result
+        assert "5 min ago" == result
+
+    def test_hours_exact(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        result = fn(ts)
+        assert result == "2 hr ago"
+
+    def test_hours_and_minutes(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(hours=1, minutes=30)).isoformat()
+        result = fn(ts)
+        assert result == "1 hr 30 min ago"
+
+    def test_zulu_suffix_parsed(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        dt = datetime.now(timezone.utc) - timedelta(minutes=10)
+        ts = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        result = fn(ts)
+        assert "10 min ago" == result
 
 
 # ---------------------------------------------------------------------------
