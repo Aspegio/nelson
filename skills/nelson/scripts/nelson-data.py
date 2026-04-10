@@ -515,6 +515,7 @@ def _register_squadron(
 ) -> None:
     """Write squadron to battle-plan.json, fleet-status.json, and mission-log."""
     squadron: dict[str, Any] = {
+        "mode": mode,
         "admiral": {"ship_name": admiral, "model": admiral_model},
         "captains": list(captains),
     }
