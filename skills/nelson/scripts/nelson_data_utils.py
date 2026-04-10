@@ -43,6 +43,17 @@ VALID_EVENT_TYPES = frozenset(
         "admiralty_action_required",
         "admiralty_action_completed",
         "battle_plan_amended",
+        "phase_transition",
+        "phase_override",
+        "permission_granted",
+    }
+)
+
+VALID_HANDOFF_TYPES = frozenset(
+    {
+        "relief_on_station",
+        "session_resumption",
+        "mid_mission_resize",
     }
 )
 

@@ -2,9 +2,14 @@
 name: nelson
 description: Orchestrates multi-agent task execution using a Royal Navy squadron metaphor — from mission planning through parallel work coordination to stand-down. Use when work needs parallel agent orchestration, tight task coordination with quality gates, structured delegation with progress checkpoints, or a documented decision log.
 argument-hint: "[mission description]"
+paths: [".nelson/**"]
 ---
 
 # Nelson
+
+```!
+python3 "{skill-dir}/scripts/nelson-data.py" status --mission-dir "$(ls -td .nelson/missions/*/ 2>/dev/null | head -1)" || echo "No active missions"
+```
 
 Execute this workflow for the user's mission.
 
@@ -30,11 +35,17 @@ Out of scope: Migration script for existing sessions
 
 **Establish Mission Directory:**
 - **New session:** Generate a short session identifier by running `uuidgen | cut -d- -f1` (produces an 8-character hex string). This identifier is stable for the duration of the mission. Create a mission directory at `.nelson/missions/{YYYY-MM-DD_HHMMSS}_{SESSION_ID}/` using the current date and time (24-hour format, including seconds) and the SESSION_ID generated above. Create the subdirectories `damage-reports/` and `turnover-briefs/` within it. Record the mission directory path and refer to it as `{mission-dir}` for the remainder of this mission. After creating the mission directory, write its path to `.nelson/.active-{SESSION_ID}`. This file persists the mission directory for this session.
-- **Resumed session:** If you have previously created a mission directory in this session and know the SESSION_ID, read `.nelson/.active-{SESSION_ID}` to recover the mission path. Set that path as `{mission-dir}`. If you cannot determine your SESSION_ID (e.g., after a full restart), list `.nelson/missions/` and present the options to the user for selection. Set the chosen directory as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose).
+- **Resumed session:** First, attempt auto-recovery by running `python3 .claude/skills/nelson/scripts/nelson-data.py recover --missions-dir .nelson/missions`. If this finds an active mission with handoff packets, use the structured recovery briefing to resume directly. Otherwise, if you know the SESSION_ID, read `.nelson/.active-{SESSION_ID}` to recover the mission path. Set that path as `{mission-dir}`. If you cannot determine your SESSION_ID (e.g., after a full restart), list `.nelson/missions/` and present the options to the user for selection. Set the chosen directory as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose).
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
 
-**Structured Data Capture:** After establishing the mission directory, run the `nelson-data.py` script located in the skill's directory (e.g., `python3 .claude/skills/nelson/scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."`). If installed globally, it may be in `~/.claude/skills/nelson/scripts/`. This creates `sailing-orders.json` and initialises `mission-log.json`. See `references/structured-data.md` for the full argument list.
+**Structured Data Capture:** After establishing the mission directory, run the `nelson-data.py` script located in the skill's directory (e.g., `python3 .claude/skills/nelson/scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."`). If installed globally, it may be in `~/.claude/skills/nelson/scripts/`. This creates `sailing-orders.json`, initialises `mission-log.json`, and creates `fleet-status.json` with the initial phase `SAILING_ORDERS`. See `references/structured-data.md` for the full argument list.
+
+**Phase Advance:** After structured data capture, advance the mission phase from SAILING_ORDERS to BATTLE_PLAN:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+```
 
 **Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
@@ -68,7 +79,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
-**Structured Data Capture:** Task registration requires owners, which are assigned in Step 3. No script calls at this step.
+**Structured Data Capture:** Task registration requires owners, which are assigned in Step 3. No `nelson-data.py` script calls at this step.
 
 ## 3. Form the Squadron
 
@@ -78,8 +89,18 @@ If any answer triggers a standing order, you MUST apply the corrective action an
     - `agent-team`: captains benefit from a shared task list, peer messaging, or coordinated deliverables; or 4+ captains are needed.
 
 **Mode-Tool Consistency Gate:** Before assigning ships, confirm your tool usage matches the selected mode by reviewing `references/tool-mapping.md`:
-- **`subagents` mode:** Do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only.
+- **`subagents` mode:** Captains do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only. The admiral uses `TaskCreate`/`TaskUpdate`/`TaskList` to track progress in the session task list (visibility only — captains cannot see these tasks).
 - **`agent-team` mode:** Do NOT use `Agent` with `subagent_type` to spawn captains (marines still use `subagent_type`). Use `TeamCreate` first, then `Agent` with `team_name` + `name`. Coordinate via `TaskList` and `SendMessage`.
+- **`single-session` mode:** The admiral uses `TaskCreate`, `TaskUpdate`, `TaskList`, and `TaskGet` to track progress as it completes each task sequentially.
+
+**Task List Visibility:** After selecting the execution mode, create a `TaskCreate` entry for each battle plan task to make mission progress visible in the Claude Code task list (Ctrl+T). This applies in **all execution modes** — it is admiral-level visibility tracking, not inter-agent coordination.
+
+For each task:
+- `subject`: Task name from the battle plan (imperative form, e.g., "Refactor auth module")
+- `description`: One-line deliverable
+- `activeForm`: Present-continuous form shown in the UI spinner (e.g., "Refactoring auth module")
+
+All tasks start as `pending`. They will be updated with owners and status as the mission progresses. In `single-session` mode (where Step 3 is otherwise skipped), the admiral still creates these entries before proceeding to Step 4.
 
 - Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
@@ -115,21 +136,41 @@ Actions marked `timing: before task starts` require your sign-off before the rel
 
 Do not spawn any agents or create any tasks until the user approves. If the user requests changes, revise and redisplay before proceeding.
 
-> **Note:** Nelson requires an interactive session for formation approval. Headless and CI invocation are not supported at this time.
+> **Note:** For headless and CI invocation, use `nelson-data.py headless --auto-approve` which combines Steps 1-3 and skips the interactive approval gate. See `references/structured-data.md` for details.
 
-**Structured Data Capture:** Once formation is approved, run these commands in order:
+**Structured Data Capture:** Once formation is approved, use the composite `form` command (recommended) or the individual commands below.
+
+**Recommended — composite `form` command:** Write a plan JSON file with the task and squadron definitions, then run a single command:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py form \
+  --mission-dir {mission-dir} \
+  --plan {mission-dir}/plan-input.json \
+  --mode [mode]
+```
+
+This registers all tasks, records the squadron, computes DAG metrics, and runs the conflict scan in one step. See `references/structured-data.md` for the plan JSON schema and output format.
+
+**Alternative — individual commands:**
 1. `python3 .claude/skills/nelson/scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task (owners are now known from formation). See `references/structured-data.md` for task arguments.
 2. `python3 .claude/skills/nelson/scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
-3. `python3 .claude/skills/nelson/scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
-4. `python3 .claude/skills/nelson/scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json` to verify there are no file ownership conflicts. If conflicts are found, you MUST resolve them and update the battle plan before proceeding.
+3. `python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}` to advance from BATTLE_PLAN to FORMATION (validates all tasks have station tiers).
+4. `python3 .claude/skills/nelson/scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
+5. `python3 .claude/skills/nelson/scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json` to verify there are no file ownership conflicts. If conflicts are found, you MUST resolve them and update the battle plan before proceeding.
+6. `python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}` to advance from FORMATION to PERMISSION.
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
-**Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then create and assign work with `TaskCreate` + `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
+**Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then assign work to the existing task entries with `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
+
+**Task Status Updates:** After formation, update the task list entries created earlier in this step:
+- **`agent-team` mode:** Use `TaskUpdate` to set `owner` to each captain's name and `status` to `in_progress` as captains are spawned. The team's shared task list now serves both visibility and coordination.
+- **`subagents` mode:** Use `TaskUpdate` to set `status` to `in_progress` as each captain is dispatched. The admiral tracks these directly.
+- **`single-session` mode:** Use `TaskUpdate` to set `status` to `in_progress` as the admiral begins each task.
 
 **Edit permissions:** When spawning any agent whose task involves editing files, set `mode: "acceptEdits"` on the `Agent` tool call. Omitting this can cause a permission race condition that silently stalls the agent at its first edit. When in doubt, include it.
 
-**Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a turnover brief using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
+**Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a typed handoff packet using `python3 .claude/skills/nelson/scripts/nelson-data.py handoff ...` (see `references/structured-data.md`). An optional prose companion brief may also be written using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
 
 ## 4. Get Permission to Sail
 
@@ -137,6 +178,16 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 1. Display the complete battle plan to the user if `becalmed-fleet.md` is in effect.
 2. Display the complete squadron formation to the user if `becalmed-fleet.md` is not in effect. The battle plan (drafted in Step 2) should also be available for review.
 3. You are REQUIRED to wait for explicit permission to proceed.
+
+**Phase Advance:** After the user grants permission, log the event and advance:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py event \
+  --mission-dir {mission-dir} --type permission_granted --checkpoint 0
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+```
+
+This transitions the mission from PERMISSION to UNDERWAY, unlocking agent spawning and task creation.
 
 ## 5. Run Quarterdeck Rhythm
 
@@ -154,6 +205,7 @@ If the task is complete and no pending task depends on it, proceed to shutdown p
 - **Checkpoint Cadence Gate:** You MUST NOT process a third task completion without writing a quarterdeck checkpoint. Before dispatching new work or processing the next completion, confirm the last checkpoint is no more than 2 completions old. The quarterdeck report is your only recovery point if context compaction occurs — stale reports mean lost coordination state.
 - Run a quarterdeck checkpoint after every 1-2 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
     - Update progress by checking `TaskList` for task states: `pending`, `in_progress`, `completed`.
+    - Mark completed tasks with `TaskUpdate` setting `status` to `completed`. In `subagents` and `single-session` modes, the admiral updates the session task list directly; in `agent-team` mode, captains or the admiral update the shared task list.
     - Identify blockers and choose a concrete next action.
     - Use `SendMessage` to unblock captains or redirect their approach.
     - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
@@ -220,9 +272,11 @@ Reference `references/admiralty-templates/captains-log.md` for the captain's log
 
 **Structured Data Capture:** Before writing the captain's log, run `python3 .claude/skills/nelson/scripts/nelson-data.py stand-down --mission-dir {mission-dir} --outcome-achieved --actual-outcome "..." --metric-result "..."` to capture the structured mission summary. See `references/structured-data.md` for the full argument list.
 
+**Task List Cleanup:** Verify all task list entries reflect final state. Mark any remaining `in_progress` tasks as `completed` if their work is done, or note incomplete tasks in the captain's log. This ensures the Claude Code task list shows an accurate final summary.
+
 **Session State Cleanup:** Remove the session state file by deleting `.nelson/.active-{SESSION_ID}`.
 
-**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
+**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 7 is never permitted.
 
 ## Standing Orders
 

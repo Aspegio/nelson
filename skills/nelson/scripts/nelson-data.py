@@ -32,8 +32,12 @@ from nelson_data_fleet import VALID_METRICS, cmd_analytics, cmd_brief, cmd_histo
 from nelson_data_lifecycle import (
     cmd_checkpoint,
     cmd_event,
+    cmd_form,
+    cmd_handoff,
+    cmd_headless,
     cmd_init,
     cmd_plan_approved,
+    cmd_recover,
     cmd_squadron,
     cmd_stand_down,
     cmd_status,
@@ -134,6 +138,57 @@ def build_parser() -> argparse.ArgumentParser:
     p_ev.add_argument("--checkpoint", type=int, default=None, help="Checkpoint number")
     # Additional key-value pairs handled via parse_known_args
 
+    # --- handoff ---
+    p_ho = subs.add_parser("handoff", help="Write a typed handoff packet")
+    p_ho.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_ho.add_argument("--ship-name", required=True, help="Outgoing ship name")
+    p_ho.add_argument("--task-id", required=True, type=int, help="Task ID")
+    p_ho.add_argument("--task-name", required=True, help="Task name")
+    p_ho.add_argument(
+        "--handoff-type",
+        required=True,
+        help="Handoff type: relief_on_station, session_resumption, mid_mission_resize",
+    )
+    p_ho.add_argument(
+        "--completed-subtask",
+        action="append",
+        help="Completed subtask (repeatable)",
+    )
+    p_ho.add_argument(
+        "--partial-output",
+        action="append",
+        help="Partial output: subtask:progress:notes (repeatable)",
+    )
+    p_ho.add_argument(
+        "--known-blocker", action="append", help="Known blocker (repeatable)"
+    )
+    p_ho.add_argument(
+        "--file-ownership", action="append", help="Owned file path (repeatable)"
+    )
+    p_ho.add_argument(
+        "--next-step", action="append", help="Next step (repeatable, at least one required)"
+    )
+    p_ho.add_argument(
+        "--open-decision", action="append", help="Open decision (repeatable)"
+    )
+    p_ho.add_argument(
+        "--hull-at-handoff", required=True, type=int, help="Hull integrity % at handoff"
+    )
+    p_ho.add_argument(
+        "--tokens-consumed", required=True, type=int, help="Tokens consumed at handoff"
+    )
+    p_ho.add_argument(
+        "--key-finding", action="append", help="Key finding (repeatable)"
+    )
+    p_ho.add_argument(
+        "--relief-entry",
+        action="append",
+        help="Relief chain entry: ship:reason:time (repeatable, max 3)",
+    )
+    p_ho.add_argument(
+        "--incoming-ship", default=None, help="Replacement ship name"
+    )
+
     # --- checkpoint ---
     p_cp = subs.add_parser("checkpoint", help="Record a quarterdeck checkpoint")
     p_cp.add_argument("--mission-dir", required=True, help="Mission directory path")
@@ -183,9 +238,49 @@ def build_parser() -> argparse.ArgumentParser:
         "--avoid", action="append", default=None, help="Pattern to avoid (repeatable)"
     )
 
+    # --- form ---
+    p_form = subs.add_parser("form", help="Composite formation: tasks + squadron + plan")
+    p_form.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_form.add_argument("--plan", required=True, help="Path to plan JSON file")
+    p_form.add_argument(
+        "--mode",
+        default="subagents",
+        help="Execution mode: single-session, subagents, agent-team",
+    )
+
+    # --- headless ---
+    p_hl = subs.add_parser("headless", help="Headless mission: init + form in one step")
+    p_hl.add_argument(
+        "--sailing-orders", required=True, help="Path to sailing orders JSON file"
+    )
+    p_hl.add_argument(
+        "--battle-plan", required=True, help="Path to battle plan JSON file"
+    )
+    p_hl.add_argument(
+        "--mode",
+        default="subagents",
+        help="Execution mode: single-session, subagents, agent-team",
+    )
+    p_hl.add_argument(
+        "--auto-approve",
+        action="store_true",
+        help="Skip interactive approval gate",
+    )
+
     # --- status ---
     p_st = subs.add_parser("status", help="Print current fleet status")
-    p_st.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_st.add_argument("--mission-dir", default="", help="Mission directory path")
+
+    # --- recover ---
+    p_rec = subs.add_parser("recover", help="Auto-recover session state (read-only)")
+    p_rec.add_argument("--mission-dir", default=None, help="Mission directory path")
+    p_rec.add_argument("--missions-dir", default=None, help="Missions root directory")
+    p_rec.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
 
     # --- index ---
     p_idx = subs.add_parser("index", help="Build fleet intelligence index")
@@ -267,9 +362,13 @@ def main() -> None:
         "task": lambda: cmd_task(args),
         "plan-approved": lambda: cmd_plan_approved(args),
         "event": lambda: cmd_event(args, extra),
+        "handoff": lambda: cmd_handoff(args),
         "checkpoint": lambda: cmd_checkpoint(args),
         "stand-down": lambda: cmd_stand_down(args),
+        "form": lambda: cmd_form(args),
+        "headless": lambda: cmd_headless(args),
         "status": lambda: cmd_status(args),
+        "recover": lambda: cmd_recover(args),
         "index": lambda: cmd_index(args),
         "history": lambda: cmd_history(args),
         "brief": lambda: cmd_brief(args),

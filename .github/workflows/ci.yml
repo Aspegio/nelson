@@ -61,7 +61,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pytest
-      - run: pytest skills/nelson/scripts/ -v
+      - run: pytest skills/nelson/scripts/ -v && pytest hooks/ -v
 
   references:
     name: Cross-reference check

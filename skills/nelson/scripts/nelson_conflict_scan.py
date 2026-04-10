@@ -121,7 +121,7 @@ def parse_battle_plan(path: Path) -> dict:
         data = json.loads(content)
         for task in data.get("tasks", []):
             owner = task.get("owner")
-            files = task.get("files", [])
+            files = task.get("file_ownership", task.get("files", []))
             if owner and files:
                 if owner not in ownership:
                     ownership[owner] = set()

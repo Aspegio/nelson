@@ -9,6 +9,10 @@ Nelson is a Claude Code skill for coordinating agent work using Royal Navy termi
   plugin.json             — Plugin manifest
   marketplace.json        — Marketplace definition (self-hosted)
 settings.json             — Plugin default settings (enables agent teams)
+hooks/
+  hooks.json              — Skill-scoped hook configuration (auto-discovered)
+  nelson_hooks.py         — Hook enforcement script (preflight, brief, task, idle)
+  test_nelson_hooks.py    — Tests for hook handlers
 skills/nelson/
   SKILL.md                — Main entrypoint (what Claude reads)
   references/             — Supporting docs loaded on demand
@@ -49,8 +53,10 @@ scripts/                  — Maintenance & utility scripts
   nelson_data_memory.py     — Cross-mission memory store and pattern library
   nelson_data_lifecycle.py  — Mission lifecycle commands (init through status)
   nelson_data_fleet.py      — Fleet intelligence and analytics commands
+  nelson-phase.py           — Deterministic phase engine for mission scaffolding
   conftest.py               — Shared test helpers (pytest auto-discovery)
   test_nelson_data.py       — Lifecycle command tests
   test_nelson_data_fleet.py — Fleet intelligence and analytics tests
   test_nelson_data_memory.py — Memory store and I/O tests
+  test_nelson_phase.py      — Python tests for nelson-phase.py
 ```
