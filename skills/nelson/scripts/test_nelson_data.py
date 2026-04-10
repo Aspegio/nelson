@@ -518,7 +518,11 @@ class TestStatus:
             "--decision", "continue", "--rationale", "Test",
         )
         result = run("status", "--mission-dir", str(mission_dir))
-        assert "Status:" in result.stdout or "nelson-data" in result.stdout
+        assert "NELSON FLEET STATUS" in result.stdout
+        assert "underway" in result.stdout
+        assert "1/3 tasks complete" in result.stdout
+        assert "Budget:" in result.stdout
+        assert "Last checkpoint: 1" in result.stdout
 
     def test_status_no_fleet_data_is_silent(self, tmp_path: Path) -> None:
         """Status on a mission with no fleet-status.json is a silent no-op (rc=0)."""
@@ -527,6 +531,451 @@ class TestStatus:
         result = run("status", "--mission-dir", str(mission_dir))
         # Silent no-op — no output, no error
         assert result.stdout.strip() == ""
+
+    def test_status_shows_per_ship_status(self, tmp_path: Path) -> None:
+        """Status output includes per-ship hull status."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir, captains=[
+            "HMS Argyll:frigate:sonnet:1",
+            "HMS Kent:destroyer:sonnet:2",
+        ])
+        add_task(mission_dir, task_id=1, name="Task A", owner="HMS Argyll")
+        add_task(mission_dir, task_id=2, name="Task B", owner="HMS Kent")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "1", "--completed", "1", "--blocked", "0",
+            "--tokens-spent", "40000", "--tokens-remaining", "60000",
+            "--hull-green", "2", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert "HMS Argyll" in result.stdout
+        assert "HMS Kent" in result.stdout
+        assert "Ships:" in result.stdout
+
+    def test_status_shows_completed_ships(self, tmp_path: Path) -> None:
+        """Ships whose tasks are complete show (completed) in status."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir, captains=[
+            "HMS Argyll:frigate:sonnet:1",
+            "HMS Kent:destroyer:sonnet:2",
+        ])
+        add_task(mission_dir, task_id=1, name="Task A", owner="HMS Argyll")
+        add_task(mission_dir, task_id=2, name="Task B", owner="HMS Kent")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        # Record task completion event for HMS Argyll
+        run(
+            "event",
+            "--mission-dir", str(mission_dir),
+            "--type", "task_completed",
+            "--checkpoint", "1",
+            "--task-id", "1", "--task-name", "Task A", "--owner", "HMS Argyll",
+            "--station-tier", "0", "--verification", "passed",
+        )
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "1", "--completed", "1", "--blocked", "0",
+            "--tokens-spent", "50000", "--tokens-remaining", "50000",
+            "--hull-green", "1", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert "HMS Argyll (completed)" in result.stdout
+        assert "HMS Kent (Green" in result.stdout
+
+    def test_status_shows_mission_name(self, tmp_path: Path) -> None:
+        """Status output includes the mission directory name."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "0", "--completed", "1", "--blocked", "0",
+            "--tokens-spent", "10000", "--tokens-remaining", "90000",
+            "--hull-green", "1", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert f"Mission: {mission_dir.name}" in result.stdout
+
+    def test_status_no_mission_dir_is_silent(self, tmp_path: Path) -> None:
+        """Status without --mission-dir is a silent no-op."""
+        result = run("status", cwd=tmp_path)
+        assert result.stdout.strip() == ""
+
+    def test_status_shows_blocked_count(self, tmp_path: Path) -> None:
+        """Status shows blocked count when blockers exist."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "1", "--in-progress", "0", "--completed", "1", "--blocked", "1",
+            "--tokens-spent", "30000", "--tokens-remaining", "70000",
+            "--hull-green", "1", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        result = run("status", "--mission-dir", str(mission_dir))
+        assert "1 blocked" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# _format_elapsed unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestFormatElapsed:
+    """Direct unit tests for _format_elapsed() helper."""
+
+    @staticmethod
+    def _import_format_elapsed():
+        """Import _format_elapsed from nelson-data.py."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("nelson_data", str(SCRIPT))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod._format_elapsed, mod
+
+    def test_empty_string_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn("") == ""
+
+    def test_none_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn(None) == ""
+
+    def test_unparsable_returns_empty(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        assert fn("not-a-date") == ""
+
+    def test_future_timestamp_returns_empty(self) -> None:
+        fn, mod = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        assert fn(future) == ""
+
+    def test_seconds_ago(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+        result = fn(ts)
+        assert "sec ago" in result
+
+    def test_minutes_ago(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        result = fn(ts)
+        assert "min ago" in result
+        assert "5 min ago" == result
+
+    def test_hours_exact(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        result = fn(ts)
+        assert result == "2 hr ago"
+
+    def test_hours_and_minutes(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        ts = (datetime.now(timezone.utc) - timedelta(hours=1, minutes=30)).isoformat()
+        result = fn(ts)
+        assert result == "1 hr 30 min ago"
+
+    def test_zulu_suffix_parsed(self) -> None:
+        fn, _ = self._import_format_elapsed()
+        from datetime import datetime, timezone, timedelta
+
+        dt = datetime.now(timezone.utc) - timedelta(minutes=10)
+        ts = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        result = fn(ts)
+        assert "10 min ago" == result
+
+
+# ---------------------------------------------------------------------------
+# Form (composite command)
+# ---------------------------------------------------------------------------
+
+
+def write_plan_json(path: Path, plan: dict) -> None:
+    """Write a plan JSON file for the form command."""
+    path.write_text(json.dumps(plan), encoding="utf-8")
+
+
+def make_plan(
+    captains: list[dict] | None = None,
+    tasks: list[dict] | None = None,
+    admiral: dict | None = None,
+    mode: str = "subagents",
+    red_cell: dict | None = None,
+) -> dict:
+    """Build a plan dict suitable for the form command."""
+    default_captains = [
+        {"ship_name": "HMS Argyll", "ship_class": "frigate", "model": "sonnet", "task_id": 1},
+    ] if captains is None else captains
+    default_tasks = [
+        {
+            "id": 1,
+            "name": "Auth refactor",
+            "owner": "HMS Argyll",
+            "deliverable": "JWT-based auth module",
+            "dependencies": [],
+            "station_tier": 0,
+            "file_ownership": [],
+        },
+    ] if tasks is None else tasks
+    squadron: dict = {
+        "admiral": admiral or {"ship_name": "HMS Victory", "model": "opus"},
+        "captains": default_captains,
+    }
+    if red_cell:
+        squadron["red_cell"] = red_cell
+    return {"squadron": squadron, "tasks": default_tasks, "mode": mode}
+
+
+class TestForm:
+    def test_form_registers_tasks(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan()
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        bp = read_json(mission_dir / "battle-plan.json")
+        assert len(bp["tasks"]) == 1
+        assert bp["tasks"][0]["name"] == "Auth refactor"
+        assert bp["tasks"][0]["owner"] == "HMS Argyll"
+
+    def test_form_records_squadron(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan()
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        bp = read_json(mission_dir / "battle-plan.json")
+        assert bp["squadron"]["admiral"]["ship_name"] == "HMS Victory"
+        assert len(bp["squadron"]["captains"]) == 1
+        fs = read_json(mission_dir / "fleet-status.json")
+        assert fs["mission"]["status"] == "underway"
+
+    def test_form_computes_dag_metrics(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan(
+            captains=[
+                {"ship_name": "HMS Argyll", "ship_class": "frigate", "model": "sonnet", "task_id": 1},
+                {"ship_name": "HMS Kent", "ship_class": "destroyer", "model": "sonnet", "task_id": 2},
+                {"ship_name": "HMS Lancaster", "ship_class": "frigate", "model": "sonnet", "task_id": 3},
+            ],
+            tasks=[
+                {"id": 1, "name": "A", "owner": "HMS Argyll", "deliverable": "D1",
+                 "dependencies": [], "station_tier": 0, "file_ownership": []},
+                {"id": 2, "name": "B", "owner": "HMS Kent", "deliverable": "D2",
+                 "dependencies": [], "station_tier": 0, "file_ownership": []},
+                {"id": 3, "name": "C", "owner": "HMS Lancaster", "deliverable": "D3",
+                 "dependencies": [1], "station_tier": 1, "file_ownership": []},
+            ],
+        )
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        result = run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        summary = json.loads(result.stdout)
+        assert summary["dag_metrics"]["parallel_tracks"] == 2
+        assert summary["dag_metrics"]["critical_path_length"] == 2
+
+    def test_form_outputs_json_summary(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan()
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        result = run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        summary = json.loads(result.stdout)
+        assert summary["status"] == "ok"
+        assert summary["tasks_registered"] == 1
+        assert summary["squadron"]["admiral"] == "HMS Victory"
+        assert summary["squadron"]["captains"] == 1
+        assert summary["squadron"]["mode"] == "subagents"
+        assert "conflict_scan" in summary
+
+    def test_form_missing_plan_fails(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        run(
+            "form", "--mission-dir", str(mission_dir),
+            "--plan", str(tmp_path / "nonexistent.json"),
+            expect_fail=True,
+        )
+
+    def test_form_empty_tasks_fails(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan(tasks=[])
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        run(
+            "form", "--mission-dir", str(mission_dir), "--plan", str(plan_path),
+            expect_fail=True,
+        )
+
+    def test_form_missing_squadron_fails(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = {"tasks": [{"id": 1, "name": "T", "owner": "X", "deliverable": "D",
+                           "dependencies": [], "station_tier": 0, "file_ownership": []}]}
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        run(
+            "form", "--mission-dir", str(mission_dir), "--plan", str(plan_path),
+            expect_fail=True,
+        )
+
+    def test_form_with_dependencies(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan(
+            captains=[
+                {"ship_name": "HMS Argyll", "ship_class": "frigate", "model": "sonnet", "task_id": 1},
+                {"ship_name": "HMS Kent", "ship_class": "destroyer", "model": "sonnet", "task_id": 2},
+            ],
+            tasks=[
+                {"id": 1, "name": "A", "owner": "HMS Argyll", "deliverable": "D1",
+                 "dependencies": [], "station_tier": 0, "file_ownership": []},
+                {"id": 2, "name": "B", "owner": "HMS Kent", "deliverable": "D2",
+                 "dependencies": [1], "station_tier": 1, "file_ownership": []},
+            ],
+        )
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        result = run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        bp = read_json(mission_dir / "battle-plan.json")
+        assert bp["tasks"][0]["dependents"] == [2]
+        assert bp["tasks"][1]["dependencies"] == [1]
+
+    def test_form_with_red_cell(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan(red_cell={"ship_name": "HMS Astute", "model": "haiku"})
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        result = run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        summary = json.loads(result.stdout)
+        assert summary["squadron"]["has_red_cell"] is True
+        bp = read_json(mission_dir / "battle-plan.json")
+        assert bp["squadron"]["red_cell"]["ship_name"] == "HMS Astute"
+
+    def test_form_runs_conflict_scan(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan()
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        result = run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        summary = json.loads(result.stdout)
+        assert "conflict_scan" in summary
+        assert isinstance(summary["conflict_scan"]["clean"], bool)
+
+
+# ---------------------------------------------------------------------------
+# Headless (init + form)
+# ---------------------------------------------------------------------------
+
+
+def write_sailing_orders_json(path: Path, orders: dict) -> None:
+    """Write a sailing orders JSON file."""
+    path.write_text(json.dumps(orders), encoding="utf-8")
+
+
+def make_sailing_orders(
+    outcome: str = "Test mission",
+    metric: str = "All tests pass",
+    deadline: str = "this_session",
+    token_budget: int | None = 100000,
+) -> dict:
+    """Build sailing orders suitable for headless command."""
+    result: dict = {
+        "outcome": outcome,
+        "metric": metric,
+        "deadline": deadline,
+    }
+    if token_budget is not None:
+        result["budget"] = {"token_limit": token_budget}
+    return result
+
+
+class TestHeadless:
+    def test_headless_creates_mission(self, tmp_path: Path) -> None:
+        so = make_sailing_orders()
+        plan = make_plan()
+        so_path = tmp_path / "sailing-orders.json"
+        plan_path = tmp_path / "plan.json"
+        write_sailing_orders_json(so_path, so)
+        write_plan_json(plan_path, plan)
+        result = run(
+            "headless",
+            "--sailing-orders", str(so_path),
+            "--battle-plan", str(plan_path),
+            "--mode", "subagents",
+            "--auto-approve",
+            cwd=tmp_path,
+        )
+        summary = json.loads(result.stdout)
+        assert summary["status"] == "ok"
+        mission_dir = tmp_path / summary["mission_dir"]
+        assert mission_dir.is_dir()
+        assert (mission_dir / "sailing-orders.json").exists()
+        assert (mission_dir / "battle-plan.json").exists()
+        assert (mission_dir / "fleet-status.json").exists()
+
+    def test_headless_outputs_json(self, tmp_path: Path) -> None:
+        so = make_sailing_orders()
+        plan = make_plan()
+        so_path = tmp_path / "sailing-orders.json"
+        plan_path = tmp_path / "plan.json"
+        write_sailing_orders_json(so_path, so)
+        write_plan_json(plan_path, plan)
+        result = run(
+            "headless",
+            "--sailing-orders", str(so_path),
+            "--battle-plan", str(plan_path),
+            "--mode", "subagents",
+            "--auto-approve",
+            cwd=tmp_path,
+        )
+        summary = json.loads(result.stdout)
+        assert "mission_dir" in summary
+        assert "sailing_orders" in summary
+        assert summary["sailing_orders"]["outcome"] == "Test mission"
+        assert "formation" in summary
+
+    def test_headless_missing_sailing_orders_fails(self, tmp_path: Path) -> None:
+        plan = make_plan()
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        run(
+            "headless",
+            "--sailing-orders", str(tmp_path / "nonexistent.json"),
+            "--battle-plan", str(plan_path),
+            "--mode", "subagents",
+            "--auto-approve",
+            cwd=tmp_path,
+            expect_fail=True,
+        )
+
+    def test_headless_missing_battle_plan_fails(self, tmp_path: Path) -> None:
+        so = make_sailing_orders()
+        so_path = tmp_path / "sailing-orders.json"
+        write_sailing_orders_json(so_path, so)
+        run(
+            "headless",
+            "--sailing-orders", str(so_path),
+            "--battle-plan", str(tmp_path / "nonexistent.json"),
+            "--mode", "subagents",
+            "--auto-approve",
+            cwd=tmp_path,
+            expect_fail=True,
+        )
 
 
 # ---------------------------------------------------------------------------

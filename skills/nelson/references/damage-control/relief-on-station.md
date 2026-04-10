@@ -24,8 +24,9 @@ Hull integrity monitoring may surface context exhaustion before crew overrun is 
 5. Admiral spawns a replacement ship. The replacement need not be the same ship class — select the class that matches the characteristics of the remaining work (e.g., swap a destroyer for a frigate if the remaining work is lighter).
 6. Admiral briefs the replacement ship with a crew briefing that includes the handoff packet file path. The replacement reads the JSON handoff packet as its first action.
 7. Admiral reassigns the task to the replacement ship.
-8. Admiral issues a shutdown request to the damaged ship.
-9. Admiral updates the battle plan to reflect the new ship assignment.
+8. Admiral updates the task list entry with `TaskUpdate` to reflect the replacement ship as the new owner.
+9. Admiral issues a shutdown request to the damaged ship.
+10. Admiral updates the battle plan to reflect the new ship assignment.
 
 ## Flagship Self-Monitoring
 

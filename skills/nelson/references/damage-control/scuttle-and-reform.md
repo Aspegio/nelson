@@ -16,5 +16,6 @@ Procedure:
    - Tasks completed and their outputs.
    - Tasks abandoned and their partial state.
    - Conditions required before re-attempting the mission.
-4. Admiral issues shutdown requests to all agents.
-5. Admiral presents the abort log to the human (Admiralty) with a recommendation: retry with new constraints, descope, or abandon.
+4. Admiral marks all task list entries as `completed` (for finished tasks) or updates their description to note they were abandoned (for incomplete tasks). This ensures the user's Ctrl+T display does not show stale in-progress tasks.
+5. Admiral issues shutdown requests to all agents.
+6. Admiral presents the abort log to the human (Admiralty) with a recommendation: retry with new constraints, descope, or abandon.
