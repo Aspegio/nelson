@@ -1713,3 +1713,376 @@ class TestHistoryCorruptIndex:
             cwd=tmp_path, expect_fail=True,
         )
         assert "corrupt" in result.stderr.lower() or "json" in result.stderr.lower() or "error" in result.stderr.lower()
+
+
+# ---------------------------------------------------------------------------
+# Handoff helpers
+# ---------------------------------------------------------------------------
+
+
+def setup_mission_with_task(
+    tmp_path: Path,
+    station_tier: int = 1,
+) -> Path:
+    """Create a mission with squadron + task, ready for handoff testing."""
+    mission_dir = init_mission(tmp_path)
+    add_squadron(mission_dir)
+    add_task(mission_dir, task_id=1, name="Test task", station_tier=station_tier)
+    run("plan-approved", "--mission-dir", str(mission_dir))
+    return mission_dir
+
+
+def write_handoff(
+    mission_dir: Path,
+    ship_name: str = "HMS Argyll",
+    task_id: int = 1,
+    task_name: str = "Test task",
+    handoff_type: str = "relief_on_station",
+    next_steps: list[str] | None = None,
+    file_ownership: list[str] | None = None,
+    relief_entries: list[str] | None = None,
+    extra_args: list[str] | None = None,
+    expect_fail: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """Run the handoff subcommand and return the result."""
+    args = [
+        "handoff",
+        "--mission-dir", str(mission_dir),
+        "--ship-name", ship_name,
+        "--task-id", str(task_id),
+        "--task-name", task_name,
+        "--handoff-type", handoff_type,
+        "--hull-at-handoff", "38",
+        "--tokens-consumed", "145000",
+    ]
+    for step in (next_steps or ["Complete remaining work"]):
+        args.extend(["--next-step", step])
+    for fo in (file_ownership or ["src/main.py"]):
+        args.extend(["--file-ownership", fo])
+    for entry in (relief_entries or []):
+        args.extend(["--relief-entry", entry])
+    if extra_args:
+        args.extend(extra_args)
+    return run(*args, expect_fail=expect_fail)
+
+
+# ---------------------------------------------------------------------------
+# Handoff
+# ---------------------------------------------------------------------------
+
+
+class TestHandoff:
+    def test_writes_handoff_packet(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(mission_dir)
+        packets = list((mission_dir / "turnover-briefs").glob("*.json"))
+        assert len(packets) == 1
+
+    def test_handoff_packet_schema(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(
+            mission_dir,
+            extra_args=[
+                "--completed-subtask", "Schema design",
+                "--completed-subtask", "GET endpoint",
+                "--key-finding", "Rate limiting needs middleware",
+            ],
+        )
+        packets = list((mission_dir / "turnover-briefs").glob("*.json"))
+        packet = read_json(packets[0])
+        assert packet["version"] == 1
+        assert packet["ship_name"] == "HMS Argyll"
+        assert packet["task_id"] == 1
+        assert packet["task_name"] == "Test task"
+        assert packet["handoff_type"] == "relief_on_station"
+        assert packet["state"]["completed_subtasks"] == ["Schema design", "GET endpoint"]
+        assert packet["state"]["next_steps"] == ["Complete remaining work"]
+        assert packet["state"]["file_ownership"] == ["src/main.py"]
+        assert packet["context"]["hull_at_handoff"] == 38
+        assert packet["context"]["tokens_consumed"] == 145000
+        assert packet["context"]["key_findings"] == ["Rate limiting needs middleware"]
+        assert "created_at" in packet
+
+    def test_handoff_appends_relief_event(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(mission_dir, extra_args=["--incoming-ship", "HMS Kent"])
+        log = read_json(mission_dir / "mission-log.json")
+        relief_events = [
+            e for e in log["events"] if e["type"] == "relief_on_station"
+        ]
+        assert len(relief_events) == 1
+        data = relief_events[0]["data"]
+        assert data["outgoing_ship"] == "HMS Argyll"
+        assert data["incoming_ship"] == "HMS Kent"
+        assert data["reason"] == "relief_on_station"
+        assert "handoff_packet_path" in data
+
+    def test_handoff_validates_handoff_type(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        result = write_handoff(
+            mission_dir, handoff_type="invalid_type", expect_fail=True,
+        )
+        assert "handoff-type" in result.stderr.lower() or "handoff_type" in result.stderr.lower()
+
+    def test_handoff_requires_next_steps(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        result = run(
+            "handoff",
+            "--mission-dir", str(mission_dir),
+            "--ship-name", "HMS Argyll",
+            "--task-id", "1",
+            "--task-name", "Test task",
+            "--handoff-type", "relief_on_station",
+            "--hull-at-handoff", "38",
+            "--tokens-consumed", "145000",
+            "--file-ownership", "src/main.py",
+            expect_fail=True,
+        )
+        assert "next-step" in result.stderr.lower() or "next_step" in result.stderr.lower()
+
+    def test_handoff_validates_relief_chain_max_3(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        result = write_handoff(
+            mission_dir,
+            relief_entries=[
+                "HMS Argyll:context_exhaustion:2026-04-01T10:00:00Z",
+                "HMS Kent:context_exhaustion:2026-04-01T11:00:00Z",
+                "HMS Lancaster:context_exhaustion:2026-04-01T12:00:00Z",
+                "HMS Richmond:context_exhaustion:2026-04-01T13:00:00Z",
+            ],
+            expect_fail=True,
+        )
+        assert "relief chain" in result.stderr.lower()
+
+    def test_handoff_validates_file_ownership_for_implementation(
+        self, tmp_path: Path,
+    ) -> None:
+        mission_dir = setup_mission_with_task(tmp_path, station_tier=1)
+        result = run(
+            "handoff",
+            "--mission-dir", str(mission_dir),
+            "--ship-name", "HMS Argyll",
+            "--task-id", "1",
+            "--task-name", "Test task",
+            "--handoff-type", "relief_on_station",
+            "--hull-at-handoff", "38",
+            "--tokens-consumed", "145000",
+            "--next-step", "Finish work",
+            expect_fail=True,
+        )
+        assert "file-ownership" in result.stderr.lower() or "file_ownership" in result.stderr.lower()
+
+    def test_handoff_allows_empty_file_ownership_for_tier_0(
+        self, tmp_path: Path,
+    ) -> None:
+        mission_dir = setup_mission_with_task(tmp_path, station_tier=0)
+        run(
+            "handoff",
+            "--mission-dir", str(mission_dir),
+            "--ship-name", "HMS Argyll",
+            "--task-id", "1",
+            "--task-name", "Test task",
+            "--handoff-type", "relief_on_station",
+            "--hull-at-handoff", "38",
+            "--tokens-consumed", "145000",
+            "--next-step", "Finish work",
+        )
+        packets = list((mission_dir / "turnover-briefs").glob("*.json"))
+        assert len(packets) == 1
+
+    def test_handoff_partial_outputs_parsing(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(
+            mission_dir,
+            extra_args=[
+                "--partial-output", "POST endpoint:60%:Validation logic pending",
+                "--partial-output", "Auth module:80%:JWT token: RS256 signing done",
+            ],
+        )
+        packets = list((mission_dir / "turnover-briefs").glob("*.json"))
+        packet = read_json(packets[0])
+        po = packet["state"]["partial_outputs"]
+        assert len(po) == 2
+        assert po[0] == {
+            "subtask": "POST endpoint",
+            "progress": "60%",
+            "notes": "Validation logic pending",
+        }
+        # Notes can contain colons
+        assert po[1]["notes"] == "JWT token: RS256 signing done"
+
+    def test_handoff_relief_chain_parsing(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(
+            mission_dir,
+            relief_entries=[
+                "HMS Argyll:context_exhaustion:2026-04-08T14:30:00Z",
+            ],
+        )
+        packets = list((mission_dir / "turnover-briefs").glob("*.json"))
+        packet = read_json(packets[0])
+        chain = packet["relief_chain"]
+        assert len(chain) == 1
+        assert chain[0] == {
+            "ship": "HMS Argyll",
+            "reason": "context_exhaustion",
+            "handoff_time": "2026-04-08T14:30:00Z",
+        }
+
+    def test_handoff_auto_detects_checkpoint(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        # Record a checkpoint first
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "1", "--completed", "0",
+            "--blocked", "0",
+            "--tokens-spent", "50000", "--tokens-remaining", "50000",
+            "--hull-green", "1", "--hull-amber", "0",
+            "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "On track",
+        )
+        write_handoff(mission_dir)
+        packets = list((mission_dir / "turnover-briefs").glob("*.json"))
+        packet = read_json(packets[0])
+        assert packet["context"]["checkpoint_number"] == 1
+
+    def test_handoff_multiple_packets_coexist(self, tmp_path: Path) -> None:
+        import time
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(mission_dir, ship_name="HMS Argyll")
+        time.sleep(1.1)  # ensure different timestamp
+        write_handoff(mission_dir, ship_name="HMS Kent")
+        packets = list((mission_dir / "turnover-briefs").glob("*.json"))
+        assert len(packets) == 2
+        names = {read_json(p)["ship_name"] for p in packets}
+        assert names == {"HMS Argyll", "HMS Kent"}
+
+
+# ---------------------------------------------------------------------------
+# Recover
+# ---------------------------------------------------------------------------
+
+
+class TestRecover:
+    def test_recover_reads_fleet_status(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "1", "--completed", "0",
+            "--blocked", "0",
+            "--tokens-spent", "50000", "--tokens-remaining", "50000",
+            "--hull-green", "1", "--hull-amber", "0",
+            "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "On track",
+        )
+        result = run("recover", "--mission-dir", str(mission_dir))
+        briefing = json.loads(result.stdout)
+        assert briefing["fleet_status"] is not None
+        assert briefing["fleet_status"]["mission"]["status"] == "underway"
+
+    def test_recover_reads_handoff_packets(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(mission_dir)
+        result = run("recover", "--mission-dir", str(mission_dir))
+        briefing = json.loads(result.stdout)
+        assert len(briefing["handoff_packets"]) == 1
+        assert briefing["handoff_packets"][0]["ship_name"] == "HMS Argyll"
+
+    def test_recover_auto_discovers_active_mission(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(mission_dir)
+        # Create .active-* file
+        nelson_dir = mission_dir.parent.parent  # .nelson
+        active_file = nelson_dir / ".active-test123"
+        active_file.write_text(str(mission_dir), encoding="utf-8")
+        result = run(
+            "recover", "--missions-dir", str(mission_dir.parent),
+            cwd=tmp_path,
+        )
+        briefing = json.loads(result.stdout)
+        assert briefing["mission_dir"] == str(mission_dir)
+        assert len(briefing["handoff_packets"]) == 1
+
+    def test_recover_json_output(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        result = run("recover", "--mission-dir", str(mission_dir), "--format", "json")
+        briefing = json.loads(result.stdout)
+        assert "mission_dir" in briefing
+        assert "fleet_status" in briefing
+        assert "handoff_packets" in briefing
+        assert "pending_tasks" in briefing
+        assert "recommended_actions" in briefing
+
+    def test_recover_text_output(self, tmp_path: Path) -> None:
+        mission_dir = setup_mission_with_task(tmp_path)
+        write_handoff(mission_dir)
+        result = run("recover", "--mission-dir", str(mission_dir), "--format", "text")
+        assert "[nelson-data] Recovery briefing" in result.stdout
+        assert "HMS Argyll" in result.stdout
+
+    def test_recover_no_active_mission_silent(self, tmp_path: Path) -> None:
+        missions_dir = tmp_path / ".nelson" / "missions"
+        missions_dir.mkdir(parents=True)
+        result = run("recover", "--missions-dir", str(missions_dir), cwd=tmp_path)
+        assert "No active mission" in result.stdout
+
+    def test_recover_skips_completed_missions(self, tmp_path: Path) -> None:
+        # Create a completed mission (has stand-down.json)
+        create_completed_mission(tmp_path, mission_id="2026-04-01_100000")
+        missions_dir = tmp_path / ".nelson" / "missions"
+        result = run("recover", "--missions-dir", str(missions_dir), cwd=tmp_path)
+        assert "No active mission" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Handoff Lifecycle
+# ---------------------------------------------------------------------------
+
+
+class TestHandoffLifecycle:
+    def test_full_handoff_lifecycle(self, tmp_path: Path) -> None:
+        """init -> squadron -> task -> plan-approved -> checkpoint -> handoff -> recover -> stand-down."""
+        mission_dir = setup_mission_with_task(tmp_path)
+
+        # Checkpoint
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "0", "--in-progress", "1", "--completed", "0",
+            "--blocked", "0",
+            "--tokens-spent", "50000", "--tokens-remaining", "50000",
+            "--hull-green", "1", "--hull-amber", "0",
+            "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "On track",
+        )
+
+        # Handoff
+        write_handoff(
+            mission_dir,
+            extra_args=[
+                "--completed-subtask", "Schema design",
+                "--incoming-ship", "HMS Kent",
+                "--relief-entry", "HMS Argyll:context_exhaustion:2026-04-08T14:30:00Z",
+            ],
+        )
+
+        # Recover
+        result = run("recover", "--mission-dir", str(mission_dir))
+        briefing = json.loads(result.stdout)
+        assert len(briefing["handoff_packets"]) == 1
+        assert briefing["recommended_actions"][0].startswith("Resume task")
+
+        # Stand down
+        run(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Task completed after handoff",
+            "--metric-result", "All tests pass",
+        )
+
+        # Verify relief was counted
+        sd = read_json(mission_dir / "stand-down.json")
+        assert sd["fleet"]["reliefs"] == 1

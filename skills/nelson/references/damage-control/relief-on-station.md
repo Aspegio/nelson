@@ -19,10 +19,10 @@ Hull integrity monitoring may surface context exhaustion before crew overrun is 
 
 1. Admiral signals the damaged ship to prepare for turnover.
 2. Damaged ship pauses current work and commits or saves any in-progress outputs.
-3. Damaged ship writes a turnover brief to file at `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.md` using the template in `references/admiralty-templates/turnover-brief.md`. Do not send the brief as a message — write it to file to keep the replacement ship's context clean.
-4. Damaged ship signals admiral that the turnover brief is written and provides the file path.
+3. Damaged ship writes a typed handoff packet by running `python3 .claude/skills/nelson/scripts/nelson-data.py handoff --mission-dir {mission-dir} --ship-name "..." --task-id N --task-name "..." --handoff-type relief_on_station ...` (see `references/structured-data.md` for full arguments). This writes a JSON handoff packet to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.json` and logs the `relief_on_station` event. Optionally, the ship may also write a prose companion brief to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.md` using `references/admiralty-templates/turnover-brief.md` for human readability.
+4. Damaged ship signals admiral that the handoff packet is written and provides the file path.
 5. Admiral spawns a replacement ship. The replacement need not be the same ship class — select the class that matches the characteristics of the remaining work (e.g., swap a destroyer for a frigate if the remaining work is lighter).
-6. Admiral briefs the replacement ship with a crew briefing that includes the turnover brief file path. The replacement reads the turnover brief as its first action.
+6. Admiral briefs the replacement ship with a crew briefing that includes the handoff packet file path. The replacement reads the JSON handoff packet as its first action.
 7. Admiral reassigns the task to the replacement ship.
 8. Admiral updates the task list entry with `TaskUpdate` to reflect the replacement ship as the new owner.
 9. Admiral issues a shutdown request to the damaged ship.
@@ -44,7 +44,7 @@ No action required. Continue normal operations.
 
 ### Red Hull Integrity (40-59% remaining)
 
-1. Admiral writes a comprehensive flagship turnover brief to `{mission-dir}/turnover-briefs/flagship-{timestamp}.md` containing:
+1. Admiral writes a typed handoff packet via `nelson-data.py handoff --handoff-type relief_on_station ...` to `{mission-dir}/turnover-briefs/flagship-{timestamp}.json`. Additionally, write a prose flagship turnover brief to `{mission-dir}/turnover-briefs/flagship-{timestamp}.md` containing:
    - Full sailing orders (copied verbatim).
    - Battle plan with current task statuses, owners, and ship assignments.
    - All active ship statuses and their hull integrity levels.
@@ -64,9 +64,9 @@ No action required. Continue normal operations.
 
 When a task requires multiple handovers (A hands to B, B hands to C), maintain institutional memory without unbounded growth.
 
-1. Each turnover brief includes a "Relief chain" section listing all previous handovers for this task.
-2. Each entry in the relief chain is a single-line summary: ship name, time on station, key accomplishment, and reason for relief.
-3. The current ship writes a full turnover brief for its own work. Previous ships' work is represented only by their relief chain summaries, not by appending their full briefs.
+1. Each handoff packet includes a `relief_chain` array listing all previous handovers for this task. The `handoff` command validates that this array does not exceed 3 entries.
+2. Each entry in the relief chain contains ship name, reason for relief, and handoff time.
+3. The current ship writes a full handoff packet for its own work. Previous ships' work is represented only by their relief chain entries, not by appending their full packets.
 4. Maximum 3 reliefs per task. If a third replacement is needed, the admiral should re-scope the task — it is likely too large or poorly defined for a single ship.
 5. The relief chain gives the replacement ship a lineage of what has been tried and accomplished without consuming excessive context.
 
@@ -75,8 +75,8 @@ When a task requires multiple handovers (A hands to B, B hands to C), maintain i
 When a crew member aboard a ship exhausts their context, the captain handles relief at ship level.
 
 1. Captain identifies the crew member at Red or Critical hull integrity.
-2. Captain instructs the crew member to write a turnover brief to file.
-3. Captain spawns a replacement crew member and provides the turnover brief path.
+2. Captain instructs the crew member to write a handoff packet (or turnover brief if the crew member cannot run `nelson-data.py`) to file.
+3. Captain spawns a replacement crew member and provides the handoff packet path.
 4. Captain issues a shutdown request to the exhausted crew member.
 5. Captain updates the ship manifest to reflect the new assignment.
 6. If the same role requires relief twice, captain escalates to admiral — the sub-task may need re-scoping.

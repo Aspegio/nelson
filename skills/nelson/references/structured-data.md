@@ -79,6 +79,40 @@ python3 .claude/skills/nelson/scripts/nelson-data.py event \
   --station-tier 1 --verification passed
 ```
 
+### `handoff` — Write a typed handoff packet
+
+Run at Step 5 when a ship is relieved due to context exhaustion, session resumption, or mid-mission resize.
+
+Writes a schema-validated JSON handoff packet to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.json`. Appends a `relief_on_station` event to `mission-log.json` with the packet path. This supersedes `event --type relief_on_station` as the preferred relief path.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py handoff \
+  --mission-dir .nelson/missions/2026-04-08_140000_a1b2c3d4 \
+  --ship-name "HMS Argyll" \
+  --task-id 3 --task-name "API endpoint implementation" \
+  --handoff-type relief_on_station \
+  --completed-subtask "Schema design" \
+  --completed-subtask "GET endpoint" \
+  --partial-output "POST endpoint:60%:Validation logic pending" \
+  --file-ownership "src/api/endpoints.py" \
+  --file-ownership "src/api/validators.py" \
+  --next-step "Complete POST validation" \
+  --next-step "Write integration tests" \
+  --hull-at-handoff 38 --tokens-consumed 145000 \
+  --key-finding "API rate limiting needs custom middleware" \
+  --key-finding "Existing auth works with new endpoints" \
+  --relief-entry "HMS Argyll:context_exhaustion:2026-04-08T14:30:00Z" \
+  --incoming-ship "HMS Kent"
+```
+
+Repeatable arguments: `--completed-subtask`, `--partial-output` (format: `subtask:progress:notes`), `--known-blocker`, `--file-ownership`, `--next-step`, `--open-decision`, `--key-finding`, `--relief-entry` (format: `ship:reason:time`).
+
+Validations:
+- `--handoff-type` must be `relief_on_station`, `session_resumption`, or `mid_mission_resize`.
+- At least one `--next-step` is required.
+- `--relief-entry` is bounded to a maximum of 3 entries.
+- `--file-ownership` is required when the task has `station_tier > 0` (looked up from `battle-plan.json`).
+
 ### `checkpoint` — Record a quarterdeck checkpoint
 
 Run at Step 4 at each checkpoint, alongside the prose quarterdeck report.
@@ -209,6 +243,42 @@ Last checkpoint: 2 (12 min ago)
 Budget: 45% consumed
 ```
 
+### `recover` — Auto-recover session state (read-only)
+
+Run at session resumption to auto-discover the active mission and build a structured recovery briefing.
+
+Reads `fleet-status.json`, `battle-plan.json`, and any `.json` handoff packets in `turnover-briefs/`. Outputs a structured recovery briefing to stdout. No files are written.
+
+```bash
+# Auto-discover active mission
+python3 .claude/skills/nelson/scripts/nelson-data.py recover \
+  --missions-dir .nelson/missions
+
+# Target a specific mission
+python3 .claude/skills/nelson/scripts/nelson-data.py recover \
+  --mission-dir .nelson/missions/2026-04-08_140000_a1b2c3d4
+
+# Human-readable output
+python3 .claude/skills/nelson/scripts/nelson-data.py recover \
+  --mission-dir .nelson/missions/2026-04-08_140000_a1b2c3d4 \
+  --format text
+```
+
+Auto-discovery checks `.nelson/.active-*` files first, then falls back to the most recent mission directory without a `stand-down.json`.
+
+Output (JSON):
+
+```json
+{
+  "mission_dir": ".nelson/missions/2026-04-08_140000_a1b2c3d4",
+  "mission_status": "underway",
+  "fleet_status": { "..." },
+  "handoff_packets": [ { "..." } ],
+  "pending_tasks": [ { "task_id": 3, "task_name": "...", "owner": "...", "status": "..." } ],
+  "recommended_actions": ["Resume task 3 from handoff packet (HMS Argyll)"]
+}
+```
+
 ## Write Timing
 
 | Workflow Step | Script Command | JSON Written | Prose (existing) |
@@ -220,7 +290,7 @@ Budget: 45% consumed
 | Step 4: Get Permission to Sail | (none) | — | (conversation-only) |
 | Step 5: Each Checkpoint | `checkpoint` | `mission-log.json`, `fleet-status.json` | `quarterdeck-report.md` |
 | Step 5: Between Checkpoints | `event` | `mission-log.json` | -- |
-| Step 5: Relief on Station | `event --type relief_on_station` | `mission-log.json` | `turnover-briefs/{ship}.md` |
+| Step 5: Relief on Station | `handoff` | `mission-log.json`, `turnover-briefs/{ship}.json` | `turnover-briefs/{ship}.md` (optional companion) |
 | Step 5: Action Stations | `event --type task_completed` | `mission-log.json` | -- |
 | Step 6: Stand Down | `stand-down` | `mission-log.json`, `fleet-status.json`, `stand-down.json` | `captains-log.md` |
 
@@ -391,6 +461,40 @@ Current-state snapshot for real-time consumers (hooks, dashboards).
   "blockers": [],
   "recent_events": ["Task 1 completed (HMS Argyll)", "HMS Kent hull crossed to Amber (68%)"],
   "last_updated": "2026-03-27T12:35:00Z"
+}
+```
+
+### handoff-packet.json (Write-Once Per Relief)
+
+Written to `{mission-dir}/turnover-briefs/{ship-name}-{timestamp}.json` by the `handoff` command.
+
+```json
+{
+  "version": 1,
+  "ship_name": "HMS Argyll",
+  "task_id": 3,
+  "task_name": "API endpoint implementation",
+  "handoff_type": "relief_on_station",
+  "state": {
+    "completed_subtasks": ["Schema design", "GET endpoint"],
+    "partial_outputs": [
+      {"subtask": "POST endpoint", "progress": "60%", "notes": "Validation logic pending"}
+    ],
+    "known_blockers": [],
+    "file_ownership": ["src/api/endpoints.py", "src/api/validators.py"],
+    "next_steps": ["Complete POST validation", "Write integration tests"],
+    "open_decisions": []
+  },
+  "context": {
+    "hull_at_handoff": 38,
+    "tokens_consumed": 145000,
+    "checkpoint_number": 4,
+    "key_findings": ["API rate limiting needs custom middleware", "Existing auth works with new endpoints"]
+  },
+  "relief_chain": [
+    {"ship": "HMS Argyll", "reason": "context_exhaustion", "handoff_time": "2026-04-08T14:30:00Z"}
+  ],
+  "created_at": "2026-04-08T14:30:00Z"
 }
 ```
 
