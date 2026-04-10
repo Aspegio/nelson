@@ -279,6 +279,48 @@ Output (JSON):
 }
 ```
 
+## Phase Engine
+
+The `nelson-phase.py` script manages the deterministic phase engine. It enforces phase transitions with defined entry/exit criteria and validates phase-appropriate tool usage via PreToolUse hooks.
+
+Phases progress linearly: `SAILING_ORDERS` → `BATTLE_PLAN` → `FORMATION` → `PERMISSION` → `UNDERWAY` → `STAND_DOWN`.
+
+### `current` — Print current phase
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-phase.py current \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
+```
+
+Auto-discovers active mission from `.nelson/.active-*` files if `--mission-dir` is omitted.
+
+### `advance` — Advance to next phase
+
+Validates exit criteria for the current phase before transitioning. Appends a `phase_transition` event to `mission-log.json`.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
+```
+
+### `validate-tool` — Check tool permission (for hooks)
+
+Used by PreToolUse hooks to block phase-inappropriate tool usage. Exits 0 if allowed, 1 if blocked.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-phase.py validate-tool \
+  --tool Agent --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4
+```
+
+### `set` — Force-set phase (recovery)
+
+Escape hatch for recovery scenarios. Skips exit criteria validation.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-phase.py set \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 --phase UNDERWAY
+```
+
 ## Write Timing
 
 | Workflow Step | Script Command | JSON Written | Prose (existing) |
@@ -312,6 +354,9 @@ Output (JSON):
 | `admiralty_action_required` | Task needs human input | task_id, action, timing |
 | `admiralty_action_completed` | Human completed action | task_id, resolution |
 | `battle_plan_amended` | Admiral rescopes | changes, rationale |
+| `phase_transition` | Phase engine advances | from_phase, to_phase |
+| `phase_override` | Manual phase set (recovery) | from_phase, to_phase |
+| `permission_granted` | User approves formation | (empty data) |
 | `mission_complete` | Step 6 | outcome_achieved, tasks_completed, total_tokens_consumed, duration_minutes |
 
 ## JSON Schemas
@@ -437,6 +482,7 @@ Current-state snapshot for real-time consumers (hooks, dashboards).
   "mission": {
     "outcome": "Refactor auth module to use JWT tokens",
     "status": "underway",
+    "phase": "UNDERWAY",
     "started_at": "2026-03-27T12:00:00Z",
     "checkpoint_number": 2
   },

@@ -1,5 +1,18 @@
 {
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|TeamCreate|TaskCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -f skills/nelson/scripts/nelson-phase.py && python3 skills/nelson/scripts/nelson-phase.py validate-tool --tool \"$CLAUDE_TOOL_NAME\" || true"
+          }
+        ]
+      }
+    ]
   }
 }

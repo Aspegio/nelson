@@ -39,7 +39,13 @@ Out of scope: Migration script for existing sessions
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
 
-**Structured Data Capture:** After establishing the mission directory, run the `nelson-data.py` script located in the skill's directory (e.g., `python3 .claude/skills/nelson/scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."`). If installed globally, it may be in `~/.claude/skills/nelson/scripts/`. This creates `sailing-orders.json` and initialises `mission-log.json`. See `references/structured-data.md` for the full argument list.
+**Structured Data Capture:** After establishing the mission directory, run the `nelson-data.py` script located in the skill's directory (e.g., `python3 .claude/skills/nelson/scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."`). If installed globally, it may be in `~/.claude/skills/nelson/scripts/`. This creates `sailing-orders.json`, initialises `mission-log.json`, and creates `fleet-status.json` with the initial phase `SAILING_ORDERS`. See `references/structured-data.md` for the full argument list.
+
+**Phase Advance:** After structured data capture, advance the mission phase from SAILING_ORDERS to BATTLE_PLAN:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+```
 
 **Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
@@ -148,8 +154,10 @@ This registers all tasks, records the squadron, computes DAG metrics, and runs t
 **Alternative — individual commands:**
 1. `python3 .claude/skills/nelson/scripts/nelson-data.py task --mission-dir {mission-dir} --id N --name "..." --owner "..." ...` for each task (owners are now known from formation). See `references/structured-data.md` for task arguments.
 2. `python3 .claude/skills/nelson/scripts/nelson-data.py plan-approved --mission-dir {mission-dir}` to finalise the battle plan and compute DAG metrics.
-3. `python3 .claude/skills/nelson/scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
-4. `python3 .claude/skills/nelson/scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json` to verify there are no file ownership conflicts. If conflicts are found, you MUST resolve them and update the battle plan before proceeding.
+3. `python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}` to advance from BATTLE_PLAN to FORMATION (validates all tasks have station tiers).
+4. `python3 .claude/skills/nelson/scripts/nelson-data.py squadron --mission-dir {mission-dir} --admiral "..." --admiral-model [model] --captain "name:class:model:task_id" ... --mode [mode]` to record squadron composition. Repeat `--captain` for each captain. See `references/structured-data.md` for the full argument list.
+5. `python3 .claude/skills/nelson/scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json` to verify there are no file ownership conflicts. If conflicts are found, you MUST resolve them and update the battle plan before proceeding.
+6. `python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}` to advance from FORMATION to PERMISSION.
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
@@ -170,6 +178,16 @@ This registers all tasks, records the squadron, computes DAG metrics, and runs t
 1. Display the complete battle plan to the user if `becalmed-fleet.md` is in effect.
 2. Display the complete squadron formation to the user if `becalmed-fleet.md` is not in effect. The battle plan (drafted in Step 2) should also be available for review.
 3. You are REQUIRED to wait for explicit permission to proceed.
+
+**Phase Advance:** After the user grants permission, log the event and advance:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py event \
+  --mission-dir {mission-dir} --type permission_granted --checkpoint 0
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+```
+
+This transitions the mission from PERMISSION to UNDERWAY, unlocking agent spawning and task creation.
 
 ## 5. Run Quarterdeck Rhythm
 

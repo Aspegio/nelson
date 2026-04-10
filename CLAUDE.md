@@ -45,5 +45,7 @@ scripts/                  — Maintenance & utility scripts
   check-references.sh       — Cross-reference validation for documentation links
   count-tokens.py           — Token counter for hull integrity damage reports
   nelson-data.py            — Structured data capture for Nelson missions
+  nelson-phase.py           — Deterministic phase engine for mission scaffolding
   test_nelson_data.py       — Python tests for nelson-data.py
+  test_nelson_phase.py      — Python tests for nelson-phase.py
 ```
