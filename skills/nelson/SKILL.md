@@ -70,6 +70,15 @@ If any answer triggers a standing order, you MUST apply the corrective action an
 
 **Structured Data Capture:** Task registration requires owners, which are assigned in Step 3. No script calls at this step.
 
+**Task List Visibility:** After finalizing the battle plan, create a `TaskCreate` entry for each task to make mission progress visible in the Claude Code task list (Ctrl+T). This applies in **all execution modes** — it is admiral-level visibility tracking, not inter-agent coordination.
+
+For each task:
+- `subject`: Task name from the battle plan (imperative form, e.g., "Refactor auth module")
+- `description`: One-line deliverable
+- `activeForm`: Present-continuous form shown in the UI spinner (e.g., "Refactoring auth module")
+
+All tasks start as `pending`. They will be updated with owners and status as the mission progresses.
+
 ## 3. Form the Squadron
 
 - Select execution mode per `references/squadron-composition.md`. If the user explicitly requested a mode, use it — user preference overrides the decision matrix.
@@ -78,8 +87,9 @@ If any answer triggers a standing order, you MUST apply the corrective action an
     - `agent-team`: captains benefit from a shared task list, peer messaging, or coordinated deliverables; or 4+ captains are needed.
 
 **Mode-Tool Consistency Gate:** Before assigning ships, confirm your tool usage matches the selected mode by reviewing `references/tool-mapping.md`:
-- **`subagents` mode:** Do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only.
+- **`subagents` mode:** Captains do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only. The admiral uses `TaskUpdate` to track progress in the session task list (visibility only — captains cannot see these tasks).
 - **`agent-team` mode:** Do NOT use `Agent` with `subagent_type` to spawn captains (marines still use `subagent_type`). Use `TeamCreate` first, then `Agent` with `team_name` + `name`. Coordinate via `TaskList` and `SendMessage`.
+- **`single-session` mode:** The admiral uses `TaskUpdate` to track progress as it completes each task sequentially.
 
 - Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
@@ -127,6 +137,10 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 **Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then create and assign work with `TaskCreate` + `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
 
+**Task Status Updates:** After formation, update the task list entries created in Step 2:
+- **`agent-team` mode:** Tasks were already created for visibility. Use `TaskUpdate` to set `owner` to each captain's name and `status` to `in_progress` as captains are spawned. The team's shared task list now serves both visibility and coordination.
+- **`subagents` / `single-session` mode:** Use `TaskUpdate` to set `status` to `in_progress` as each task begins. The admiral tracks these directly.
+
 **Edit permissions:** When spawning any agent whose task involves editing files, set `mode: "acceptEdits"` on the `Agent` tool call. Omitting this can cause a permission race condition that silently stalls the agent at its first edit. When in doubt, include it.
 
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a turnover brief using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
@@ -154,6 +168,7 @@ If the task is complete and no pending task depends on it, proceed to shutdown p
 - **Checkpoint Cadence Gate:** You MUST NOT process a third task completion without writing a quarterdeck checkpoint. Before dispatching new work or processing the next completion, confirm the last checkpoint is no more than 2 completions old. The quarterdeck report is your only recovery point if context compaction occurs — stale reports mean lost coordination state.
 - Run a quarterdeck checkpoint after every 1-2 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
     - Update progress by checking `TaskList` for task states: `pending`, `in_progress`, `completed`.
+    - Mark completed tasks with `TaskUpdate` setting `status` to `completed`. In `subagents` and `single-session` modes, the admiral updates the session task list directly; in `agent-team` mode, captains or the admiral update the shared task list.
     - Identify blockers and choose a concrete next action.
     - Use `SendMessage` to unblock captains or redirect their approach.
     - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
@@ -219,6 +234,8 @@ Reference `references/admiralty-templates/red-cell-review.md` for the red-cell r
 Reference `references/admiralty-templates/captains-log.md` for the captain's log template and `references/commendations.md` for Mentioned in Despatches criteria.
 
 **Structured Data Capture:** Before writing the captain's log, run `python3 .claude/skills/nelson/scripts/nelson-data.py stand-down --mission-dir {mission-dir} --outcome-achieved --actual-outcome "..." --metric-result "..."` to capture the structured mission summary. See `references/structured-data.md` for the full argument list.
+
+**Task List Cleanup:** Verify all task list entries reflect final state. Mark any remaining `in_progress` tasks as `completed` if their work is done, or note incomplete tasks in the captain's log. This ensures the Ctrl+T display shows an accurate final summary.
 
 **Session State Cleanup:** Remove the session state file by deleting `.nelson/.active-{SESSION_ID}`.
 
