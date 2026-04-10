@@ -61,7 +61,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pytest
-      - run: pytest skills/nelson/scripts/test_nelson_data.py skills/nelson/scripts/test_nelson_phase.py hooks/test_nelson_hooks.py -v
+      - run: pytest skills/nelson/scripts/ -v && pytest hooks/ -v
 
   references:
     name: Cross-reference check
