@@ -68,7 +68,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
-**Structured Data Capture:** Task registration requires owners, which are assigned in Step 3. No script calls at this step.
+**Structured Data Capture:** Task registration requires owners, which are assigned in Step 3. No `nelson-data.py` script calls at this step.
 
 ## 3. Form the Squadron
 
@@ -78,8 +78,18 @@ If any answer triggers a standing order, you MUST apply the corrective action an
     - `agent-team`: captains benefit from a shared task list, peer messaging, or coordinated deliverables; or 4+ captains are needed.
 
 **Mode-Tool Consistency Gate:** Before assigning ships, confirm your tool usage matches the selected mode by reviewing `references/tool-mapping.md`:
-- **`subagents` mode:** Do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only.
+- **`subagents` mode:** Captains do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only. The admiral uses `TaskCreate`/`TaskUpdate`/`TaskList` to track progress in the session task list (visibility only — captains cannot see these tasks).
 - **`agent-team` mode:** Do NOT use `Agent` with `subagent_type` to spawn captains (marines still use `subagent_type`). Use `TeamCreate` first, then `Agent` with `team_name` + `name`. Coordinate via `TaskList` and `SendMessage`.
+- **`single-session` mode:** The admiral uses `TaskCreate`, `TaskUpdate`, `TaskList`, and `TaskGet` to track progress as it completes each task sequentially.
+
+**Task List Visibility:** After selecting the execution mode, create a `TaskCreate` entry for each battle plan task to make mission progress visible in the Claude Code task list (Ctrl+T). This applies in **all execution modes** — it is admiral-level visibility tracking, not inter-agent coordination.
+
+For each task:
+- `subject`: Task name from the battle plan (imperative form, e.g., "Refactor auth module")
+- `description`: One-line deliverable
+- `activeForm`: Present-continuous form shown in the UI spinner (e.g., "Refactoring auth module")
+
+All tasks start as `pending`. They will be updated with owners and status as the mission progresses. In `single-session` mode (where Step 3 is otherwise skipped), the admiral still creates these entries before proceeding to Step 4.
 
 - Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
@@ -125,7 +135,12 @@ Do not spawn any agents or create any tasks until the user approves. If the user
 
 **Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
-**Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then create and assign work with `TaskCreate` + `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
+**Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then assign work to the existing task entries with `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
+
+**Task Status Updates:** After formation, update the task list entries created earlier in this step:
+- **`agent-team` mode:** Use `TaskUpdate` to set `owner` to each captain's name and `status` to `in_progress` as captains are spawned. The team's shared task list now serves both visibility and coordination.
+- **`subagents` mode:** Use `TaskUpdate` to set `status` to `in_progress` as each captain is dispatched. The admiral tracks these directly.
+- **`single-session` mode:** Use `TaskUpdate` to set `status` to `in_progress` as the admiral begins each task.
 
 **Edit permissions:** When spawning any agent whose task involves editing files, set `mode: "acceptEdits"` on the `Agent` tool call. Omitting this can cause a permission race condition that silently stalls the agent at its first edit. When in doubt, include it.
 
@@ -154,6 +169,7 @@ If the task is complete and no pending task depends on it, proceed to shutdown p
 - **Checkpoint Cadence Gate:** You MUST NOT process a third task completion without writing a quarterdeck checkpoint. Before dispatching new work or processing the next completion, confirm the last checkpoint is no more than 2 completions old. The quarterdeck report is your only recovery point if context compaction occurs — stale reports mean lost coordination state.
 - Run a quarterdeck checkpoint after every 1-2 task completions, when a captain reports a blocker, or when a captain goes idle with unverified outputs:
     - Update progress by checking `TaskList` for task states: `pending`, `in_progress`, `completed`.
+    - Mark completed tasks with `TaskUpdate` setting `status` to `completed`. In `subagents` and `single-session` modes, the admiral updates the session task list directly; in `agent-team` mode, captains or the admiral update the shared task list.
     - Identify blockers and choose a concrete next action.
     - Use `SendMessage` to unblock captains or redirect their approach.
     - Confirm each crew member has active sub-tasks; flag idle crew or role mismatches.
@@ -220,9 +236,11 @@ Reference `references/admiralty-templates/captains-log.md` for the captain's log
 
 **Structured Data Capture:** Before writing the captain's log, run `python3 .claude/skills/nelson/scripts/nelson-data.py stand-down --mission-dir {mission-dir} --outcome-achieved --actual-outcome "..." --metric-result "..."` to capture the structured mission summary. See `references/structured-data.md` for the full argument list.
 
+**Task List Cleanup:** Verify all task list entries reflect final state. Mark any remaining `in_progress` tasks as `completed` if their work is done, or note incomplete tasks in the captain's log. This ensures the Claude Code task list shows an accurate final summary.
+
 **Session State Cleanup:** Remove the session state file by deleting `.nelson/.active-{SESSION_ID}`.
 
-**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 6 is never permitted.
+**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 7 is never permitted.
 
 ## Standing Orders
 

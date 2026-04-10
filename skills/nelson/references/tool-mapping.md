@@ -9,9 +9,10 @@ Maps Nelson operations to Claude Code tool calls by execution mode.
 | Form the squadron | `TeamCreate` | agent-team |
 | Spawn captain | `Agent` with `team_name` + `name` | agent-team |
 | Spawn captain | `Agent` with `subagent_type` | subagents |
-| Create task | `TaskCreate` | agent-team |
+| Create task (coordination) | `TaskCreate` | agent-team |
 | Assign task to captain | `TaskUpdate` with `owner` | agent-team |
-| Check task progress | `TaskList` / `TaskGet` | agent-team |
+| Check task progress (coordination) | `TaskList` / `TaskGet` | agent-team |
+| Track task visibility (admiral) | `TaskCreate` / `TaskUpdate` / `TaskList` | all modes ¹ |
 | Message a captain | `SendMessage(type="message")` | agent-team |
 | Broadcast to squadron | `SendMessage(type="broadcast")` | agent-team |
 | Shut down a ship | `SendMessage(type="shutdown_request")` | agent-team / subagents |
@@ -26,9 +27,12 @@ Maps Nelson operations to Claude Code tool calls by execution mode.
   and captains report only to the admiral. Use the `Agent` tool to spawn
   captains.
     - **Available:** `Agent` with `subagent_type`, `SendMessage(type="shutdown_request")`
-    - **Not available:** `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`,
+    - **Not available (captains):** `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`,
       `SendMessage(type="message")`, `SendMessage(type="broadcast")`, `TeamCreate`,
       `TeamDelete`
+    - **Admiral exception:** The admiral uses `TaskCreate`/`TaskUpdate`/`TaskList`
+      for session-level visibility tracking (the user's Ctrl+T task list). These
+      tasks are not visible to captains — they are for the user's benefit only. ¹
 - **`agent-team` mode:** The task list (`TaskCreate`, `TaskList`, `TaskGet`,
   `TaskUpdate`) is the shared coordination surface. Captains can message each
   other via `SendMessage`. Use `TeamCreate` first, then spawn captains with the
@@ -38,6 +42,14 @@ Maps Nelson operations to Claude Code tool calls by execution mode.
     - **Not available:** `Agent` with `subagent_type` for captains (marines still
       use `subagent_type`)
 - **`single-session` mode:** No spawning. The admiral executes all work directly.
+    - **Available:** `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet` (for
+      visibility tracking) ¹
+    - **Not available:** `Agent`, `TeamCreate`, `TeamDelete`, `SendMessage`
+
+¹ Visibility tracking uses the same task tools as agent-team coordination but
+serves a different purpose: making mission progress visible in the user's
+Ctrl+T task list. In `subagents` and `single-session` modes, only the admiral
+calls these tools; captains never see or interact with these task entries.
 
 ## Anti-Patterns
 
@@ -50,4 +62,4 @@ Common mode-tool mismatches and their correct alternatives. See
 | `SendMessage(type="message")` in subagents mode | No team exists to route messages | Include instructions in the `Agent` prompt instead |
 | `Agent` with `subagent_type` to spawn a captain in agent-team mode | Agent is not registered as a teammate | Use `Agent` with `team_name` + `name` |
 | `TeamCreate` in subagents mode | Creates an unnecessary team structure | Omit — spawn captains directly with `Agent` |
-| `TaskCreate` in subagents mode | Tasks are created but no agent can see them | Track work in the admiral's conversation context |
+| `TaskCreate` by captains in subagents mode | No shared task list exists for captains | Admiral tracks visibility via `TaskCreate`/`TaskUpdate` in its own session; captains report via `Agent` return value |
