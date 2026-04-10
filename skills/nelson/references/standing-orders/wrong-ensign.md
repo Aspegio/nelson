@@ -22,14 +22,21 @@ spawned with mismatched parameters cannot communicate with the squadron.
 confirm every planned tool call is valid for the selected execution mode:
 
 - **`subagents` mode — available:** `Agent` with `subagent_type` to spawn,
-  `SendMessage(type="shutdown_request")` to shut down. **Not available:**
-  `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, `SendMessage(type="message")`,
-  `SendMessage(type="broadcast")`, `TeamCreate`, `TeamDelete`.
+  `SendMessage(type="shutdown_request")` to shut down. **Not available
+  (captains):** `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`,
+  `SendMessage(type="message")`, `SendMessage(type="broadcast")`, `TeamCreate`,
+  `TeamDelete`. **Exception:** The admiral uses `TaskCreate`/`TaskUpdate`/`TaskList`
+  for session-level visibility tracking (the user's Ctrl+T task list). These
+  tasks are not visible to captains — they are for the user's benefit only.
 - **`agent-team` mode — available:** `TeamCreate` to form squadron, `Agent`
   with `team_name` + `name` to spawn, `TaskCreate`/`TaskList`/`TaskGet`/`TaskUpdate`
   for coordination, `SendMessage` for all message types, `TeamDelete` to
   stand down. **Not available:** `Agent` with `subagent_type` for captains
   (marines still use `subagent_type`).
+
+- **`single-session` mode — available:** `TaskCreate`, `TaskUpdate`, `TaskList`,
+  `TaskGet` (for visibility tracking). **Not available:** `Agent`, `TeamCreate`,
+  `TeamDelete`, `SendMessage`.
 
 If detected mid-mission, consult `references/damage-control/comms-failure.md`
 for recovery procedures.

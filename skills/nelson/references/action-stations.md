@@ -126,23 +126,10 @@ See `references/tool-mapping.md` for the full set of coordination tools.
 
 An optional `TaskCompleted` hook can enforce quality gate validation before allowing a task to be marked complete. A hook that exits with code 2 rejects the completion and feeds back the reason to the agent.
 
-Example hook configuration in `.claude/settings.json`:
+Nelson ships a `TaskCompleted` hook in `hooks/hooks.json` that enforces these
+quality gates automatically. The hook checks validation evidence, rollback
+notes, failure cases, and red-cell review based on the task's station tier.
+It exits with code 2 to reject incomplete tasks with specific feedback.
 
-```json
-{
-  "hooks": {
-    "TaskCompleted": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'Verify: validation evidence present, rollback note included, station tier controls satisfied'"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-This is an opt-in enhancement. Quality gates work without hooks via the admiral's quarterdeck checkpoint and red-cell review process.
+This supplements the admiral's quarterdeck checkpoint and red-cell review
+process with deterministic enforcement.

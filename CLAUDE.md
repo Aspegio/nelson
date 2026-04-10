@@ -9,6 +9,10 @@ Nelson is a Claude Code skill for coordinating agent work using Royal Navy termi
   plugin.json             — Plugin manifest
   marketplace.json        — Marketplace definition (self-hosted)
 settings.json             — Plugin default settings (enables agent teams)
+hooks/
+  hooks.json              — Skill-scoped hook configuration (auto-discovered)
+  nelson_hooks.py         — Hook enforcement script (preflight, brief, task, idle)
+  test_nelson_hooks.py    — Tests for hook handlers
 skills/nelson/
   SKILL.md                — Main entrypoint (what Claude reads)
   references/             — Supporting docs loaded on demand

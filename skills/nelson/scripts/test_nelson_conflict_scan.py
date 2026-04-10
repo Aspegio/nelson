@@ -128,6 +128,23 @@ Task ID: 2
         self.assertEqual(conflicts[0][1], "src/shared.py")
         self.assertEqual(conflicts[0][3], "src/shared.py")
 
+    def test_json_file_ownership_key(self):
+        """parse_battle_plan reads 'file_ownership' from JSON battle plans."""
+        import json
+
+        plan = {
+            "tasks": [
+                {"owner": "HMS Victory", "file_ownership": ["src/api.py", "src/models.py"]},
+                {"owner": "HMS Enterprise", "file_ownership": ["src/ui.js"]},
+            ]
+        }
+        plan_path = self.root / "battle-plan.json"
+        plan_path.write_text(json.dumps(plan))
+
+        ownership = parse_battle_plan(plan_path)
+        self.assertEqual(ownership["HMS Victory"], {"src/api.py", "src/models.py"})
+        self.assertEqual(ownership["HMS Enterprise"], {"src/ui.js"})
+
     def test_path_traversal_skipped(self):
         """Files that escape the project root should be skipped."""
         # Create a file inside the root so we have at least one valid entry
