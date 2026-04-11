@@ -46,6 +46,7 @@ VALID_EVENT_TYPES = frozenset(
         "phase_transition",
         "phase_override",
         "permission_granted",
+        "circuit_breaker_tripped",
     }
 )
 

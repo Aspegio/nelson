@@ -17,6 +17,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from nelson_circuit_breakers import (
+    BreakerTrip,
+    compute_budget_metrics,
+    evaluate as evaluate_circuit_breakers,
+    format_alarm_line,
+    load_config as load_circuit_breaker_config,
+)
 from nelson_data_memory import _update_patterns_store, _update_standing_order_stats
 from nelson_data_utils import (
     JSON_INDENT,
@@ -58,6 +65,7 @@ def _do_init(
     out_of_scope: list[str] | None = None,
     stop_criteria: list[str] | None = None,
     handoff_artifacts: list[str] | None = None,
+    circuit_breakers: dict[str, Any] | None = None,
 ) -> Path:
     """Create mission directory and write initial JSON files.  Returns the path."""
     base = Path(".nelson") / "missions" / _mission_dir_stamp()
@@ -78,6 +86,7 @@ def _do_init(
         "out_of_scope": list(out_of_scope or []),
         "stop_criteria": list(stop_criteria or []),
         "handoff_artifacts": list(handoff_artifacts or []),
+        "circuit_breakers": dict(circuit_breakers) if circuit_breakers else {},
         "created_at": _now_iso(),
     }
 
@@ -628,6 +637,13 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
         old_fs = _read_json(fs_path)
         existing_phase = old_fs.get("mission", {}).get("phase")
 
+    budget_metrics = compute_budget_metrics(
+        tokens_spent=args.tokens_spent,
+        tokens_remaining=args.tokens_remaining,
+        completed=args.completed,
+        total=total,
+    )
+
     fleet_status = {
         "version": 1,
         "mission": {
@@ -649,6 +665,10 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
             "tokens_remaining": args.tokens_remaining,
             "pct_consumed": pct_consumed,
             "burn_rate_per_checkpoint": burn_rate,
+            "burn_rate_per_task": budget_metrics["burn_rate_per_task"],
+            "projected_budget_at_completion": budget_metrics[
+                "projected_budget_at_completion"
+            ],
         },
         "squadron": squadron_status,
         "blockers": [],
@@ -667,6 +687,27 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
 
     _write_json(fs_path, fleet_status)
 
+    # Evaluate automated circuit breakers against the freshly-written state.
+    # Trips are advisory — surface them to the admiral via stdout and append
+    # structured events so post-mission analysis can see what fired.
+    sailing_orders_for_breakers = _read_json_optional(so_path) if so_path.exists() else None
+    trips = evaluate_circuit_breakers(
+        fleet_status=fleet_status,
+        sailing_orders=sailing_orders_for_breakers,
+        mission_log_events=events + [checkpoint_event],
+        now_iso=_now_iso(),
+    )
+    for trip in trips:
+        _append_event(
+            mission_dir,
+            {
+                "type": "circuit_breaker_tripped",
+                "checkpoint": checkpoint_num,
+                "timestamp": _now_iso(),
+                "data": trip.to_event_data(),
+            },
+        )
+
     hull_summary = (
         f"{args.hull_green}G {args.hull_amber}A {args.hull_red}R {args.hull_critical}C"
     )
@@ -677,6 +718,8 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
         f"Hull: {hull_summary} | "
         f"Blockers: {args.blocked}"
     )
+    for trip in trips:
+        print(format_alarm_line(trip))
 
 
 # ---------------------------------------------------------------------------

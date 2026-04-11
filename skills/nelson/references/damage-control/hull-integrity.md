@@ -66,6 +66,10 @@ Hull integrity monitoring works alongside existing damage control procedures:
 - **Man Overboard** (`man-overboard.md`): Replacing a stuck agent consumes additional context. Factor hull integrity into the decision to replace versus descope.
 - **Scuttle and Reform** (`scuttle-and-reform.md`): When the flagship reaches Red and multiple ships are also at Red or Critical, consider scuttling the current mission and reforming with fresh context rather than attempting piecemeal relief.
 
+## Automated Circuit Breaker
+
+In addition to the damage-report-driven readiness board, Nelson's automated circuit breakers emit a `hull_integrity_breach` advisory at each checkpoint when any ship's `hull_integrity_pct` falls at or below `circuit_breakers.hull_integrity_threshold` (default 80%). See `damage-control/circuit-breakers.md` for thresholds, configuration, and output format.
+
 ## Advanced: TeammateIdle Hook
 
 Nelson ships a `TeammateIdle` hook in `hooks/hooks.json` that triggers an
