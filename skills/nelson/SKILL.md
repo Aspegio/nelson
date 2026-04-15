@@ -8,7 +8,7 @@ paths: [".nelson/**"]
 # Nelson
 
 ```!
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/nelson-data.py" status
+python3 "${CLAUDE_PLUGIN_ROOT}/skills/nelson/scripts/nelson-data.py" status
 ```
 
 Execute this workflow for the user's mission.

@@ -102,6 +102,30 @@ for ref_file in "$REF_DIR"/*.md; do
   fi
 done
 
+# ---------- 6. Auto-exec script path ----------
+# The ```! block in SKILL.md must reference a script that actually exists.
+# Regression guard for issue #99: {skill-dir} → ${CLAUDE_PLUGIN_ROOT} path fix.
+echo "Checking auto-exec script paths..."
+while IFS= read -r script_path; do
+  # Strip the ${CLAUDE_PLUGIN_ROOT}/ prefix to get repo-relative path
+  rel_path="${script_path#\$\{CLAUDE_PLUGIN_ROOT\}/}"
+  if [ ! -f "$rel_path" ]; then
+    error "SKILL.md auto-exec references '$script_path' but '$rel_path' does not exist"
+  fi
+done < <(sed -n '/^```!/,/^```$/p' "$SKILL_DIR/SKILL.md" \
+  | grep -oE '\$\{CLAUDE_PLUGIN_ROOT\}/[^ "]+' \
+  | sort -u)
+
+# ---------- 7. No {skill-dir} placeholder ----------
+# {skill-dir} is not a valid Claude Code variable. Use ${CLAUDE_PLUGIN_ROOT}.
+echo "Checking for invalid {skill-dir} placeholders..."
+for file in "$SKILL_DIR/SKILL.md" hooks/hooks.json; do
+  [ -f "$file" ] || continue
+  if grep -q '{skill-dir}' "$file"; then
+    error "$file contains invalid {skill-dir} placeholder (use \${CLAUDE_PLUGIN_ROOT})"
+  fi
+done
+
 # ---------- Summary ----------
 if [ "$errors" -gt 0 ]; then
   echo ""
