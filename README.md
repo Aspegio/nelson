@@ -194,6 +194,44 @@ The token counts come from the API usage data that Claude Code already records o
 
 Other damage control procedures: man overboard (stuck agent replacement), session resumption (picking up after interruption), partial rollback (reverting faulty work), crew overrun (budget recovery), scuttle and reform (mission abort), and escalation (chain of command).
 
+### Conflict radar
+
+When multiple ships work in parallel, undeclared file overlaps are a common source of merge pain. Nelson ships two tools that catch conflicts at different stages:
+
+- **Pre-flight conflict scan** (`nelson_conflict_scan.py`) — parses the battle plan before Action Stations, walks the codebase import graph, and flags "split-keel" violations where two captains own files that import each other.
+- **Runtime conflict radar** (`nelson_conflict_radar.py`) — compares live `git status` against the battle plan's file ownership declarations during execution and alerts on changed files that have no registered owner.
+
+Both tools are stdlib-only and run as part of the mission workflow without additional setup.
+
+### Enforcement hooks
+
+Nelson is not purely advisory. A set of Claude Code hooks (`hooks/nelson_hooks.py`) enforce structural guarantees at the tool level:
+
+| Event | Hook | What it enforces |
+|---|---|---|
+| `PreToolUse` on `Agent` | `preflight` | Station tier gate, file ownership conflicts, mode-tool consistency |
+| `PreToolUse` on `TaskCreate` | `mode-check` | Rejects task creation in non-agent-team modes |
+| `PostToolUse` on `Write`/`Edit` | `brief-validate` | Turnover brief quality gate |
+| `TaskCompleted` | `task-complete` | Validation evidence and station controls |
+| `TeammateIdle` | `idle-ship` | Paid-off standing order advisory |
+
+Plugin installs auto-discover `hooks/hooks.json` and wire these up with no user action. Hooks degrade gracefully: if no active Nelson mission is found, they exit cleanly and do not interfere with non-Nelson workflows. See [Installation](#installation) for manual-install caveats.
+
+### Cross-mission intelligence
+
+Nelson accumulates learning across missions in `.nelson/memory/`. Each completed mission feeds a persistent pattern library (`patterns.json`) and standing-order violation stats (`standing-order-stats.json`). Four `nelson-data.py` subcommands expose this:
+
+- **`brief`** — pre-mission intelligence brief: relevant patterns, win rate, standing order hot spots, and context-matched precedents drawn from prior missions.
+- **`analytics`** — focused metric queries (`success-rate`, `standing-orders`, `efficiency`) with text or JSON output.
+- **`history`** / **`index`** — review and rebuild the fleet intelligence index across past missions.
+- **`stand-down --adopt/--avoid`** — capture reusable patterns at mission close so the next run benefits.
+
+Running `index` backfills the memory store for missions completed before the feature existed, so upgrading is non-destructive.
+
+### Admiral synthesis
+
+Once every ship has reported on Stand Down, the admiral produces a fleet-wide synthesis — consolidating captain outputs into a single decision record. Boundary controls prevent premature synthesis (before all ships have reported) and keep the admiral out of direct implementation.
+
 ### Templates
 
 The skill includes structured templates for consistent output across missions:
@@ -265,6 +303,8 @@ cp -r /tmp/nelson/skills/nelson ~/.claude/skills/nelson
 ```
 
 Then commit `.claude/skills/nelson/` to version control so your team can use it.
+
+> **Heads up:** the manual path installs the skill only. Nelson's [enforcement hooks](#enforcement-hooks) and the bundled `settings.json` (which enables agent teams) are wired up automatically by the plugin system via `${CLAUDE_PLUGIN_ROOT}` and are **not** picked up by a skill-only copy. If you rely on the station-tier gate, file ownership checks, or turnover brief validation, use the plugin install above. To enable agent teams with a manual install, add the env var from [Prerequisites](#prerequisites) to your own `settings.json`.
 
 </details>
 
@@ -390,15 +430,19 @@ Edit `references/squadron-composition.md` to adjust the decision matrix or defau
 ## Plugin file structure
 
 ```
+.claude-plugin/           # Plugin + marketplace manifests
+settings.json             # Default settings (enables agent teams)
+hooks/                    # Enforcement hooks (auto-discovered by plugin)
 skills/nelson/
 ├── SKILL.md              # Main skill instructions (entrypoint)
-└── references/           # Supporting docs loaded on demand
-    ├── action-stations.md        # Risk tier definitions
-    ├── admiralty-templates/       # 10 structured templates
-    ├── crew-roles.md             # Crew role definitions & ship names
-    ├── damage-control/           # 10 recovery procedures
-    ├── standing-orders/          # 15 anti-pattern guards
-    └── squadron-composition.md   # Mode selection & team sizing
+├── references/           # Supporting docs loaded on demand
+│   ├── action-stations.md        # Risk tier definitions
+│   ├── admiralty-templates/      # 10 structured templates
+│   ├── crew-roles.md             # Crew role definitions & ship names
+│   ├── damage-control/           # 10 recovery procedures
+│   ├── standing-orders/          # 15 anti-pattern guards
+│   └── squadron-composition.md   # Mode selection & team sizing
+└── scripts/              # nelson-data.py, conflict scan, tests
 ```
 
 <details>
@@ -409,62 +453,74 @@ skills/nelson/
 ├── plugin.json                               # Plugin manifest
 └── marketplace.json                          # Marketplace definition (self-hosted)
 settings.json                                 # Plugin default settings (enables agent teams)
+hooks/
+├── hooks.json                                # Skill-scoped hook configuration (auto-discovered)
+├── nelson_hooks.py                           # Hook enforcement script (preflight, brief, task, idle)
+└── test_nelson_hooks.py                      # Tests for hook handlers
 skills/nelson/
 ├── SKILL.md                                  # Main skill instructions (entrypoint)
-└── references/
-    ├── action-stations.md                    # Risk tier definitions and controls
-    ├── admiralty-templates/                  # Individual template files
-    │   ├── battle-plan.md
-    │   ├── captains-log.md
-    │   ├── crew-briefing.md
-    │   ├── damage-report.md
-    │   ├── marine-deployment-brief.md
-    │   ├── quarterdeck-report.md
-    │   ├── red-cell-review.md
-    │   ├── sailing-orders.md
-    │   ├── ship-manifest.md
-    │   └── turnover-brief.md
-    ├── commendations.md                       # Recognition signals and correction guidance
-    ├── crew-roles.md                         # Crew role definitions, ship names, sizing
-    ├── damage-control/                       # Individual procedure files
-    │   ├── comms-failure.md
-    │   ├── crew-overrun.md
-    │   ├── escalation.md
-    │   ├── hull-integrity.md
-    │   ├── man-overboard.md
-    │   ├── partial-rollback.md
-    │   ├── relief-on-station.md
-    │   ├── scuttle-and-reform.md
-    │   ├── session-hygiene.md
-    │   └── session-resumption.md
-    ├── model-selection.md                    # Cost-optimized model assignment for agents
-    ├── royal-marines.md                      # Royal Marines deployment rules
-    ├── squadron-composition.md              # Mode selection and team sizing rules
-    ├── structured-data.md                    # Structured fleet data capture reference
-    ├── tool-mapping.md                       # Nelson-to-Claude Code tool reference
-    └── standing-orders/                      # Individual anti-pattern files
-        ├── admiral-at-the-helm.md
-        ├── all-hands-on-deck.md
-        ├── awaiting-admiralty.md
-        ├── battalion-ashore.md
-        ├── becalmed-fleet.md
-        ├── captain-at-the-capstan.md
-        ├── crew-without-canvas.md
-        ├── drifting-anchorage.md
-        ├── light-squadron.md
-        ├── paid-off.md
-        ├── press-ganged-navigator.md
-        ├── pressed-crew.md
-        ├── skeleton-crew.md
-        ├── split-keel.md
-        └── unclassified-engagement.md
+├── references/
+│   ├── action-stations.md                    # Risk tier definitions and controls
+│   ├── admiralty-templates/                  # Individual template files
+│   │   ├── battle-plan.md
+│   │   ├── captains-log.md
+│   │   ├── crew-briefing.md
+│   │   ├── damage-report.md
+│   │   ├── marine-deployment-brief.md
+│   │   ├── quarterdeck-report.md
+│   │   ├── red-cell-review.md
+│   │   ├── sailing-orders.md
+│   │   ├── ship-manifest.md
+│   │   └── turnover-brief.md
+│   ├── commendations.md                       # Recognition signals and correction guidance
+│   ├── crew-roles.md                         # Crew role definitions, ship names, sizing
+│   ├── damage-control/                       # Individual procedure files
+│   │   ├── comms-failure.md
+│   │   ├── crew-overrun.md
+│   │   ├── escalation.md
+│   │   ├── hull-integrity.md
+│   │   ├── man-overboard.md
+│   │   ├── partial-rollback.md
+│   │   ├── relief-on-station.md
+│   │   ├── scuttle-and-reform.md
+│   │   ├── session-hygiene.md
+│   │   └── session-resumption.md
+│   ├── model-selection.md                    # Cost-optimized model assignment for agents
+│   ├── royal-marines.md                      # Royal Marines deployment rules
+│   ├── squadron-composition.md               # Mode selection and team sizing rules
+│   ├── structured-data.md                    # Structured fleet data capture reference
+│   ├── tool-mapping.md                       # Nelson-to-Claude Code tool reference
+│   └── standing-orders/                      # Individual anti-pattern files
+│       ├── admiral-at-the-helm.md
+│       ├── all-hands-on-deck.md
+│       ├── awaiting-admiralty.md
+│       ├── battalion-ashore.md
+│       ├── becalmed-fleet.md
+│       ├── captain-at-the-capstan.md
+│       ├── crew-without-canvas.md
+│       ├── drifting-anchorage.md
+│       ├── light-squadron.md
+│       ├── paid-off.md
+│       ├── press-ganged-navigator.md
+│       ├── pressed-crew.md
+│       ├── skeleton-crew.md
+│       ├── split-keel.md
+│       └── unclassified-engagement.md
+└── scripts/                                  # Distributed with the skill (since v1.9.1)
+    ├── nelson-data.py                        # CLI entry point for structured data capture
+    ├── nelson_data_utils.py                  # Shared I/O, validation, constants
+    ├── nelson_data_memory.py                 # Cross-mission memory store (v2.0.0)
+    ├── nelson_data_lifecycle.py              # Mission lifecycle commands
+    ├── nelson_data_fleet.py                  # Fleet intelligence & analytics
+    ├── nelson_conflict_scan.py               # Pre-flight split-keel scanner
+    ├── nelson-phase.py                       # Deterministic phase engine
+    └── test_*.py                             # Test suite (pytest)
 agents/
-└── nelson.md                                # Agent definition with skill binding
+└── nelson.md                                 # Agent definition with skill binding
 scripts/
 ├── check-references.sh                       # Cross-reference validation for documentation links
 ├── count-tokens.py                           # Token counter for hull integrity monitoring
-├── nelson-data.py                            # Structured data capture for Nelson missions
-└── test_nelson_data.py                       # Tests for nelson-data.py
+└── nelson_conflict_radar.py                  # Runtime file-conflict monitor
 ```
 
 </details>
@@ -473,20 +529,33 @@ scripts/
 - `marketplace.json` lets users add this repo as a plugin marketplace and install Nelson by name.
 - `SKILL.md` is the entrypoint that Claude reads when the skill is invoked. It defines the six-step workflow and references the supporting files.
 - Files in `references/` contain detailed guidance that Claude loads on demand — they are not all loaded into context at once.
+- `hooks/hooks.json` is auto-discovered by the Claude Code plugin system; the commands resolve via `${CLAUDE_PLUGIN_ROOT}` and only run when Nelson is installed as a plugin.
+- `skills/nelson/scripts/` ships `nelson-data.py` and its sibling modules alongside the skill so they are distributed on install. The root-level `scripts/` directory holds repo-level utilities (`count-tokens.py`, `check-references.sh`, runtime conflict radar).
 
 ## Mission artifacts
 
-Each mission creates a timestamped directory for its runtime artifacts. Previous missions are preserved — each run gets its own directory. The `SESSION_ID` suffix is an 8-character hex string generated at session start via `uuidgen`, ensuring concurrent Nelson sessions in the same repository create distinct directories.
+Each mission creates a timestamped directory for its runtime artifacts. Previous missions are preserved — each run gets its own directory. The `SESSION_ID` suffix is an 8-character hex string generated at session start via `uuidgen`, ensuring **concurrent Nelson sessions** in the same repository create distinct directories.
+
+Nelson writes two kinds of artifacts side by side: **prose** for humans (captain's log, quarterdeck report, turnover briefs) and **structured JSON** for machines (session resumption, hooks, analytics). The JSON files are produced by `nelson-data.py` subcommands called at each workflow step.
 
 <details>
 <summary>Artifact directory structure</summary>
 
 ```
-.nelson/missions/{YYYY-MM-DD_HHMMSS}_{SESSION_ID}/
-  captains-log.md         — Written at stand-down
-  quarterdeck-report.md   — Updated at every checkpoint
-  damage-reports/         — Ship damage reports (JSON)
-  turnover-briefs/        — Ship turnover briefs (markdown)
+.nelson/
+├── missions/{YYYY-MM-DD_HHMMSS}_{SESSION_ID}/
+│   ├── captains-log.md         — Written at stand-down
+│   ├── quarterdeck-report.md   — Updated at every checkpoint
+│   ├── damage-reports/         — Ship damage reports (JSON)
+│   ├── turnover-briefs/        — Ship turnover briefs (markdown)
+│   ├── sailing-orders.json     — Mission definition (init)
+│   ├── battle-plan.json        — Tasks, owners, file ownership (plan-approved)
+│   ├── mission-log.json        — Event stream (events, handoffs, checkpoints)
+│   ├── fleet-status.json       — Current squadron state (live)
+│   └── stand-down.json         — Final outcome, decisions, adopted/avoided patterns
+└── memory/                     — Cross-mission memory store (v2.0.0)
+    ├── patterns.json           — Accumulated adopt/avoid pattern library
+    └── standing-order-stats.json — Violation frequency & correlations
 ```
 
 </details>
