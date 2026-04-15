@@ -568,6 +568,7 @@ def cmd_idle_ship(args: argparse.Namespace) -> None:
             f"Check hull integrity and task status.",
             file=sys.stderr,
         )
+        _check_idle_circuit_breaker(mission_dir, teammate_name)
         _allow()
 
     ship_name = ship.get("ship_name", teammate_name)
@@ -582,12 +583,15 @@ def cmd_idle_ship(args: argparse.Namespace) -> None:
                 f"See references/standing-orders/paid-off.md.",
                 file=sys.stderr,
             )
+            # Completed ships don't need an idle-timeout advisory — clear tracker.
+            _clear_idle_tracker(mission_dir, ship_name)
         else:
             print(
                 f"{ship_name} task is complete but has pending dependent "
                 f"tasks. Hold position until dependents are evaluated.",
                 file=sys.stderr,
             )
+            _check_idle_circuit_breaker(mission_dir, ship_name)
     else:
         hull = ship.get("hull_integrity_status", "unknown")
         print(
@@ -595,8 +599,58 @@ def cmd_idle_ship(args: argparse.Namespace) -> None:
             f"(hull: {hull}). Check hull integrity and task progress.",
             file=sys.stderr,
         )
+        _check_idle_circuit_breaker(mission_dir, ship_name)
 
     _allow()
+
+
+def _check_idle_circuit_breaker(mission_dir: Path, ship_name: str) -> None:
+    """Run the idle-timeout circuit breaker and surface an advisory if tripped.
+
+    Imports are local so the hook stays fast and has no hard dependency on
+    the scripts directory being importable (the hook degrades gracefully).
+    """
+    if not ship_name:
+        return
+    try:
+        sys.path.insert(
+            0, str(Path(__file__).resolve().parent.parent / "skills" / "nelson" / "scripts")
+        )
+        from nelson_circuit_breakers import (  # type: ignore[import-not-found]
+            evaluate_idle_timeout,
+            load_config,
+        )
+    except ImportError:
+        return
+
+    sailing_orders = _read_json(mission_dir / "sailing-orders.json") or None
+    config = load_config(sailing_orders)
+    if not config.get("enabled", True):
+        return
+
+    from datetime import datetime, timezone
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    trip = evaluate_idle_timeout(mission_dir, ship_name, now_iso, config)
+    if trip is None:
+        return
+
+    print(
+        f"[CIRCUIT BREAKER: {trip.type}] {trip.message}",
+        file=sys.stderr,
+    )
+
+
+def _clear_idle_tracker(mission_dir: Path, ship_name: str) -> None:
+    """Best-effort: clear the idle tracker entry for a completed ship."""
+    try:
+        sys.path.insert(
+            0, str(Path(__file__).resolve().parent.parent / "skills" / "nelson" / "scripts")
+        )
+        from nelson_circuit_breakers import clear_idle_tracker  # type: ignore[import-not-found]
+    except ImportError:
+        return
+    clear_idle_tracker(mission_dir, ship_name)
 
 
 # ---------------------------------------------------------------------------

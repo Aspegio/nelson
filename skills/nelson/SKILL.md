@@ -315,6 +315,7 @@ Consult the specific procedure that matches the situation.
 | Ship's crew consuming disproportionate tokens or time | `references/damage-control/crew-overrun.md` |
 | Ship's context window depleted, needs replacement | `references/damage-control/relief-on-station.md` |
 | Ship context window approaching limits | `references/damage-control/hull-integrity.md` |
+| Automated budget, hull, and idle alarms crossing thresholds | `references/damage-control/circuit-breakers.md` |
 | Preparing the mission directory at session start | `references/damage-control/session-hygiene.md` |
 | Agent team communication failure (lost agent IDs, message bus down) | `references/damage-control/comms-failure.md` |
 
