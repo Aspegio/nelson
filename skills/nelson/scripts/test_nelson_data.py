@@ -443,6 +443,38 @@ class TestStatus:
         # Silent no-op — no output, no error
         assert result.stdout.strip() == ""
 
+    def test_status_auto_detects_latest_mission(self, tmp_path: Path) -> None:
+        """Status without --mission-dir auto-detects the latest mission."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        run(
+            "checkpoint",
+            "--mission-dir", str(mission_dir),
+            "--pending", "1", "--in-progress", "1", "--completed", "1", "--blocked", "0",
+            "--tokens-spent", "30000", "--tokens-remaining", "70000",
+            "--hull-green", "2", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
+            "--decision", "continue", "--rationale", "Test",
+        )
+        import os
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+            result = run("status", "--mission-dir", "")
+            assert "Status:" in result.stdout or "nelson-data" in result.stdout
+        finally:
+            os.chdir(old_cwd)
+
+    def test_status_no_missions_dir_prints_message(self, tmp_path: Path) -> None:
+        """Status without --mission-dir and no .nelson/missions/ prints message."""
+        import os
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+            result = run("status", "--mission-dir", "")
+            assert "No active missions" in result.stdout
+        finally:
+            os.chdir(old_cwd)
+
 
 # ---------------------------------------------------------------------------
 # Form (composite command)

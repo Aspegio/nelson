@@ -855,9 +855,22 @@ def cmd_stand_down(args: argparse.Namespace) -> None:
 
 def cmd_status(args: argparse.Namespace) -> None:
     """Print current fleet status from fleet-status.json (read-only)."""
-    raw = getattr(args, "mission_dir", None)
-    if not raw:
-        return  # silent no-op
+    raw = getattr(args, "mission_dir", None) or ""
+    if not raw.strip():
+        # Auto-detect latest mission directory when none provided.
+        missions_root = Path(".nelson/missions")
+        if not missions_root.is_dir():
+            print("No active missions")
+            return
+        candidates = sorted(
+            (d for d in missions_root.iterdir() if d.is_dir()),
+            key=lambda d: d.stat().st_mtime,
+            reverse=True,
+        )
+        if not candidates:
+            print("No active missions")
+            return
+        raw = str(candidates[0])
     mission_dir = Path(raw)
     fs_path = mission_dir / "fleet-status.json"
     if not fs_path.exists():
