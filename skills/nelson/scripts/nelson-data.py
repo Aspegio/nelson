@@ -82,6 +82,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.add_argument(
         "--handoff-artifacts", action="append", help="Handoff artifact (repeatable)"
     )
+    p_init.add_argument(
+        "--session-id",
+        default=None,
+        help=(
+            "Optional 8-char lowercase hex session id. Auto-generated if omitted. "
+            "Embedded in the mission dir name and used for the "
+            ".nelson/.active-<id> marker file."
+        ),
+    )
 
     # --- squadron ---
     p_sq = subs.add_parser("squadron", help="Record squadron formation")

@@ -10,7 +10,7 @@ The script lives at `scripts/nelson-data.py` relative to the skill directory. Al
 
 Run at Step 1 after sailing orders are agreed.
 
-Creates `sailing-orders.json` and empty `mission-log.json`. Prints the mission directory path to stdout.
+`init` owns the mission-directory contract end-to-end. It generates (or accepts via `--session-id`) an 8-character hex SESSION_ID, creates `.nelson/missions/{YYYY-MM-DD_HHMMSS}_{SESSION_ID}/` with the `damage-reports/` and `turnover-briefs/` subdirectories, writes `sailing-orders.json`, `mission-log.json`, and `fleet-status.json` (initial phase `SAILING_ORDERS`), and writes `.nelson/.active-{SESSION_ID}` as the session marker consumed by recovery/hooks. The mission directory path is printed to stdout; the SESSION_ID is the segment after the last underscore in the directory name.
 
 ```bash
 python3 .claude/skills/nelson/scripts/nelson-data.py init \
@@ -19,6 +19,8 @@ python3 .claude/skills/nelson/scripts/nelson-data.py init \
   --deadline "this_session" \
   --token-budget 200000
 ```
+
+Optional: pass `--session-id <8-hex>` to use a specific session identifier (e.g., for deterministic tests or when resuming with a known id). Must be exactly 8 lowercase hex characters; invalid values are rejected.
 
 ### `squadron` — Record squadron formation
 
