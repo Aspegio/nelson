@@ -73,7 +73,7 @@ Nelson gives your missions a shared vocabulary: "action stations" instead of "ri
 - **Damage control built in** — Ten named procedures for stuck agents, context exhaustion, faulty output, budget overruns, and mission abort. These are protocols, not improvisation.
 - **A decision log by default** — Captain's log, quarterdeck reports, and turnover briefs are written as the mission runs. Every decision is auditable after the session ends.
 
-Nelson coordinates its own development — the v1.7.0 release was planned and executed as a Nelson mission.
+Nelson coordinates its own development — recent releases have been planned and executed as Nelson missions.
 
 ### Who is this for?
 
