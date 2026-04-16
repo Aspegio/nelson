@@ -63,6 +63,59 @@ class TestInit:
         assert so["constraints"] == ["No breaking changes", "Keep it simple"]
         assert so["out_of_scope"] == ["UI changes"]
 
+    def test_auto_generates_session_id_in_dirname(self, tmp_path: Path) -> None:
+        """Without --session-id, init embeds an 8-hex-char session id in the dir name."""
+        mission_dir = init_mission(tmp_path)
+        # Expected dir name: {YYYY-MM-DD_HHMMSS}_{8-hex}
+        name = mission_dir.name
+        parts = name.rsplit("_", 1)
+        assert len(parts) == 2, f"Expected '<stamp>_<session_id>', got: {name}"
+        session_id = parts[1]
+        assert len(session_id) == 8, f"Expected 8-char session id, got: {session_id!r}"
+        assert all(c in "0123456789abcdef" for c in session_id), (
+            f"Expected lowercase hex session id, got: {session_id!r}"
+        )
+
+    def test_accepts_explicit_session_id(self, tmp_path: Path) -> None:
+        """--session-id is respected verbatim in the dir name suffix."""
+        result = run(
+            "init",
+            "--outcome", "Test",
+            "--metric", "Pass",
+            "--deadline", "now",
+            "--session-id", "deadbeef",
+            cwd=tmp_path,
+        )
+        mission_dir = tmp_path / result.stdout.strip()
+        assert mission_dir.name.endswith("_deadbeef"), (
+            f"Expected dir name to end with _deadbeef, got: {mission_dir.name}"
+        )
+
+    def test_writes_active_sidecar(self, tmp_path: Path) -> None:
+        """init writes .nelson/.active-{session_id} pointing at the mission dir."""
+        mission_dir = init_mission(tmp_path)
+        session_id = mission_dir.name.rsplit("_", 1)[1]
+        sidecar = tmp_path / ".nelson" / f".active-{session_id}"
+        assert sidecar.is_file(), f"Expected sidecar at {sidecar}"
+        recorded = sidecar.read_text(encoding="utf-8").strip()
+        # Sidecar should resolve to the same directory (relative or absolute)
+        assert (tmp_path / recorded).resolve() == mission_dir.resolve(), (
+            f"Sidecar points to {recorded!r}, expected {mission_dir}"
+        )
+
+    def test_rejects_invalid_session_id(self, tmp_path: Path) -> None:
+        """Non-hex or wrongly-sized session ids are rejected (prevents path injection)."""
+        result = run(
+            "init",
+            "--outcome", "Test",
+            "--metric", "Pass",
+            "--deadline", "now",
+            "--session-id", "../etc",
+            cwd=tmp_path,
+            expect_fail=True,
+        )
+        assert "session-id" in result.stderr.lower()
+
 
 # ---------------------------------------------------------------------------
 # Squadron
