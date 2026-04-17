@@ -103,6 +103,47 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def add_estimate(
+    mission_dir: Path,
+    body: str | None = None,
+) -> None:
+    """Write a minimal estimate.md to *mission_dir* to satisfy the phase exit."""
+    text = body or (
+        "# The Estimate\n\n"
+        "## 1. Reconnaissance\nTest mission.\n\n"
+        "## 2. Task analysis\nTest task.\n\n"
+        "## 3. Environment\nTest environment.\n\n"
+        "## 4. Courses of action\nSingle course.\n\n"
+        "## 5. Coordination\nSingle captain.\n\n"
+        "## 6. Execution\nProceed.\n\n"
+        "## 7. Control\nWatch for drift.\n"
+    )
+    (mission_dir / "estimate.md").write_text(text, encoding="utf-8")
+
+
+def record_estimate_outcome(
+    mission_dir: Path,
+    *,
+    effect_id: str = "E1",
+    criterion_id: str = "C1",
+    status: str = "pass",
+    method: str = "test",
+    evidence: str = "pytest -q",
+    recorded_by: str = "HMS Argyll",
+) -> None:
+    """Append an estimate outcome via the CLI."""
+    run(
+        "estimate-outcome",
+        "--mission-dir", str(mission_dir),
+        "--effect-id", effect_id,
+        "--criterion-id", criterion_id,
+        "--status", status,
+        "--method", method,
+        "--evidence", evidence,
+        "--recorded-by", recorded_by,
+    )
+
+
 def create_completed_mission(
     cwd: Path,
     mission_id: str | None = None,
@@ -112,6 +153,7 @@ def create_completed_mission(
     station_tiers: list[int] | None = None,
     actual_outcome: str = "Mission completed",
     metric_result: str = "All tests pass",
+    estimate_outcomes: list[dict] | None = None,
 ) -> Path:
     """Create a fully completed mission with all 4 JSON files.
 
@@ -136,6 +178,10 @@ def create_completed_mission(
         )
 
     run("plan-approved", "--mission-dir", str(mission_dir))
+
+    if estimate_outcomes:
+        for o in estimate_outcomes:
+            record_estimate_outcome(mission_dir, **o)
 
     run(
         "checkpoint",

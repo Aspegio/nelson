@@ -37,13 +37,20 @@ from nelson_data_lifecycle import (
     cmd_headless,
     cmd_init,
     cmd_plan_approved,
+    cmd_record_estimate_outcome,
     cmd_recover,
+    cmd_skip_estimate,
     cmd_squadron,
     cmd_stand_down,
     cmd_status,
     cmd_task,
 )
-from nelson_data_utils import VALID_MODES, _die
+from nelson_data_utils import (
+    VALID_ESTIMATE_OUTCOME_METHODS,
+    VALID_ESTIMATE_OUTCOME_STATUSES,
+    VALID_MODES,
+    _die,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +137,52 @@ def build_parser() -> argparse.ArgumentParser:
     # --- plan-approved ---
     p_pa = subs.add_parser("plan-approved", help="Finalize battle plan")
     p_pa.add_argument("--mission-dir", required=True, help="Mission directory path")
+
+    # --- skip-estimate ---
+    p_se = subs.add_parser(
+        "skip-estimate", help="Record that the ESTIMATE phase is being skipped"
+    )
+    p_se.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_se.add_argument(
+        "--reason",
+        required=True,
+        help="Rationale for skipping the estimate (e.g. 'trivial scope')",
+    )
+
+    # --- estimate-outcome ---
+    p_eo = subs.add_parser(
+        "estimate-outcome",
+        help="Record a per-criterion verification outcome for The Estimate",
+    )
+    p_eo.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_eo.add_argument(
+        "--effect-id", required=True, help="Effect identifier from the Estimate"
+    )
+    p_eo.add_argument(
+        "--criterion-id",
+        required=True,
+        help="Criterion identifier within the effect",
+    )
+    p_eo.add_argument(
+        "--status",
+        required=True,
+        choices=sorted(VALID_ESTIMATE_OUTCOME_STATUSES),
+        help="Verification status",
+    )
+    p_eo.add_argument(
+        "--method",
+        required=True,
+        choices=sorted(VALID_ESTIMATE_OUTCOME_METHODS),
+        help="Verification method used",
+    )
+    p_eo.add_argument(
+        "--evidence", default="", help="Free-text evidence supporting the outcome"
+    )
+    p_eo.add_argument(
+        "--recorded-by",
+        required=True,
+        help="Ship or role that recorded the outcome",
+    )
 
     # --- event ---
     p_ev = subs.add_parser("event", help="Log a mission event")
@@ -361,6 +414,8 @@ def main() -> None:
         "squadron": lambda: cmd_squadron(args),
         "task": lambda: cmd_task(args),
         "plan-approved": lambda: cmd_plan_approved(args),
+        "skip-estimate": lambda: cmd_skip_estimate(args),
+        "estimate-outcome": lambda: cmd_record_estimate_outcome(args),
         "event": lambda: cmd_event(args, extra),
         "handoff": lambda: cmd_handoff(args),
         "checkpoint": lambda: cmd_checkpoint(args),

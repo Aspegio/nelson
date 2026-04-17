@@ -47,6 +47,8 @@ VALID_EVENT_TYPES = frozenset(
         "phase_override",
         "permission_granted",
         "circuit_breaker_tripped",
+        "estimate_skipped",
+        "estimate_outcome_recorded",
     }
 )
 
@@ -60,6 +62,10 @@ VALID_HANDOFF_TYPES = frozenset(
 
 VALID_DECISIONS = frozenset({"continue", "rescope", "stop"})
 VALID_MODES = frozenset({"single-session", "subagents", "agent-team"})
+VALID_ESTIMATE_OUTCOME_STATUSES = frozenset({"pass", "fail", "not-verified"})
+VALID_ESTIMATE_OUTCOME_METHODS = frozenset(
+    {"test", "type-check", "lint", "review", "visual"}
+)
 JSON_INDENT = 2
 
 
@@ -173,6 +179,24 @@ def _append_event(mission_dir: Path, event: dict) -> None:
         new_events = list(log.get("events", [])) + [event]
         new_log = {**log, "events": new_events}
         _write_json(log_path, new_log)
+
+
+def _append_estimate_outcome(mission_dir: Path, outcome: dict) -> None:
+    """Append *outcome* to estimate-outcomes.json using read-modify-write.
+
+    Uses an exclusive file lock to tolerate concurrent writes from multiple
+    captains verifying criteria in parallel.
+    """
+    outcomes_path = mission_dir / "estimate-outcomes.json"
+    lock_path = mission_dir / ".estimate-outcomes.lock"
+
+    with _file_lock(lock_path):
+        existing = _read_json_optional(outcomes_path)
+        if existing is None:
+            existing = {"version": 1, "outcomes": []}
+        new_outcomes = list(existing.get("outcomes", [])) + [outcome]
+        new_doc = {**existing, "version": 1, "outcomes": new_outcomes}
+        _write_json(outcomes_path, new_doc)
 
 
 def _err(msg: str) -> None:

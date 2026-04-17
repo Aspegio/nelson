@@ -17,7 +17,7 @@ This plan introduces **The Estimate** as a new phase between Sailing Orders and 
 ### The revised operational flow
 
 ```
-Sailing Orders → The Estimate → Battle Plan → Form Squadron → Quarterdeck → Stand Down
+Sailing Orders → The Estimate → Battle Plan → Form Squadron → Quarterdeck Rhythm → Action Stations → Stand Down
 ```
 
 ### Why this matters
@@ -26,6 +26,12 @@ Sailing Orders → The Estimate → Battle Plan → Form Squadron → Quarterdec
 - Acceptance criteria defined during The Estimate flow through the entire pipeline — captains know what "done" looks like, the quarterdeck can verify objectively, and review passes have concrete criteria rather than vibes.
 - Intent propagation becomes explicit. Each agent receives the commander's intent, enabling independent judgement when plans meet reality.
 - The Estimate is the first mechanism by which Nelson can *measure* whether its output meets its spec — the beginning of evidence-based confidence in the framework.
+
+### Positioning: Nelson as a full-lifecycle framework
+
+A recurring question when Nelson is discussed publicly is how it compares to planning-focused skills like Superpowers or GSD. The honest answer today: Nelson is strong at execution — parallel coordination, quality gates, captain delegation — but thinner at the analytical front end. In practice the author himself reaches for a planning-first tool for the *thinking* phase and hands over to Nelson for the *doing* phase.
+
+The Estimate is the direct response. With it, Nelson covers the full mission lifecycle: deliberate analysis, structured planning, coordinated execution, and evidence-based stand-down. The framework becomes one continuous voice from mission brief to completion, rather than a handoff between tools. This is the primary motivation for the feature and the headline improvement for the eventual PR.
 
 ---
 
@@ -83,30 +89,32 @@ The Estimate is a conversation between the admiral and the user, not a monologue
 
 **Final review.** The admiral presents the complete estimate. The user approves, requests amendments, or overrides specific questions. Upon approval, the phase advances from `ESTIMATE` to `BATTLE_PLAN`.
 
-**Checkpoint discipline.** Checkpoints are *available*, not *mandatory*. The admiral should read the room. If the Sailing Orders are precise and the terrain is familiar, the admiral may present the complete estimate in one pass rather than stopping twice. The two-checkpoint flow is the default for complex or ambiguous missions.
+**Checkpoint discipline.** Checkpoints are *available*, not *mandatory*. The admiral may collapse to a single end-of-estimate review when **all three** conditions hold: the Sailing Orders specify outcome, metric, and deadline; reconnaissance (Q1) reveals no surprises requiring reframing; and the work lands in a single subsystem or file. Outside that narrow case, the two-checkpoint flow is the default.
 
 ### 3.3 Output format
 
-Seven markdown files in `{mission-dir}/estimate/`:
+A single markdown file, `{mission-dir}/estimate.md`, with one H2 section per question:
 
 ```
-{mission-dir}/estimate/
-  01-reconnaissance.md
-  02-intent.md
-  03-effects.md
-  04-terrain.md
-  05-forces.md
-  06-coordination.md
-  07-control.md
+{mission-dir}/estimate.md
+  ## 1. Reconnaissance
+  ## 2. Intent
+  ## 3. Effects
+  ## 4. Terrain
+  ## 5. Forces
+  ## 6. Coordination
+  ## 7. Control
 ```
 
-The admiral writes these as a confident, thoughtful briefing — not as auto-generated documentation. Concise but never terse. Clear but never flat. The kind of prose a capable officer would want to read before going into action.
+If a section grows unwieldy during a complex mission, the admiral may split it into its own file at `{mission-dir}/estimate/0N-name.md` and leave a prose pointer in the parent. The default is one file — splitting is the exception, not the rule.
+
+The admiral writes this as a confident, thoughtful briefing — not as auto-generated documentation. Concise but never terse. Clear but never flat. The kind of prose a capable officer would want to read before going into action.
 
 Cross-references between questions use natural prose, not IDs or schemas. The Battle Plan step reads the estimate in context; it is the same admiral reading its own work.
 
 ### 3.4 Effects, acceptance criteria, and commander's guidance
 
-Each effect in `03-effects.md` carries three elements:
+Each effect in the Effects section (Q3) carries three elements:
 
 ```markdown
 ### Effect: Replace session auth with JWT signing
@@ -141,7 +149,7 @@ This mirrors Nelson's practice before Trafalgar: one memorandum, shared with eve
 
 ### 3.6 Adaptive planning
 
-The Estimate is a living document, not a contract. When the admiral or a captain encounters something that contradicts the estimate — a file more complex than expected, a dependency not apparent, an approach that proves unworkable — the admiral amends the relevant estimate file with a dated addendum:
+The Estimate is a living document, not a contract. When the admiral or a captain encounters something that contradicts the estimate — a file more complex than expected, a dependency not apparent, an approach that proves unworkable — the admiral amends the relevant section with a dated addendum:
 
 ```markdown
 ## Addendum — 14:32
@@ -164,6 +172,8 @@ The recommendation should be honest. For straightforward missions with clear sco
 
 When The Estimate is conducted for simpler missions, the admiral writes shorter answers. The seven questions are always followed; the depth scales with the mission.
 
+When the user declines, the admiral records the decision in `sailing-orders.json` as `"estimate_skipped": true` with a short reason, and the phase engine advances directly from `SAILING_ORDERS` to `BATTLE_PLAN`. The `ESTIMATE` phase exit criterion accepts either the estimate file or this flag — opting out does not break the deterministic transition.
+
 ### 3.8 How the Battle Plan simplifies
 
 With The Estimate in place, the Battle Plan no longer performs analytical work. It inherits:
@@ -175,13 +185,15 @@ With The Estimate in place, the Battle Plan no longer performs analytical work. 
 
 The Battle Plan step reduces to: translate effects into task assignments, assign captains, apply standing order checks. The standing order gate remains — it catches structural problems in the *assignment*, not in the *analysis*.
 
+**Worked example.** For a JWT auth refactor, the Estimate produces: Q4 names `src/auth/session.ts`, `src/auth/middleware.ts`, and the 47-test suite as the affected surface; Q5 proposes one destroyer captain on a sonnet model, one red-cell navigator, no crew; Q6 notes that middleware changes must follow session changes, with tests run at the end. The Battle Plan inherits all of this and adds: ship names, task IDs, `admiralty-action-required` flags, action-station tier assignments, and the formal standing-order gate check. It answers *how the squadron is spun up*, not *what needs doing*. If you find yourself re-deriving terrain or forces during Battle Plan, the Estimate was incomplete — amend it rather than duplicating.
+
 ---
 
 ## 4. Implementation
 
 ### 4.1 Phase engine
 
-Add `ESTIMATE` to the phase sequence in `nelson-phase.py`, between `SAILING_ORDERS` and `BATTLE_PLAN`. The phase advances on user approval of the complete estimate.
+Add `ESTIMATE` to the `PHASES` tuple in `nelson-phase.py`, between `SAILING_ORDERS` and `BATTLE_PLAN`. The full chain becomes `SAILING_ORDERS → ESTIMATE → BATTLE_PLAN → FORMATION → PERMISSION → UNDERWAY → STAND_DOWN`. The phase advances on user approval of the complete estimate, or when `sailing-orders.json` carries `"estimate_skipped": true`. Tool blocks on `ESTIMATE`: `TeamCreate` and `TaskCreate` remain blocked (no captains, no tasks yet); `Agent` is permitted because Q1 dispatches Explore agents.
 
 ### 4.2 Reference document
 
@@ -189,19 +201,25 @@ Create `skills/nelson/references/the-estimate.md` containing the seven questions
 
 ### 4.3 SKILL.md changes
 
-Insert The Estimate as a new step between the current steps 1 (Sailing Orders) and 2 (Battle Plan). Update the Sailing Orders step to include the opt-in prompt. Update the Battle Plan step to reference the estimate and remove analytical work that moves into The Estimate.
+Insert The Estimate as a new step between the current steps 1 (Sailing Orders) and 2 (Battle Plan). Update the Sailing Orders step to include the opt-in prompt. Update the Battle Plan step to reference the estimate and remove analytical work that moves into The Estimate. Include a single sentence directing the admiral to write elegantly — not 18th-century prose, but the clear, confident register of an officer who respects the reader's time. The skill's own voice sets the example, so no separate voice-and-style reference is needed.
 
 ### 4.4 Estimate template
 
-Create `skills/nelson/references/admiralty-templates/estimate.md` with the directory structure and per-question templates. Light scaffolding, not fill-in-the-blanks — the admiral writes prose, not forms.
+Create `skills/nelson/references/admiralty-templates/estimate.md` with the single-file layout and per-section skeletons. Light scaffolding, not fill-in-the-blanks — the admiral writes prose, not forms.
 
 ### 4.5 Battle Plan template updates
 
 Update `skills/nelson/references/admiralty-templates/battle-plan.md` to include commander's intent propagation and acceptance criteria inheritance from effects.
 
-### 4.6 Voice and style
+### 4.6 Measurement and telemetry
 
-Encode in the reference document, not buried in templates. A short section setting the standard: *write like a commander who respects the reader's time and intelligence.* Nelson's prose should be a distinguishing quality of the tool, not an afterthought.
+The Estimate's acceptance criteria are the first point at which Nelson can *measure* whether its output meets its spec. Capture this data from day one:
+
+- The quarterdeck records per-criterion outcomes (`pass`, `fail`, `not-verified`) and the verification method used (test, type-check, lint, review, visual).
+- Outcomes land in `estimate-outcomes.json` in the mission directory and are surfaced in the captain's log.
+- Fleet analytics (`nelson-data.py fleet`) aggregate pass rates across missions, broken down by verification method.
+
+Without this the feature adds process without evidence. With it, we can tell in three months' time whether The Estimate produces better outcomes than Sailing Orders alone.
 
 ---
 
@@ -218,7 +236,7 @@ Encode in the reference document, not buried in templates. A short section setti
 
 - [ ] The phase engine accepts `ESTIMATE` as a valid phase between `SAILING_ORDERS` and `BATTLE_PLAN`, and transitions correctly in both directions
 - [ ] The admiral offers The Estimate after Sailing Orders with an honest recommendation
-- [ ] Q1 dispatches at least one Explore agent and synthesises findings into `01-reconnaissance.md`
+- [ ] Q1 produces a terrain assessment; Explore agents are dispatched when terrain is ambiguous or unfamiliar, and their findings are synthesised into the Reconnaissance section
 - [ ] The admiral presents findings after Q1 and pauses for user input (checkpoint 1)
 - [ ] Mission reframing is possible at checkpoint 1 — Sailing Orders can be amended with original preserved
 - [ ] Q3 produces effects with commander's guidance and verifiable acceptance criteria
@@ -228,6 +246,8 @@ Encode in the reference document, not buried in templates. A short section setti
 - [ ] The quarterdeck verifies completion against acceptance criteria, not subjective assessment
 - [ ] Estimate files are amendable with dated addenda when new information surfaces
 - [ ] The Battle Plan step no longer duplicates analytical work covered by The Estimate
-- [ ] All seven markdown files are written in the estimate directory within the mission directory
+- [ ] The estimate file (or split files, when escalated) covers all seven questions and is written inside the mission directory
 - [ ] Existing Nelson missions without The Estimate continue to function (backwards compatible)
+- [ ] Users can decline The Estimate at the opt-in prompt; `sailing-orders.json` records the skip with a reason, and the phase advances directly to `BATTLE_PLAN`
+- [ ] Per-criterion verification outcomes are captured in `estimate-outcomes.json` with the verification method recorded
 - [ ] Tests cover the phase engine changes

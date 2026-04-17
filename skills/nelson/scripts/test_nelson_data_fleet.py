@@ -656,6 +656,114 @@ class TestAnalyticsCommand:
         data = json.loads(result.stdout)
         assert data["total"] == 2
 
+    def test_estimate_outcomes_metric(self, tmp_path: Path) -> None:
+        """Analytics reports pass/fail/not-verified totals across missions."""
+        create_completed_mission(
+            tmp_path,
+            mission_id="2026-04-01_100000",
+            estimate_outcomes=[
+                {"effect_id": "E1", "criterion_id": "C1", "status": "pass", "method": "test"},
+                {"effect_id": "E1", "criterion_id": "C2", "status": "fail", "method": "test"},
+                {"effect_id": "E1", "criterion_id": "C3", "status": "pass", "method": "review"},
+            ],
+        )
+        create_completed_mission(
+            tmp_path,
+            mission_id="2026-04-02_100000",
+            estimate_outcomes=[
+                {"effect_id": "E1", "criterion_id": "C1", "status": "pass", "method": "type-check"},
+                {"effect_id": "E1", "criterion_id": "C2", "status": "not-verified", "method": "visual"},
+            ],
+        )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "estimate-outcomes",
+            "--json",
+            cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert data["total"] == 5
+        assert data["pass"] == 3
+        assert data["fail"] == 1
+        assert data["not_verified"] == 1
+        assert data["missions_with_outcomes"] == 2
+        assert data["pass_rate"] == 60.0
+
+        by_method = data["by_method"]
+        assert by_method["test"]["total"] == 2
+        assert by_method["test"]["pass"] == 1
+        assert by_method["test"]["pass_rate"] == 50.0
+        assert by_method["review"]["total"] == 1
+        assert by_method["review"]["pass_rate"] == 100.0
+        assert by_method["visual"]["total"] == 1
+        assert by_method["visual"]["pass_rate"] == 0.0
+        assert by_method["lint"]["total"] == 0
+        assert by_method["lint"]["pass_rate"] is None
+
+        assert len(data["by_mission"]) == 2
+
+    def test_estimate_outcomes_text_format(self, tmp_path: Path) -> None:
+        """Human-readable output shows overall pass rate and method breakdown."""
+        create_completed_mission(
+            tmp_path,
+            mission_id="2026-04-01_100000",
+            estimate_outcomes=[
+                {"effect_id": "E1", "criterion_id": "C1", "status": "pass", "method": "test"},
+                {"effect_id": "E1", "criterion_id": "C2", "status": "fail", "method": "review"},
+            ],
+        )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "estimate-outcomes",
+            cwd=tmp_path,
+        )
+        assert "Estimate outcomes" in result.stdout
+        assert "50.0% pass" in result.stdout
+        assert "By method" in result.stdout
+        assert "test:" in result.stdout
+        assert "review:" in result.stdout
+
+    def test_estimate_outcomes_empty_when_no_data(self, tmp_path: Path) -> None:
+        """Metric works even when no mission recorded outcomes."""
+        self._setup_indexed(tmp_path, count=2)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "estimate-outcomes",
+            "--json",
+            cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert data["total"] == 0
+        assert data["missions_with_outcomes"] == 0
+        assert data["pass_rate"] is None
+
+    def test_estimate_outcomes_in_all_metric(self, tmp_path: Path) -> None:
+        """--metric all includes the estimate_outcomes group."""
+        create_completed_mission(
+            tmp_path,
+            mission_id="2026-04-01_100000",
+            estimate_outcomes=[
+                {"effect_id": "E1", "criterion_id": "C1", "status": "pass", "method": "test"},
+            ],
+        )
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        result = run(
+            "analytics",
+            "--missions-dir", self._missions_dir(tmp_path),
+            "--metric", "all",
+            "--json",
+            cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert "estimate_outcomes" in data
+        assert data["estimate_outcomes"]["total"] == 1
+
     def test_analytics_no_index_fails(self, tmp_path: Path) -> None:
         """analytics without an index fails gracefully."""
         missions_dir = tmp_path / ".nelson" / "missions"

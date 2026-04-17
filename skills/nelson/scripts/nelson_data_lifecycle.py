@@ -28,9 +28,12 @@ from nelson_data_memory import _update_patterns_store, _update_standing_order_st
 from nelson_data_utils import (
     JSON_INDENT,
     VALID_DECISIONS,
+    VALID_ESTIMATE_OUTCOME_METHODS,
+    VALID_ESTIMATE_OUTCOME_STATUSES,
     VALID_EVENT_TYPES,
     VALID_HANDOFF_TYPES,
     VALID_MODES,
+    _append_estimate_outcome,
     _append_event,
     _count_events_of_type,
     _die,
@@ -481,6 +484,118 @@ def _compute_dag_metrics(tasks: list[dict]) -> tuple[int, int]:
 
     critical_path_length = max(longest_path(t["id"]) for t in tasks)
     return parallel_tracks, critical_path_length
+
+
+# ---------------------------------------------------------------------------
+# Subcommand: skip-estimate
+# ---------------------------------------------------------------------------
+
+
+def cmd_skip_estimate(args: argparse.Namespace) -> None:
+    """Record that the ESTIMATE phase is being skipped for this mission.
+
+    Writes ``estimate_skipped: true`` and ``estimate_skip_reason`` into
+    ``sailing-orders.json`` and logs an ``estimate_skipped`` mission event.
+    Allows the phase exit validator to advance SAILING_ORDERS/ESTIMATE to
+    BATTLE_PLAN without requiring an ``estimate.md`` file.
+    """
+    mission_dir = _require_mission_dir(args)
+
+    reason = (args.reason or "").strip()
+    if not reason:
+        _die("Error: --reason is required and must be non-empty.")
+
+    so_path = mission_dir / "sailing-orders.json"
+    if not so_path.exists():
+        _die(
+            "Error: sailing-orders.json does not exist. Run 'init' before skipping the estimate."
+        )
+
+    sailing_orders = _read_json(so_path)
+    new_sailing_orders = {
+        **sailing_orders,
+        "estimate_skipped": True,
+        "estimate_skip_reason": reason,
+    }
+    _write_json(so_path, new_sailing_orders)
+
+    event = {
+        "type": "estimate_skipped",
+        "checkpoint": 0,
+        "timestamp": _now_iso(),
+        "data": {"reason": reason},
+    }
+    _append_event(mission_dir, event)
+
+    print(f"[nelson-data] Estimate skipped: {reason}")
+
+
+# ---------------------------------------------------------------------------
+# Subcommand: estimate-outcome
+# ---------------------------------------------------------------------------
+
+
+def cmd_record_estimate_outcome(args: argparse.Namespace) -> None:
+    """Record a per-criterion verification outcome for The Estimate.
+
+    Appends to ``{mission-dir}/estimate-outcomes.json`` and logs an
+    ``estimate_outcome_recorded`` event. Captains call this at the moment
+    they verify a criterion during UNDERWAY; the quarterdeck aggregates
+    at stand-down.
+    """
+    mission_dir = _require_mission_dir(args)
+
+    status = args.status
+    if status not in VALID_ESTIMATE_OUTCOME_STATUSES:
+        _die(
+            f"Error: invalid status '{status}'. "
+            f"Valid: {', '.join(sorted(VALID_ESTIMATE_OUTCOME_STATUSES))}"
+        )
+
+    method = args.method
+    if method not in VALID_ESTIMATE_OUTCOME_METHODS:
+        _die(
+            f"Error: invalid method '{method}'. "
+            f"Valid: {', '.join(sorted(VALID_ESTIMATE_OUTCOME_METHODS))}"
+        )
+
+    effect_id = (args.effect_id or "").strip()
+    criterion_id = (args.criterion_id or "").strip()
+    recorded_by = (args.recorded_by or "").strip()
+    if not effect_id or not criterion_id or not recorded_by:
+        _die(
+            "Error: --effect-id, --criterion-id and --recorded-by are required and must be non-empty."
+        )
+
+    outcome = {
+        "effect_id": effect_id,
+        "criterion_id": criterion_id,
+        "status": status,
+        "method": method,
+        "evidence": args.evidence or "",
+        "recorded_by": recorded_by,
+        "recorded_at": _now_iso(),
+    }
+    _append_estimate_outcome(mission_dir, outcome)
+
+    event = {
+        "type": "estimate_outcome_recorded",
+        "checkpoint": 0,
+        "timestamp": _now_iso(),
+        "data": {
+            "effect_id": effect_id,
+            "criterion_id": criterion_id,
+            "status": status,
+            "method": method,
+            "recorded_by": recorded_by,
+        },
+    }
+    _append_event(mission_dir, event)
+
+    print(
+        f"[nelson-data] Estimate outcome recorded: {effect_id}/{criterion_id} "
+        f"{status} via {method} (by {recorded_by})"
+    )
 
 
 # ---------------------------------------------------------------------------

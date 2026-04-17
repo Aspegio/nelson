@@ -6,7 +6,7 @@ and enforces transition criteria.  The admiral still does all judgment
 work inside each phase; this script handles structural transitions only.
 
 Phases:
-    SAILING_ORDERS -> BATTLE_PLAN -> FORMATION -> PERMISSION -> UNDERWAY -> STAND_DOWN
+    SAILING_ORDERS -> ESTIMATE -> BATTLE_PLAN -> FORMATION -> PERMISSION -> UNDERWAY -> STAND_DOWN
 
 Usage examples:
 
@@ -43,6 +43,7 @@ except ImportError:
 
 PHASES = (
     "SAILING_ORDERS",
+    "ESTIMATE",
     "BATTLE_PLAN",
     "FORMATION",
     "PERMISSION",
@@ -57,6 +58,7 @@ PHASE_SET = frozenset(PHASES)
 # formation, but blocks Agent/TeamCreate since the squadron isn't ready yet.
 BLOCKED_TOOLS: dict[str, frozenset[str]] = {
     "SAILING_ORDERS": frozenset({"Agent", "TeamCreate", "TaskCreate"}),
+    "ESTIMATE": frozenset({"TeamCreate", "TaskCreate"}),
     "BATTLE_PLAN": frozenset({"Agent", "TeamCreate", "TaskCreate"}),
     "FORMATION": frozenset({"Agent", "TeamCreate"}),
     "PERMISSION": frozenset({"Agent", "TeamCreate", "TaskCreate"}),
@@ -67,6 +69,10 @@ BLOCKED_TOOLS: dict[str, frozenset[str]] = {
 # Human-readable descriptions of exit criteria per phase.
 EXIT_CRITERIA_DESC: dict[str, str] = {
     "SAILING_ORDERS": "sailing-orders.json must exist in the mission directory",
+    "ESTIMATE": (
+        "estimate.md must exist in the mission directory, "
+        "or sailing-orders.json must carry estimate_skipped: true"
+    ),
     "BATTLE_PLAN": "battle-plan.json must have tasks, all with station_tier assigned",
     "FORMATION": "battle-plan.json must have a squadron section",
     "PERMISSION": "a permission_granted event must exist in mission-log.json",
@@ -270,6 +276,25 @@ def _check_sailing_orders_exit(mission_dir: Path) -> str | None:
     return None
 
 
+def _check_estimate_exit(mission_dir: Path) -> str | None:
+    """Check exit criteria for ESTIMATE phase.
+
+    Returns None if either estimate.md exists in the mission directory
+    or the sailing orders explicitly record that the estimate was skipped.
+    """
+    if (mission_dir / "estimate.md").exists():
+        return None
+    so_path = mission_dir / "sailing-orders.json"
+    if so_path.exists():
+        so = _read_json(so_path)
+        if so.get("estimate_skipped") is True:
+            return None
+    return (
+        "estimate.md does not exist and sailing-orders.json does not "
+        "record estimate_skipped: true"
+    )
+
+
 def _check_battle_plan_exit(mission_dir: Path) -> str | None:
     """Check exit criteria for BATTLE_PLAN phase.
 
@@ -362,6 +387,7 @@ def _check_underway_exit(mission_dir: Path) -> str | None:
 # Map phase -> exit criteria checker
 EXIT_VALIDATORS: dict[str, Any] = {
     "SAILING_ORDERS": _check_sailing_orders_exit,
+    "ESTIMATE": _check_estimate_exit,
     "BATTLE_PLAN": _check_battle_plan_exit,
     "FORMATION": _check_formation_exit,
     "PERMISSION": _check_permission_exit,

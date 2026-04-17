@@ -390,6 +390,12 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
     battle_plan = _read_json_optional(mission_dir / "battle-plan.json") or {}
     sailing_orders = _read_json_optional(mission_dir / "sailing-orders.json") or {}
     mission_log = _read_json_optional(mission_dir / "mission-log.json") or {}
+    estimate_outcomes_doc = _read_json_optional(mission_dir / "estimate-outcomes.json")
+    estimate_outcomes = (
+        estimate_outcomes_doc.get("outcomes", [])
+        if estimate_outcomes_doc
+        else []
+    )
 
     # Fleet details from battle-plan
     fleet_details = _extract_fleet_details(battle_plan)
@@ -453,4 +459,5 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
             "reusable_patterns", {"adopt": [], "avoid": []}
         ),
         "event_types": event_types,
+        "estimate_outcomes": estimate_outcomes,
     }
