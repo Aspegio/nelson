@@ -12,11 +12,11 @@ have no registered owner — not cross-ship violations (Ship A writing to Ship B
 files). For true cross-ship detection, per-agent change tracking would be needed.
 
 Usage (manual invocation):
-  python3 scripts/nelson_conflict_radar.py --plan .nelson/missions/<your-mission-dir>/battle-plan.md
+  python3 skills/nelson/scripts/nelson_conflict_radar.py --plan .nelson/missions/<your-mission-dir>/battle-plan.md
 
 Opt-in hook configuration (add to settings.json PostToolUse hooks if desired):
   Recommended guard to only run during active Nelson missions:
-    if [ -d .nelson/missions ]; then python3 scripts/nelson_conflict_radar.py --plan <path>; fi
+    if [ -d .nelson/missions ]; then python3 skills/nelson/scripts/nelson_conflict_radar.py --plan <path>; fi
 
   Note: Running this as a default PostToolUse hook is NOT recommended — it is
   too expensive to run on every tool use and will cause issues in non-Nelson

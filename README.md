@@ -73,7 +73,7 @@ Nelson gives your missions a shared vocabulary: "action stations" instead of "ri
 - **Damage control built in** — Ten named procedures for stuck agents, context exhaustion, faulty output, budget overruns, and mission abort. These are protocols, not improvisation.
 - **A decision log by default** — Captain's log, quarterdeck reports, and turnover briefs are written as the mission runs. Every decision is auditable after the session ends.
 
-Nelson coordinates its own development — the v1.7.0 release was planned and executed as a Nelson mission.
+Nelson coordinates its own development — recent releases have been planned and executed as Nelson missions.
 
 ### Who is this for?
 
@@ -513,14 +513,14 @@ skills/nelson/
     ├── nelson_data_lifecycle.py              # Mission lifecycle commands
     ├── nelson_data_fleet.py                  # Fleet intelligence & analytics
     ├── nelson_conflict_scan.py               # Pre-flight split-keel scanner
+    ├── nelson_conflict_radar.py              # Runtime file-conflict monitor
     ├── nelson-phase.py                       # Deterministic phase engine
     └── test_*.py                             # Test suite (pytest)
 agents/
 └── nelson.md                                 # Agent definition with skill binding
 scripts/
 ├── check-references.sh                       # Cross-reference validation for documentation links
-├── count-tokens.py                           # Token counter for hull integrity monitoring
-└── nelson_conflict_radar.py                  # Runtime file-conflict monitor
+└── count-tokens.py                           # Token counter for hull integrity monitoring
 ```
 
 </details>
@@ -530,7 +530,7 @@ scripts/
 - `SKILL.md` is the entrypoint that Claude reads when the skill is invoked. It defines the six-step workflow and references the supporting files.
 - Files in `references/` contain detailed guidance that Claude loads on demand — they are not all loaded into context at once.
 - `hooks/hooks.json` is auto-discovered by the Claude Code plugin system; the commands resolve via `${CLAUDE_PLUGIN_ROOT}` and only run when Nelson is installed as a plugin.
-- `skills/nelson/scripts/` ships `nelson-data.py` and its sibling modules alongside the skill so they are distributed on install. The root-level `scripts/` directory holds repo-level utilities (`count-tokens.py`, `check-references.sh`, runtime conflict radar).
+- `skills/nelson/scripts/` ships `nelson-data.py` and its sibling modules (including the conflict radar and pre-flight conflict scanner) alongside the skill so they are distributed on install. The root-level `scripts/` directory holds repo-level utilities (`count-tokens.py`, `check-references.sh`).
 
 ## Mission artifacts
 
