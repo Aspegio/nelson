@@ -23,7 +23,7 @@ The admiral executes session hygiene at Step 1 (Issue Sailing Orders), before fo
 ## Procedure: New Session
 
 1. Confirm this is a genuinely new session, not a resumption. If resuming, skip this procedure entirely and follow the Resumed Session procedure below.
-2. Verify the mission directory created by Step 1's "Establish Mission Directory" exists and contains `damage-reports/` and `turnover-briefs/` subdirectories.
+2. Verify that `nelson-data.py init` (Step 1, "Structured Data Capture") has been run. It creates the mission directory, the `damage-reports/` and `turnover-briefs/` subdirectories, the three initial JSON files, and the `.nelson/.active-{SESSION_ID}` marker in one step. Confirm `{mission-dir}` is set to the path the script printed.
 3. Note that session hygiene is complete. Proceed to form the squadron.
 
 ## Procedure: Resumed Session

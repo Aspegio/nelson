@@ -38,7 +38,9 @@ from nelson_data_utils import (
     _count_events_of_type,
     _die,
     _err,
+    _generate_session_id,
     _get_last_checkpoint_number,
+    _is_valid_session_id,
     _mission_dir_stamp,
     _now_iso,
     _parse_extra_kv,
@@ -69,9 +71,26 @@ def _do_init(
     stop_criteria: list[str] | None = None,
     handoff_artifacts: list[str] | None = None,
     circuit_breakers: dict[str, Any] | None = None,
+    session_id: str | None = None,
 ) -> Path:
-    """Create mission directory and write initial JSON files.  Returns the path."""
-    base = Path(".nelson") / "missions" / _mission_dir_stamp()
+    """Create mission directory and write initial JSON files.  Returns the path.
+
+    Owns the full mission-directory contract: picks (or accepts) a session id,
+    creates ``.nelson/missions/{stamp}_{session_id}/`` with the two standard
+    subdirectories, writes ``sailing-orders.json``, ``mission-log.json``, and
+    ``fleet-status.json``, and writes the ``.nelson/.active-{session_id}``
+    marker file consumed by hooks and recovery logic.
+    """
+    if session_id is None:
+        session_id = _generate_session_id()
+    elif not _is_valid_session_id(session_id):
+        _die(
+            "Error: --session-id must be exactly 8 lowercase hex characters "
+            f"(got: {session_id!r})"
+        )
+
+    nelson_root = Path(".nelson")
+    base = nelson_root / "missions" / f"{_mission_dir_stamp()}_{session_id}"
     base.mkdir(parents=True, exist_ok=True)
     (base / "damage-reports").mkdir(exist_ok=True)
     (base / "turnover-briefs").mkdir(exist_ok=True)
@@ -125,6 +144,11 @@ def _do_init(
     _write_json(base / "mission-log.json", {"version": 1, "events": []})
     _write_json(base / "fleet-status.json", fleet_status)
 
+    # Active-session marker — consumed by hooks/nelson_hooks.py::_find_mission_dir
+    # and nelson_data_lifecycle._find_active_mission for recovery.
+    sidecar = nelson_root / f".active-{session_id}"
+    sidecar.write_text(str(base) + "\n", encoding="utf-8")
+
     return base
 
 
@@ -145,9 +169,12 @@ def cmd_init(args: argparse.Namespace) -> None:
         out_of_scope=getattr(args, "out_of_scope", None),
         stop_criteria=getattr(args, "stop_criteria", None),
         handoff_artifacts=getattr(args, "handoff_artifacts", None),
+        session_id=getattr(args, "session_id", None),
     )
 
-    # Print the mission directory path (consumed by admiral)
+    # Print the mission directory path (consumed by admiral).
+    # The trailing path segment is "{stamp}_{session_id}" — callers that
+    # need the session id can split on the last underscore.
     print(str(base))
 
 

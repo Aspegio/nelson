@@ -10,7 +10,7 @@
     {
       "name": "nelson",
       "description": "Royal Navy agent coordination framework — sailing orders, battle plans, action stations, and a captain's log",
-      "version": "2.1.1",
+      "version": "2.1.2",
       "author": { "name": "Harry Munro" },
       "source": "./",
       "repository": "https://github.com/harrymunro/nelson",

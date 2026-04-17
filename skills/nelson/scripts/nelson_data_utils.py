@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import stat
 import sys
 import tempfile
@@ -82,6 +83,25 @@ def _now_iso() -> str:
 def _mission_dir_stamp() -> str:
     """Return a timestamped directory name fragment."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
+
+
+SESSION_ID_LEN = 8
+
+
+def _generate_session_id() -> str:
+    """Return a short lowercase-hex session identifier (8 chars)."""
+    return secrets.token_hex(SESSION_ID_LEN // 2)
+
+
+def _is_valid_session_id(value: str) -> bool:
+    """Validate a session id: exactly 8 lowercase hex characters.
+
+    Constraining the format prevents path-injection via the session id and
+    keeps the ``.active-<id>`` marker filename predictable.
+    """
+    if len(value) != SESSION_ID_LEN:
+        return False
+    return all(c in "0123456789abcdef" for c in value)
 
 
 def _read_json(path: Path) -> dict | list:
