@@ -61,9 +61,10 @@ Give an honest recommendation. For straightforward missions with clear scope in 
 python3 .claude/skills/nelson/scripts/nelson-data.py skip-estimate \
   --mission-dir {mission-dir} --reason "[one-line rationale]"
 python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
 ```
 
-The second command transitions the phase from ESTIMATE to BATTLE_PLAN using the opt-out flag.
+The first `advance` moves from SAILING_ORDERS to ESTIMATE. The second `advance` moves from ESTIMATE to BATTLE_PLAN; the exit validator accepts the transition because `skip-estimate` has already recorded the opt-out in `sailing-orders.json`.
 
 ## 2. Conduct The Estimate
 

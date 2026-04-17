@@ -12,3 +12,4 @@ config:
 ignores:
   - ".venv/"
   - "demos/"
+  - "docs/superpowers/plans/"
