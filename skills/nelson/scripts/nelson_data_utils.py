@@ -157,6 +157,7 @@ def _file_lock(lock_path: Path) -> Generator[None, None, None]:
     """Acquire an exclusive file lock, yielding while held.
 
     Uses fcntl on Unix; no-ops gracefully on platforms without fcntl.
+    Cleans up the lock file after release.
     """
     lock_file = open(lock_path, "w")
     try:
@@ -167,6 +168,10 @@ def _file_lock(lock_path: Path) -> Generator[None, None, None]:
         if fcntl:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
         lock_file.close()
+        try:
+            lock_path.unlink()
+        except OSError:
+            pass
 
 
 def _append_event(mission_dir: Path, event: dict) -> None:
