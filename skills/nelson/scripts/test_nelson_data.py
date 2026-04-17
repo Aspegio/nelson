@@ -609,25 +609,13 @@ class TestStatus:
             "--hull-green", "2", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
             "--decision", "continue", "--rationale", "Test",
         )
-        import os
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            result = run("status", "--mission-dir", "")
-            assert "Status:" in result.stdout or "nelson-data" in result.stdout
-        finally:
-            os.chdir(old_cwd)
+        result = run("status", "--mission-dir", "", cwd=tmp_path)
+        assert "Status:" in result.stdout or "nelson-data" in result.stdout
 
     def test_status_no_missions_dir_prints_message(self, tmp_path: Path) -> None:
         """Status without --mission-dir and no .nelson/missions/ prints message."""
-        import os
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            result = run("status", "--mission-dir", "")
-            assert "No active missions" in result.stdout
-        finally:
-            os.chdir(old_cwd)
+        result = run("status", "--mission-dir", "", cwd=tmp_path)
+        assert "No active missions" in result.stdout
 
 
 # ---------------------------------------------------------------------------

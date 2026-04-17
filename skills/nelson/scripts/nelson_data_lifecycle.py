@@ -418,12 +418,12 @@ def cmd_plan_approved(args: argparse.Namespace) -> None:
     else:
         fleet_status = {"version": 1}
 
+    existing_mission = fleet_status.get("mission", {})
     new_fleet_status = {
         **fleet_status,
         "mission": {
-            **fleet_status.get("mission", {}),
+            **existing_mission,
             "status": "underway",
-            "phase": "BATTLE_PLAN",
         },
         "progress": {
             **fleet_status.get("progress", {}),
@@ -1274,12 +1274,12 @@ def _finalize_plan(mission_dir: Path) -> dict[str, Any]:
     else:
         fleet_status = {"version": 1}
 
+    existing_mission = fleet_status.get("mission", {})
     new_fleet_status = {
         **fleet_status,
         "mission": {
-            **fleet_status.get("mission", {}),
+            **existing_mission,
             "status": "underway",
-            "phase": "BATTLE_PLAN",
         },
         "progress": {
             **fleet_status.get("progress", {}),

@@ -111,8 +111,13 @@ def add_task(cwd: Path, mission_dir: Path, task_id: int = 1, station_tier: int =
 
 
 def approve_plan(cwd: Path, mission_dir: Path) -> None:
-    """Run plan-approved on the mission."""
+    """Run plan-approved and set phase to BATTLE_PLAN via the phase engine.
+
+    The lifecycle command (plan-approved) finalises the plan but no longer
+    manages the phase — the phase engine is the sole authority.
+    """
     run_data("plan-approved", "--mission-dir", str(mission_dir), cwd=cwd)
+    run_phase("set", "--mission-dir", str(mission_dir), "--phase", "BATTLE_PLAN")
 
 
 def write_estimate(mission_dir: Path) -> None:
@@ -254,7 +259,6 @@ class TestAdvance:
         mission_dir = init_mission(tmp_path)
         add_task(tmp_path, mission_dir, task_id=1, station_tier=1)
         approve_plan(tmp_path, mission_dir)
-        # plan-approved sets phase to BATTLE_PLAN
 
         result = run_phase("advance", "--mission-dir", str(mission_dir))
         assert "BATTLE_PLAN -> FORMATION" in result.stdout
@@ -550,6 +554,96 @@ class TestValidateTool:
         )
         assert result.returncode == 0
 
+    def test_battle_plan_blocks_agent(self, tmp_path: Path) -> None:
+        """Agent is blocked during BATTLE_PLAN phase."""
+        mission_dir = tmp_path / "battleplan-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "BATTLE_PLAN"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "Agent",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_battle_plan_blocks_team_create(self, tmp_path: Path) -> None:
+        """TeamCreate is blocked during BATTLE_PLAN phase."""
+        mission_dir = tmp_path / "battleplan-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "BATTLE_PLAN"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TeamCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_battle_plan_blocks_task_create(self, tmp_path: Path) -> None:
+        """TaskCreate is blocked during BATTLE_PLAN phase."""
+        mission_dir = tmp_path / "battleplan-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "BATTLE_PLAN"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TaskCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_permission_blocks_agent(self, tmp_path: Path) -> None:
+        """Agent is blocked during PERMISSION phase."""
+        mission_dir = tmp_path / "permission-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "PERMISSION"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "Agent",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_permission_blocks_team_create(self, tmp_path: Path) -> None:
+        """TeamCreate is blocked during PERMISSION phase."""
+        mission_dir = tmp_path / "permission-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "PERMISSION"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TeamCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_permission_blocks_task_create(self, tmp_path: Path) -> None:
+        """TaskCreate is blocked during PERMISSION phase."""
+        mission_dir = tmp_path / "permission-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "PERMISSION"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TaskCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
     def test_old_format_allows_all(self, tmp_path: Path) -> None:
         """fleet-status.json without phase field allows all tools (backward compat)."""
         mission_dir = tmp_path / "old-mission"
@@ -685,14 +779,16 @@ class TestPhasePreservation:
         fs = read_json(mission_dir / "fleet-status.json")
         assert fs["mission"]["phase"] == "SAILING_ORDERS"
 
-    def test_plan_approved_sets_battle_plan_phase(self, tmp_path: Path) -> None:
-        """plan-approved sets phase to BATTLE_PLAN."""
+    def test_plan_approved_preserves_phase(self, tmp_path: Path) -> None:
+        """plan-approved does not overwrite phase — the phase engine is the sole authority."""
         mission_dir = init_mission(tmp_path)
         add_task(tmp_path, mission_dir, task_id=1)
-        approve_plan(tmp_path, mission_dir)
+        # Set a known phase before calling plan-approved
+        run_phase("set", "--mission-dir", str(mission_dir), "--phase", "ESTIMATE")
+        run_data("plan-approved", "--mission-dir", str(mission_dir), cwd=tmp_path)
 
         fs = read_json(mission_dir / "fleet-status.json")
-        assert fs["mission"]["phase"] == "BATTLE_PLAN"
+        assert fs["mission"]["phase"] == "ESTIMATE"
 
     def test_squadron_preserves_phase(self, tmp_path: Path) -> None:
         """squadron preserves the existing phase (does not hard-set FORMATION)."""

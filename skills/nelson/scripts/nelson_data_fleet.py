@@ -21,6 +21,8 @@ from nelson_data_memory import (
 )
 from nelson_data_utils import (
     JSON_INDENT,
+    VALID_ESTIMATE_OUTCOME_METHODS,
+    VALID_ESTIMATE_OUTCOME_STATUSES,
     _die,
     _err,
     _file_lock,
@@ -695,8 +697,8 @@ def _compute_estimate_outcome_analytics(missions: list[dict]) -> dict:
     breakdown with pass rates, and per-mission pass rates so the quarterdeck
     can spot which missions skimped on verification.
     """
-    methods = ("test", "type-check", "lint", "review", "visual")
-    statuses = ("pass", "fail", "not-verified")
+    methods = sorted(VALID_ESTIMATE_OUTCOME_METHODS)
+    statuses = sorted(VALID_ESTIMATE_OUTCOME_STATUSES)
 
     totals = {s: 0 for s in statuses}
     by_method: dict[str, dict[str, int]] = {
