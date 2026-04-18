@@ -320,6 +320,8 @@ Consult the specific procedure that matches the situation.
 | Automated budget, hull, and idle alarms crossing thresholds | `references/damage-control/circuit-breakers.md` |
 | Preparing the mission directory at session start | `references/damage-control/session-hygiene.md` |
 | Agent team communication failure (lost agent IDs, message bus down) | `references/damage-control/comms-failure.md` |
+| Agent spawn returns "Tool result missing due to internal error" with `team_name` | `references/damage-control/agent-team-spawn-broken.md` |
+| Captains share files despite `isolation: "worktree"` set | `references/damage-control/worktree-team-conflict.md` |
 
 ## Admiralty Doctrine
 
