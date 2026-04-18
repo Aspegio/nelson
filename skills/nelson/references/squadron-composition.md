@@ -59,3 +59,9 @@ Worktree isolation is a stronger alternative to the file-ownership approach in `
 - Tasks are large enough that the merge cost is justified.
 
 **Trade-off:** Worktree isolation prevents conflicts during execution but requires merging changes afterward. The admiral is responsible for coordinating the merge.
+
+> **⚠ Known bug — do not combine `team_name` with `isolation: "worktree"`.** Per [claude-code#37549](https://github.com/anthropics/claude-code/issues/37549), the combination silently lands the captain in the main repo, defeating isolation. Choose one:
+> - `agent-team` mode → enforce file ownership via `standing-orders/split-keel.md`, no worktrees.
+> - `subagents` mode → use `isolation: "worktree"` freely (subagent spawning is unaffected).
+>
+> See `references/damage-control/worktree-team-conflict.md` for the recovery procedure.
