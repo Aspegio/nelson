@@ -107,7 +107,7 @@ All tasks start as `pending`. They will be updated with owners and status as the
 - Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
 - Add `1 red-cell navigator` for medium/high threat work. Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
-- If the sailing orders express cost-savings priority, load `references/model-selection.md` before assigning models. Apply weight-based model selection to all `Agent` tool calls and include haiku briefing enhancements for agents assigned to haiku.
+- For each captain, record an explicit model in the formation summary using `references/model-selection.md`. In cost-savings missions, apply the weight-and-threshold rules to push appropriate roles to `haiku` and include haiku briefing enhancements. In standard missions, record `inherit` for ships that should use the admiral's model.
 
 ```
 SQUADRON FORMATION ORDERS
@@ -116,7 +116,7 @@ Mode: [single-session | subagents | agent-team]
 Captain count: [N]
 
 Ships:
-  [Ship name] — [vessel type] — [station tier] — [mode] — [one-line task summary]
+  [Ship name] — [vessel type] — [station tier] — [mode] — [model] — [one-line task summary]
     Crew: [roles, or "Captain implements directly"]
   [repeat for each ship]
 
