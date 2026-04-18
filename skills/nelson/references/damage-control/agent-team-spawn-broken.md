@@ -25,9 +25,11 @@ succeed first. The issue is open as of April 2026.
    experimental Agent Teams spawn path as unavailable for this session.
 2. Stand down the empty team if `TeamCreate` succeeded but no members
    enrolled:
+
    ```
    TeamDelete(team_name="<name>")
    ```
+
 3. Fall back to `subagents` mode for the rest of the mission:
    - Update `battle-plan.json` `squadron.mode` to `subagents`.
    - Re-run the conflict scan: `python3 .claude/skills/nelson/scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json`.
