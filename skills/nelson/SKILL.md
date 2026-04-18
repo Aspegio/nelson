@@ -201,6 +201,8 @@ This transitions the mission from PERMISSION to UNDERWAY, unlocking agent spawni
 
 If the task is complete and no pending task depends on it, proceed to shutdown per `references/standing-orders/paid-off.md`. In agent-team mode, the admiral must confirm receipt of the captain's results before sending `shutdown_request` — retrieve them via `SendMessage` or by reading output files if not already received. In subagents mode, results are returned synchronously by the `Agent` tool, so no additional confirmation is needed. Do not wait for the next checkpoint cadence. Check the current `TaskList` state at the moment the idle notification arrives; each notification is evaluated independently against current state. This applies even when other ships are still running.
 
+**Background-agent notifications:** Background captains (`Agent` with `run_in_background: true`) deliver completion notifications identical to foreground idle notifications — apply the same three questions above. Use `Monitor` to stream a background captain's output mid-task only when periodic visibility is needed; do not poll. See `references/background-patterns.md` for backgrounding criteria.
+
 **Shutdown attempt ceiling:** If a `shutdown_request` to a ship goes unacknowledged, do not loop indefinitely. After 3 failed attempts to the same agent, abandon the shutdown attempt, note the failure in the captain's log, and continue the mission. If `TeamDelete` is blocked by stuck agents, manual cleanup is available — see `references/damage-control/man-overboard.md` for the procedure.
 
 - Keep admiral focused on coordination and unblock actions.
