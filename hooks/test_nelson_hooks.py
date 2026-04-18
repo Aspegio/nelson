@@ -29,10 +29,12 @@ from nelson_hooks import (  # noqa: E402
     VALIDATION_EVIDENCE_PATTERNS,
     _check_running_plot_nonempty,
     _check_section_present,
+    _check_team_enrollment,
     _find_mission_dir,
     _get_mode,
     _get_tasks,
     _has_evidence,
+    _read_team_config,
     cmd_brief_validate,
     cmd_idle_ship,
     cmd_mode_check,
@@ -301,6 +303,39 @@ class TestPreflight:
         )
         assert code == 0
 
+    def test_preflight_rejects_duplicate_team_member(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _make_mission(
+            tmp_path,
+            mode="agent-team",
+            tasks=[{
+                "id": "task-1",
+                "name": "Refactor auth",
+                "owner": "HMS Argyll",
+                "station_tier": 1,
+                "file_ownership": ["src/auth.py"],
+            }],
+        )
+        # Build teams dir under tmp_path so Path.home() / ".claude" / "teams" resolves correctly
+        (tmp_path / ".claude").mkdir(exist_ok=True)
+        (tmp_path / ".claude" / "teams").mkdir(exist_ok=True)
+        (tmp_path / ".claude" / "teams" / "acme").mkdir(exist_ok=True)
+        (tmp_path / ".claude" / "teams" / "acme" / "config.json").write_text(
+            json.dumps({"members": [{"name": "HMS Argyll"}]}),
+        )
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        payload = {
+            "tool_input": {
+                "team_name": "acme",
+                "name": "HMS Argyll",
+                "prompt": "...",
+            },
+        }
+        code = _run(cmd_preflight, payload, cwd=str(tmp_path))
+        assert code == 2
+
 
 # ---------------------------------------------------------------------------
 # Mode-check
@@ -526,3 +561,56 @@ class TestIdleShip:
         _make_mission(tmp_path, fleet_status={"squadron": []})
         _run(cmd_idle_ship, {"teammate_name": "HMS Unknown"}, str(tmp_path))
         assert "not found" in capsys.readouterr().err.lower()
+
+
+# ---------------------------------------------------------------------------
+# Team config helpers
+# ---------------------------------------------------------------------------
+
+
+class TestReadTeamConfig:
+    def test_no_team_dir(self, tmp_path: Path) -> None:
+        from nelson_hooks import _read_team_config
+        assert _read_team_config(tmp_path / "missing", "acme") == {}
+
+    def test_team_dir_present_no_config(self, tmp_path: Path) -> None:
+        from nelson_hooks import _read_team_config
+        teams_dir = tmp_path / "teams"
+        (teams_dir / "acme").mkdir(parents=True)
+        assert _read_team_config(teams_dir, "acme") == {}
+
+    def test_team_config_loaded(self, tmp_path: Path) -> None:
+        from nelson_hooks import _read_team_config
+        teams_dir = tmp_path / "teams"
+        team_dir = teams_dir / "acme"
+        team_dir.mkdir(parents=True)
+        cfg = {"members": [{"name": "HMS Argyll"}, {"name": "HMS Kent"}]}
+        (team_dir / "config.json").write_text(json.dumps(cfg))
+        assert _read_team_config(teams_dir, "acme") == cfg
+
+
+class TestCheckTeamEnrollment:
+    def test_no_team_name_skips_check(self) -> None:
+        from nelson_hooks import _check_team_enrollment
+        assert _check_team_enrollment({}, {"name": "HMS Argyll"}) is None
+
+    def test_no_name_provided(self) -> None:
+        from nelson_hooks import _check_team_enrollment
+        cfg = {"members": [{"name": "HMS Argyll"}]}
+        assert _check_team_enrollment(cfg, {"team_name": "acme"}) is None
+
+    def test_duplicate_name_rejected(self) -> None:
+        from nelson_hooks import _check_team_enrollment
+        cfg = {"members": [{"name": "HMS Argyll"}]}
+        msg = _check_team_enrollment(
+            cfg, {"team_name": "acme", "name": "HMS Argyll"},
+        )
+        assert msg is not None
+        assert "duplicate" in msg.lower()
+
+    def test_unique_name_allowed(self) -> None:
+        from nelson_hooks import _check_team_enrollment
+        cfg = {"members": [{"name": "HMS Argyll"}]}
+        assert _check_team_enrollment(
+            cfg, {"team_name": "acme", "name": "HMS Kent"},
+        ) is None

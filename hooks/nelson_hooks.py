@@ -118,6 +118,38 @@ def _load_mission_context(
 
 
 # ---------------------------------------------------------------------------
+# Team config helpers
+# ---------------------------------------------------------------------------
+
+
+def _read_team_config(teams_dir: Path, team_name: str) -> dict[str, Any]:
+    """Read a team's config.json. Returns empty dict on failure."""
+    if not team_name:
+        return {}
+    return _read_json(teams_dir / team_name / "config.json")
+
+
+def _check_team_enrollment(
+    team_config: dict[str, Any], tool_input: dict[str, Any],
+) -> str | None:
+    """Return rejection message if the agent's name conflicts with an existing member."""
+    team_name = tool_input.get("team_name")
+    member_name = tool_input.get("name")
+    if not team_name or not member_name:
+        return None
+    members = team_config.get("members", [])
+    existing_names = {m.get("name") for m in members if isinstance(m, dict)}
+    if member_name in existing_names:
+        return (
+            f"Team enrollment violation: agent name '{member_name}' is "
+            f"already a member of team '{team_name}'. Spawning would "
+            f"create a duplicate. Choose a different ship name from "
+            f"references/crew-roles.md."
+        )
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Preflight helpers
 # ---------------------------------------------------------------------------
 
@@ -210,10 +242,15 @@ def cmd_preflight(args: argparse.Namespace) -> None:
     tasks = _get_tasks(battle_plan)
     tool_input = payload.get("tool_input", {})
 
+    teams_dir = Path.home() / ".claude" / "teams"
+    team_name = tool_input.get("team_name", "")
+    team_config = _read_team_config(teams_dir, team_name) if team_name else {}
+
     for check in (
         lambda: _check_station_tiers(tasks),
         lambda: _check_file_ownership(tasks),
         lambda: _check_mode_tool_consistency(_get_mode(battle_plan), tool_input),
+        lambda: _check_team_enrollment(team_config, tool_input),
     ):
         msg = check()
         if msg:
