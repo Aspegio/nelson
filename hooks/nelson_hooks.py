@@ -123,8 +123,8 @@ def _load_mission_context(
 
 
 def _read_team_config(teams_dir: Path, team_name: str) -> dict[str, Any]:
-    """Read a team's config.json. Returns empty dict on failure."""
-    if not team_name:
+    """Read a team's config.json. Returns empty dict on failure or invalid name."""
+    if not team_name or "/" in team_name or team_name.startswith("."):
         return {}
     return _read_json(teams_dir / team_name / "config.json")
 
@@ -244,7 +244,7 @@ def cmd_preflight(args: argparse.Namespace) -> None:
 
     teams_dir = Path.home() / ".claude" / "teams"
     team_name = tool_input.get("team_name", "")
-    team_config = _read_team_config(teams_dir, team_name) if team_name else {}
+    team_config = _read_team_config(teams_dir, team_name)
 
     for check in (
         lambda: _check_station_tiers(tasks),

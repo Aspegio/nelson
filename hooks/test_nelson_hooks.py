@@ -570,17 +570,14 @@ class TestIdleShip:
 
 class TestReadTeamConfig:
     def test_no_team_dir(self, tmp_path: Path) -> None:
-        from nelson_hooks import _read_team_config
         assert _read_team_config(tmp_path / "missing", "acme") == {}
 
     def test_team_dir_present_no_config(self, tmp_path: Path) -> None:
-        from nelson_hooks import _read_team_config
         teams_dir = tmp_path / "teams"
         (teams_dir / "acme").mkdir(parents=True)
         assert _read_team_config(teams_dir, "acme") == {}
 
     def test_team_config_loaded(self, tmp_path: Path) -> None:
-        from nelson_hooks import _read_team_config
         teams_dir = tmp_path / "teams"
         team_dir = teams_dir / "acme"
         team_dir.mkdir(parents=True)
@@ -588,19 +585,22 @@ class TestReadTeamConfig:
         (team_dir / "config.json").write_text(json.dumps(cfg))
         assert _read_team_config(teams_dir, "acme") == cfg
 
+    def test_path_traversal_rejected(self, tmp_path: Path) -> None:
+        assert _read_team_config(tmp_path, "../../etc") == {}
+
+    def test_dotfile_rejected(self, tmp_path: Path) -> None:
+        assert _read_team_config(tmp_path, ".hidden") == {}
+
 
 class TestCheckTeamEnrollment:
     def test_no_team_name_skips_check(self) -> None:
-        from nelson_hooks import _check_team_enrollment
         assert _check_team_enrollment({}, {"name": "HMS Argyll"}) is None
 
     def test_no_name_provided(self) -> None:
-        from nelson_hooks import _check_team_enrollment
         cfg = {"members": [{"name": "HMS Argyll"}]}
         assert _check_team_enrollment(cfg, {"team_name": "acme"}) is None
 
     def test_duplicate_name_rejected(self) -> None:
-        from nelson_hooks import _check_team_enrollment
         cfg = {"members": [{"name": "HMS Argyll"}]}
         msg = _check_team_enrollment(
             cfg, {"team_name": "acme", "name": "HMS Argyll"},
@@ -609,7 +609,6 @@ class TestCheckTeamEnrollment:
         assert "duplicate" in msg.lower()
 
     def test_unique_name_allowed(self) -> None:
-        from nelson_hooks import _check_team_enrollment
         cfg = {"members": [{"name": "HMS Argyll"}]}
         assert _check_team_enrollment(
             cfg, {"team_name": "acme", "name": "HMS Kent"},
