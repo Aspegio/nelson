@@ -20,9 +20,11 @@ skills/nelson/
     admiralty-templates/     — One file per template, loaded on demand
       damage-report.md        — JSON template for hull integrity damage reports
       turnover-brief.md       — Handover brief for relief on station
+    background-patterns.md  — Background-agent and Monitor coordination patterns
     commendations.md        — Recognition signals & graduated correction
     crew-roles.md           — Crew role definitions, ship names & sizing rules
     damage-control/         — One file per procedure, loaded on demand
+      agent-team-spawn-broken.md — Recovery for #40270 broken Agent(team_name=...)
       comms-failure.md        — Agent team infrastructure failure recovery
       crew-overrun.md         — Ship crew consuming disproportionate resources
       escalation.md           — Issue exceeds current authority or needs clarification
@@ -33,6 +35,7 @@ skills/nelson/
       scuttle-and-reform.md   — Mission cannot succeed, abort and reform
       session-hygiene.md      — Clean start procedure for new sessions
       session-resumption.md   — Resuming an interrupted session
+      worktree-team-conflict.md — Recovery for #37549 worktree+team_name silent failure
     model-selection.md      — Cost-optimized model assignment for agents
     royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
