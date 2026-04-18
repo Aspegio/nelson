@@ -76,6 +76,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 - `press-ganged-navigator.md`: Is the red-cell navigator being assigned implementation work?
 - `admiral-at-the-helm.md`: Does the battle plan assign any implementation work (excluding permitted read-only recombination) to the admiral?
 - `wrong-ensign.md`: Do the planned coordination tools match the selected execution mode?
+- `spawning-authority.md`: Does any task assign agent or marine spawning to a captain? Reassign to the admiral.
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
@@ -302,6 +303,7 @@ Consult the specific standing order that matches the situation.
 | Captain completed autonomous work and needs human action to continue | `references/standing-orders/awaiting-admiralty.md` |
 | Agent completed task with no remaining work in the dependency graph | `references/standing-orders/paid-off.md` |
 | Using tools from the wrong execution mode | `references/standing-orders/wrong-ensign.md` |
+| Captain or crew attempting to spawn agents or marines | `references/standing-orders/spawning-authority.md` |
 
 ## Damage Control
 
