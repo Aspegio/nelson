@@ -88,6 +88,8 @@ If any answer triggers a standing order, you MUST apply the corrective action an
     - `subagents`: parallel, fully independent tasks that report only to the admiral.
     - `agent-team`: captains benefit from a shared task list, peer messaging, or coordinated deliverables; or 4+ captains are needed.
 
+**Agent Teams Prerequisite:** Before committing to `agent-team` mode, confirm `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` was set at session launch — see `references/squadron-composition.md` for the quick check. If the env var is unset, `TeamCreate`/`SendMessage`/`team_name` are unavailable; fall back to `subagents` mode or have the admiral relaunch Claude Code with the env var set.
+
 **Mode-Tool Consistency Gate:** Before assigning ships, confirm your tool usage matches the selected mode by reviewing `references/tool-mapping.md`:
 - **`subagents` mode:** Captains do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only. The admiral uses `TaskCreate`/`TaskUpdate`/`TaskList` to track progress in the session task list (visibility only — captains cannot see these tasks).
 - **`agent-team` mode:** Do NOT use `Agent` with `subagent_type` to spawn captains (marines still use `subagent_type`). Use `TeamCreate` first, then `Agent` with `team_name` + `name`. Coordinate via `TaskList` and `SendMessage`.
