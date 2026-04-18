@@ -116,7 +116,7 @@ Mode: [single-session | subagents | agent-team]
 Captain count: [N]
 
 Ships:
-  [Ship name] — [vessel type] — [one-line task summary]
+  [Ship name] — [vessel type] — [station tier] — [mode] — [one-line task summary]
     Crew: [roles, or "Captain implements directly"]
   [repeat for each ship]
 
@@ -170,7 +170,7 @@ This registers all tasks, records the squadron, computes DAG metrics, and runs t
 - **`subagents` mode:** Use `TaskUpdate` to set `status` to `in_progress` as each captain is dispatched. The admiral tracks these directly.
 - **`single-session` mode:** Use `TaskUpdate` to set `status` to `in_progress` as the admiral begins each task.
 
-**Edit permissions:** When spawning any agent whose task involves editing files, set `mode: "acceptEdits"` on the `Agent` tool call. Omitting this can cause a permission race condition that silently stalls the agent at its first edit. When in doubt, include it.
+**Permission mode at spawn:** Set the `mode` parameter on every `Agent` tool call per the tier mapping in `references/action-stations.md` (Permission Mode by Station Tier). At minimum, captains whose task involves editing files MUST receive `mode: "acceptEdits"` to avoid silent permission stalls; Station 2 and Station 3 captains MUST receive `mode: "plan"` for the read-only review gate. The mapping is also recorded in the formation summary (Step 3 template).
 
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a typed handoff packet using `python3 .claude/skills/nelson/scripts/nelson-data.py handoff ...` (see `references/structured-data.md`). An optional prose companion brief may also be written using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
 
