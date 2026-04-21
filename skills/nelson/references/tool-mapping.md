@@ -63,3 +63,13 @@ Common mode-tool mismatches and their correct alternatives. See
 | `Agent` with `subagent_type` to spawn a captain in agent-team mode | Agent is not registered as a teammate | Use `Agent` with `team_name` + `name` |
 | `TeamCreate` in subagents mode | Creates an unnecessary team structure | Omit — spawn captains directly with `Agent` |
 | `TaskCreate` by captains in subagents mode | No shared task list exists for captains | Admiral tracks visibility via `TaskCreate`/`TaskUpdate` in its own session; captains report via `Agent` return value |
+
+## Long-Running Tools
+
+| Nelson Operation | Claude Code Tool | Mode |
+|---|---|---|
+| Spawn captain in background | `Agent` with `run_in_background: true` | subagents / agent-team (Station 0-1 only) |
+| Stream a background captain's output | `Monitor` with target=ship name | all modes |
+| Wait for any pending notification | (no explicit call) | all modes |
+
+See `references/background-patterns.md` for when to background a captain and how to integrate completion notifications into the quarterdeck rhythm.

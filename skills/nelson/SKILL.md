@@ -119,6 +119,7 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 - `press-ganged-navigator.md`: Is the red-cell navigator being assigned implementation work?
 - `admiral-at-the-helm.md`: Does the battle plan assign any implementation work (excluding permitted read-only recombination) to the admiral?
 - `wrong-ensign.md`: Do the planned coordination tools match the selected execution mode?
+- `spawning-authority.md`: Does any task assign agent or marine spawning to a captain? Reassign to the admiral.
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
@@ -130,6 +131,8 @@ If any answer triggers a standing order, you MUST apply the corrective action an
     - `single-session`: sequential tasks, low complexity, or heavy same-file editing.
     - `subagents`: parallel, fully independent tasks that report only to the admiral.
     - `agent-team`: captains benefit from a shared task list, peer messaging, or coordinated deliverables; or 4+ captains are needed.
+
+**Agent Teams Prerequisite:** Before committing to `agent-team` mode, confirm `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` was set at session launch — see `references/squadron-composition.md` for the quick check. If the env var is unset, `TeamCreate`/`SendMessage`/`team_name` are unavailable; fall back to `subagents` mode or have the admiral relaunch Claude Code with the env var set.
 
 **Mode-Tool Consistency Gate:** Before assigning ships, confirm your tool usage matches the selected mode by reviewing `references/tool-mapping.md`:
 - **`subagents` mode:** Captains do NOT use `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, or `SendMessage(type="message")`. Captains report via the `Agent` tool return value only. The admiral uses `TaskCreate`/`TaskUpdate`/`TaskList` to track progress in the session task list (visibility only — captains cannot see these tasks).
@@ -148,7 +151,7 @@ All tasks start as `pending`. They will be updated with owners and status as the
 - Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
 - Add `1 red-cell navigator` for medium/high threat work. Do not exceed 10 squadron-level agents (admiral, captains, red-cell navigator). Crew are additional.
-- If the sailing orders express cost-savings priority, load `references/model-selection.md` before assigning models. Apply weight-based model selection to all `Agent` tool calls and include haiku briefing enhancements for agents assigned to haiku.
+- For each captain, record an explicit model in the formation summary using `references/model-selection.md`. In cost-savings missions, apply the weight-and-threshold rules to push appropriate roles to `haiku` and include haiku briefing enhancements. In standard missions, record `inherit` for ships that should use the admiral's model.
 
 ```
 SQUADRON FORMATION ORDERS
@@ -157,7 +160,7 @@ Mode: [single-session | subagents | agent-team]
 Captain count: [N]
 
 Ships:
-  [Ship name] — [vessel type] — [one-line task summary]
+  [Ship name] — [vessel type] — [station tier] — [mode] — [model] — [one-line task summary]
     Crew: [roles, or "Captain implements directly"]
   [repeat for each ship]
 
@@ -211,7 +214,7 @@ This registers all tasks, records the squadron, computes DAG metrics, and runs t
 - **`subagents` mode:** Use `TaskUpdate` to set `status` to `in_progress` as each captain is dispatched. The admiral tracks these directly.
 - **`single-session` mode:** Use `TaskUpdate` to set `status` to `in_progress` as the admiral begins each task.
 
-**Edit permissions:** When spawning any agent whose task involves editing files, set `mode: "acceptEdits"` on the `Agent` tool call. Omitting this can cause a permission race condition that silently stalls the agent at its first edit. When in doubt, include it.
+**Permission mode at spawn:** Set the `mode` parameter on every `Agent` tool call per the tier mapping in `references/action-stations.md` (Permission Mode by Station Tier). At minimum, captains whose task involves editing files MUST receive `mode: "acceptEdits"` to avoid silent permission stalls; Station 2 and Station 3 captains MUST receive `mode: "plan"` for the read-only review gate. The mapping is also recorded in the formation summary (Step 3 template).
 
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a typed handoff packet using `python3 .claude/skills/nelson/scripts/nelson-data.py handoff ...` (see `references/structured-data.md`). An optional prose companion brief may also be written using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
 
@@ -240,6 +243,8 @@ This transitions the mission from PERMISSION to UNDERWAY, unlocking agent spawni
 3. **Agent-team mode only:** Has the admiral received and processed this ship's results?
 
 If the task is complete and no pending task depends on it, proceed to shutdown per `references/standing-orders/paid-off.md`. In agent-team mode, the admiral must confirm receipt of the captain's results before sending `shutdown_request` — retrieve them via `SendMessage` or by reading output files if not already received. In subagents mode, results are returned synchronously by the `Agent` tool, so no additional confirmation is needed. Do not wait for the next checkpoint cadence. Check the current `TaskList` state at the moment the idle notification arrives; each notification is evaluated independently against current state. This applies even when other ships are still running.
+
+**Background-agent notifications:** Background captains (`Agent` with `run_in_background: true`) deliver completion notifications identical to foreground idle notifications — apply the same three questions above. Use `Monitor` to stream a background captain's output mid-task only when periodic visibility is needed; do not poll. See `references/background-patterns.md` for backgrounding criteria.
 
 **Shutdown attempt ceiling:** If a `shutdown_request` to a ship goes unacknowledged, do not loop indefinitely. After 3 failed attempts to the same agent, abandon the shutdown attempt, note the failure in the captain's log, and continue the mission. If `TeamDelete` is blocked by stuck agents, manual cleanup is available — see `references/damage-control/man-overboard.md` for the procedure.
 
@@ -343,6 +348,7 @@ Consult the specific standing order that matches the situation.
 | Captain completed autonomous work and needs human action to continue | `references/standing-orders/awaiting-admiralty.md` |
 | Agent completed task with no remaining work in the dependency graph | `references/standing-orders/paid-off.md` |
 | Using tools from the wrong execution mode | `references/standing-orders/wrong-ensign.md` |
+| Captain or crew attempting to spawn agents or marines | `references/standing-orders/spawning-authority.md` |
 
 ## Damage Control
 
@@ -361,6 +367,8 @@ Consult the specific procedure that matches the situation.
 | Automated budget, hull, and idle alarms crossing thresholds | `references/damage-control/circuit-breakers.md` |
 | Preparing the mission directory at session start | `references/damage-control/session-hygiene.md` |
 | Agent team communication failure (lost agent IDs, message bus down) | `references/damage-control/comms-failure.md` |
+| Agent spawn returns "Tool result missing due to internal error" with `team_name` | `references/damage-control/agent-team-spawn-broken.md` |
+| Captains share files despite `isolation: "worktree"` set | `references/damage-control/worktree-team-conflict.md` |
 
 ## Admiralty Doctrine
 
