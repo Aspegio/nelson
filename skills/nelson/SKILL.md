@@ -100,6 +100,7 @@ When The Estimate has been conducted, the Battle Plan inherits the analytical wo
 - Prepend the commander's intent paragraph (Estimate §2) to every captain's brief so each ship sails under a shared understanding of purpose.
 - Inherit acceptance criteria from the parent effect onto each task. Captains own the choice of verification method per criterion.
 - Inherit terrain (file ownership), coordination (dependencies), forces (captain sizing, model class), and control (action-station tier) from the Estimate. When the Estimate was skipped, supply these at this step.
+- If cost-savings is a priority, also consider task inputs — avoid multiple agents independently loading the same large inputs into their contexts.
 - For each task, note expected crew composition using the crew-or-direct decision tree in `references/crew-roles.md`. If crew are mustered, list crew roles with sub-tasks and sequence. If the captain implements directly (0 crew), note "Captain implements directly." If the captain anticipates needing marine support, note marine capacity (max 2).
 - For each task, consciously mark `admiralty-action-required: yes` or `no`.
 - Keep one task in progress per agent unless the mission explicitly requires multitasking.
