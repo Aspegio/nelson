@@ -54,14 +54,16 @@ Nelson is a Claude Code skill — it loads automatically when your request match
 
 https://github.com/user-attachments/assets/2468679d-39f5-4efb-9d93-43d43eee8907
 
-Nelson gives Claude a six-step operational framework for tackling complex missions:
+Nelson gives Claude an eight-step operational framework for tackling complex missions:
 
 1. **Sailing Orders** — Define the outcome, success metric, constraints, and stop criteria
-2. **Form the Squadron** — Choose an execution mode (single-session, subagents, or agent team) and size the team
-3. **Battle Plan** — Split the mission into independent tasks with owners, dependencies, and file ownership
-4. **Quarterdeck Rhythm** — Run checkpoints to track progress, identify blockers, monitor hull integrity, and manage budget
-5. **Action Stations** — Classify tasks by risk tier and enforce verification before marking complete
-6. **Stand Down** — Produce a captain's log with decisions, artifacts, validation evidence, and follow-ups
+2. **The Estimate** — Conduct the 7 Question Maritime Tactical Estimate: reconnaissance, intent, effects, terrain, forces, coordination, and control
+3. **Battle Plan** — Turn approved effects into task assignments with owners, dependencies, and file ownership
+4. **Form the Squadron** — Choose an execution mode (single-session, subagents, or agent team) and size the team
+5. **Get Permission to Sail** — Present the plan for user approval before committing resources
+6. **Quarterdeck Rhythm** — Run checkpoints to track progress, identify blockers, monitor hull integrity, and manage budget
+7. **Action Stations** — Classify tasks by risk tier and enforce verification before marking complete
+8. **Stand Down** — Produce a captain's log with decisions, artifacts, validation evidence, and follow-ups
 
 ## Why Nelson?
 
@@ -527,7 +529,7 @@ scripts/
 
 - `plugin.json` declares the plugin name, version, and component paths for Claude Code's plugin system.
 - `marketplace.json` lets users add this repo as a plugin marketplace and install Nelson by name.
-- `SKILL.md` is the entrypoint that Claude reads when the skill is invoked. It defines the six-step workflow and references the supporting files.
+- `SKILL.md` is the entrypoint that Claude reads when the skill is invoked. It defines the eight-step workflow and references the supporting files.
 - Files in `references/` contain detailed guidance that Claude loads on demand — they are not all loaded into context at once.
 - `hooks/hooks.json` is auto-discovered by the Claude Code plugin system; the commands resolve via `${CLAUDE_PLUGIN_ROOT}` and only run when Nelson is installed as a plugin.
 - `skills/nelson/scripts/` ships `nelson-data.py` and its sibling modules (including the conflict radar and pre-flight conflict scanner) alongside the skill so they are distributed on install. The root-level `scripts/` directory holds repo-level utilities (`count-tokens.py`, `check-references.sh`).

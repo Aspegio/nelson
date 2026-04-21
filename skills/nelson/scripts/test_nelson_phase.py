@@ -111,8 +111,21 @@ def add_task(cwd: Path, mission_dir: Path, task_id: int = 1, station_tier: int =
 
 
 def approve_plan(cwd: Path, mission_dir: Path) -> None:
-    """Run plan-approved on the mission."""
+    """Run plan-approved and set phase to BATTLE_PLAN via the phase engine.
+
+    The lifecycle command (plan-approved) finalises the plan but no longer
+    manages the phase — the phase engine is the sole authority.
+    """
     run_data("plan-approved", "--mission-dir", str(mission_dir), cwd=cwd)
+    run_phase("set", "--mission-dir", str(mission_dir), "--phase", "BATTLE_PLAN")
+
+
+def write_estimate(mission_dir: Path) -> None:
+    """Write a minimal estimate.md to satisfy the ESTIMATE exit criterion."""
+    (mission_dir / "estimate.md").write_text(
+        "# Estimate\n\n## 1. Reconnaissance\nMinimal test estimate.\n",
+        encoding="utf-8",
+    )
 
 
 def form_squadron(cwd: Path, mission_dir: Path) -> None:
@@ -220,15 +233,15 @@ class TestCurrent:
 class TestAdvance:
     """Tests for the 'advance' subcommand."""
 
-    def test_sailing_orders_to_battle_plan(self, tmp_path: Path) -> None:
-        """Advance from SAILING_ORDERS to BATTLE_PLAN when sailing-orders.json exists."""
+    def test_sailing_orders_to_estimate(self, tmp_path: Path) -> None:
+        """Advance from SAILING_ORDERS to ESTIMATE when sailing-orders.json exists."""
         mission_dir = init_mission(tmp_path)
         result = run_phase("advance", "--mission-dir", str(mission_dir))
-        assert "SAILING_ORDERS -> BATTLE_PLAN" in result.stdout
+        assert "SAILING_ORDERS -> ESTIMATE" in result.stdout
 
         # Verify phase was updated
         fs = read_json(mission_dir / "fleet-status.json")
-        assert fs["mission"]["phase"] == "BATTLE_PLAN"
+        assert fs["mission"]["phase"] == "ESTIMATE"
 
     def test_sailing_orders_blocked_without_orders(self, tmp_path: Path) -> None:
         """Cannot advance from SAILING_ORDERS if sailing-orders.json is missing."""
@@ -246,7 +259,6 @@ class TestAdvance:
         mission_dir = init_mission(tmp_path)
         add_task(tmp_path, mission_dir, task_id=1, station_tier=1)
         approve_plan(tmp_path, mission_dir)
-        # plan-approved sets phase to BATTLE_PLAN
 
         result = run_phase("advance", "--mission-dir", str(mission_dir))
         assert "BATTLE_PLAN -> FORMATION" in result.stdout
@@ -398,7 +410,7 @@ class TestAdvance:
         transition_events = [e for e in events if e.get("type") == "phase_transition"]
         assert len(transition_events) == 1
         assert transition_events[0]["data"]["from_phase"] == "SAILING_ORDERS"
-        assert transition_events[0]["data"]["to_phase"] == "BATTLE_PLAN"
+        assert transition_events[0]["data"]["to_phase"] == "ESTIMATE"
 
     def test_no_active_mission_fails(self, tmp_path: Path) -> None:
         """Advance with no active mission fails with a helpful error."""
@@ -542,6 +554,96 @@ class TestValidateTool:
         )
         assert result.returncode == 0
 
+    def test_battle_plan_blocks_agent(self, tmp_path: Path) -> None:
+        """Agent is blocked during BATTLE_PLAN phase."""
+        mission_dir = tmp_path / "battleplan-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "BATTLE_PLAN"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "Agent",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_battle_plan_blocks_team_create(self, tmp_path: Path) -> None:
+        """TeamCreate is blocked during BATTLE_PLAN phase."""
+        mission_dir = tmp_path / "battleplan-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "BATTLE_PLAN"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TeamCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_battle_plan_blocks_task_create(self, tmp_path: Path) -> None:
+        """TaskCreate is blocked during BATTLE_PLAN phase."""
+        mission_dir = tmp_path / "battleplan-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "BATTLE_PLAN"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TaskCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_permission_blocks_agent(self, tmp_path: Path) -> None:
+        """Agent is blocked during PERMISSION phase."""
+        mission_dir = tmp_path / "permission-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "PERMISSION"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "Agent",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_permission_blocks_team_create(self, tmp_path: Path) -> None:
+        """TeamCreate is blocked during PERMISSION phase."""
+        mission_dir = tmp_path / "permission-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "PERMISSION"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TeamCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+    def test_permission_blocks_task_create(self, tmp_path: Path) -> None:
+        """TaskCreate is blocked during PERMISSION phase."""
+        mission_dir = tmp_path / "permission-mission"
+        mission_dir.mkdir(parents=True)
+        write_json(mission_dir / "fleet-status.json", {
+            "version": 1,
+            "mission": {"phase": "PERMISSION"},
+        })
+        result = run_phase(
+            "validate-tool", "--tool", "TaskCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
     def test_old_format_allows_all(self, tmp_path: Path) -> None:
         """fleet-status.json without phase field allows all tools (backward compat)."""
         mission_dir = tmp_path / "old-mission"
@@ -677,14 +779,16 @@ class TestPhasePreservation:
         fs = read_json(mission_dir / "fleet-status.json")
         assert fs["mission"]["phase"] == "SAILING_ORDERS"
 
-    def test_plan_approved_sets_battle_plan_phase(self, tmp_path: Path) -> None:
-        """plan-approved sets phase to BATTLE_PLAN."""
+    def test_plan_approved_preserves_phase(self, tmp_path: Path) -> None:
+        """plan-approved does not overwrite phase — the phase engine is the sole authority."""
         mission_dir = init_mission(tmp_path)
         add_task(tmp_path, mission_dir, task_id=1)
-        approve_plan(tmp_path, mission_dir)
+        # Set a known phase before calling plan-approved
+        run_phase("set", "--mission-dir", str(mission_dir), "--phase", "ESTIMATE")
+        run_data("plan-approved", "--mission-dir", str(mission_dir), cwd=tmp_path)
 
         fs = read_json(mission_dir / "fleet-status.json")
-        assert fs["mission"]["phase"] == "BATTLE_PLAN"
+        assert fs["mission"]["phase"] == "ESTIMATE"
 
     def test_squadron_preserves_phase(self, tmp_path: Path) -> None:
         """squadron preserves the existing phase (does not hard-set FORMATION)."""
@@ -767,11 +871,6 @@ class TestPhasePreservation:
 
 
 # ---------------------------------------------------------------------------
-# TestFullLifecycle
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
 # TestCorruptJSON
 # ---------------------------------------------------------------------------
 
@@ -800,7 +899,7 @@ class TestCorruptJSON:
 
         # Advance should still succeed (corrupt log is backed up, fresh one created)
         result = run_phase("advance", "--mission-dir", str(mission_dir))
-        assert "SAILING_ORDERS -> BATTLE_PLAN" in result.stdout
+        assert "SAILING_ORDERS -> ESTIMATE" in result.stdout
         assert (mission_dir / "mission-log.json.bak").exists()
 
 
@@ -834,42 +933,49 @@ class TestFullLifecycle:
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == "SAILING_ORDERS"
 
-        # 2. Advance to BATTLE_PLAN
+        # 2. Advance to ESTIMATE
+        run_phase("advance", "--mission-dir", str(mission_dir))
+        result = run_phase("current", "--mission-dir", str(mission_dir))
+        assert result.stdout.strip() == "ESTIMATE"
+
+        # 3. Write estimate.md, advance to BATTLE_PLAN
+        write_estimate(mission_dir)
         run_phase("advance", "--mission-dir", str(mission_dir))
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == "BATTLE_PLAN"
 
-        # 3. Add task, approve plan, advance to FORMATION
+        # 4. Add task, approve plan, advance to FORMATION
         add_task(tmp_path, mission_dir, task_id=1)
         approve_plan(tmp_path, mission_dir)
         run_phase("advance", "--mission-dir", str(mission_dir))
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == "FORMATION"
 
-        # 4. Form squadron, advance to PERMISSION
+        # 5. Form squadron, advance to PERMISSION
         form_squadron(tmp_path, mission_dir)
         run_phase("advance", "--mission-dir", str(mission_dir))
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == "PERMISSION"
 
-        # 5. Grant permission, advance to UNDERWAY
+        # 6. Grant permission, advance to UNDERWAY
         log_permission(mission_dir)
         run_phase("advance", "--mission-dir", str(mission_dir))
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == "UNDERWAY"
 
-        # 6. Complete task, advance to STAND_DOWN
+        # 7. Complete task, advance to STAND_DOWN
         log_task_completed(mission_dir, task_id=1)
         run_phase("advance", "--mission-dir", str(mission_dir))
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == "STAND_DOWN"
 
-        # 7. Verify all transition events were logged
+        # 8. Verify all transition events were logged
         log = read_json(mission_dir / "mission-log.json")
         transitions = [e for e in log["events"] if e["type"] == "phase_transition"]
-        assert len(transitions) == 5
+        assert len(transitions) == 6
         expected_transitions = [
-            ("SAILING_ORDERS", "BATTLE_PLAN"),
+            ("SAILING_ORDERS", "ESTIMATE"),
+            ("ESTIMATE", "BATTLE_PLAN"),
             ("BATTLE_PLAN", "FORMATION"),
             ("FORMATION", "PERMISSION"),
             ("PERMISSION", "UNDERWAY"),
@@ -878,3 +984,327 @@ class TestFullLifecycle:
         for transition, (from_phase, to_phase) in zip(transitions, expected_transitions):
             assert transition["data"]["from_phase"] == from_phase
             assert transition["data"]["to_phase"] == to_phase
+
+
+# ---------------------------------------------------------------------------
+# TestEstimatePhase
+# ---------------------------------------------------------------------------
+
+
+class TestEstimatePhase:
+    """Tests for the ESTIMATE phase — exit criteria, opt-out flag, and tool blocks."""
+
+    def test_advance_estimate_to_battle_plan_with_file(self, tmp_path: Path) -> None:
+        """Advance from ESTIMATE to BATTLE_PLAN when estimate.md exists."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
+        write_estimate(mission_dir)
+
+        result = run_phase("advance", "--mission-dir", str(mission_dir))
+        assert "ESTIMATE -> BATTLE_PLAN" in result.stdout
+
+        fs = read_json(mission_dir / "fleet-status.json")
+        assert fs["mission"]["phase"] == "BATTLE_PLAN"
+
+    def test_advance_estimate_to_battle_plan_with_skip_flag(self, tmp_path: Path) -> None:
+        """Advance from ESTIMATE to BATTLE_PLAN when sailing-orders.json.estimate_skipped is true."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
+
+        # Set opt-out flag directly on sailing-orders.json
+        so_path = mission_dir / "sailing-orders.json"
+        so = read_json(so_path)
+        write_json(so_path, {
+            **so,
+            "estimate_skipped": True,
+            "estimate_skip_reason": "trivial scope",
+        })
+
+        result = run_phase("advance", "--mission-dir", str(mission_dir))
+        assert "ESTIMATE -> BATTLE_PLAN" in result.stdout
+
+        fs = read_json(mission_dir / "fleet-status.json")
+        assert fs["mission"]["phase"] == "BATTLE_PLAN"
+
+    def test_advance_estimate_blocked_without_file_or_flag(self, tmp_path: Path) -> None:
+        """Cannot advance from ESTIMATE when neither estimate.md nor skip flag is present."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
+
+        result = run_phase("advance", "--mission-dir", str(mission_dir), expect_fail=True)
+        assert "estimate.md" in result.stderr
+        assert "estimate_skipped" in result.stderr
+
+        fs = read_json(mission_dir / "fleet-status.json")
+        assert fs["mission"]["phase"] == "ESTIMATE"
+
+    def test_estimate_allows_agent(self, tmp_path: Path) -> None:
+        """Agent is allowed during ESTIMATE phase (Q1 dispatches Explore agents)."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
+
+        result = run_phase(
+            "validate-tool", "--tool", "Agent",
+            "--mission-dir", str(mission_dir),
+        )
+        assert result.returncode == 0
+
+    def test_estimate_blocks_team_create(self, tmp_path: Path) -> None:
+        """TeamCreate is blocked during ESTIMATE phase."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
+
+        result = run_phase(
+            "validate-tool", "--tool", "TeamCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+        assert "ESTIMATE" in result.stdout
+
+    def test_estimate_blocks_task_create(self, tmp_path: Path) -> None:
+        """TaskCreate is blocked during ESTIMATE phase."""
+        mission_dir = init_mission(tmp_path)
+        run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
+
+        result = run_phase(
+            "validate-tool", "--tool", "TaskCreate",
+            "--mission-dir", str(mission_dir),
+            expect_fail=True,
+        )
+        assert "BLOCKED" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# TestSkillMdEstimateStep
+# ---------------------------------------------------------------------------
+
+
+class TestSkillMdEstimateStep:
+    """Structural assertions for the SKILL.md surgery that inserts The Estimate."""
+
+    SKILL_MD = Path(__file__).resolve().parents[1] / "SKILL.md"
+
+    def test_conduct_the_estimate_heading_present(self) -> None:
+        """SKILL.md contains a 'Conduct The Estimate' step between Sailing Orders and Battle Plan."""
+        text = self.SKILL_MD.read_text(encoding="utf-8")
+        assert "## 2. Conduct The Estimate" in text
+
+    def test_steps_are_numbered_one_through_eight(self) -> None:
+        """All eight step headings appear in order."""
+        text = self.SKILL_MD.read_text(encoding="utf-8")
+        expected_headings = [
+            "## 1. Issue Sailing Orders",
+            "## 2. Conduct The Estimate",
+            "## 3. Draft Battle Plan",
+            "## 4. Form the Squadron",
+            "## 5. Get Permission to Sail",
+            "## 6. Run Quarterdeck Rhythm",
+            "## 7. Set Action Stations",
+            "## 8. Stand Down And Log Action",
+        ]
+        positions = [text.find(h) for h in expected_headings]
+        assert all(p >= 0 for p in positions), (
+            f"Missing headings: {[h for h, p in zip(expected_headings, positions) if p < 0]}"
+        )
+        assert positions == sorted(positions), "Step headings are out of order"
+
+    def test_estimate_phase_advance_snippet_present(self) -> None:
+        """The SAILING_ORDERS -> ESTIMATE phase-advance snippet appears before Battle Plan."""
+        text = self.SKILL_MD.read_text(encoding="utf-8")
+        estimate_idx = text.index("## 2. Conduct The Estimate")
+        battle_plan_idx = text.index("## 3. Draft Battle Plan")
+        between = text[:battle_plan_idx]
+
+        # Step 1 must advance from SAILING_ORDERS to ESTIMATE
+        assert "SAILING_ORDERS to ESTIMATE" in text[:estimate_idx]
+        # Step 2 must advance from ESTIMATE to BATTLE_PLAN
+        assert "ESTIMATE to BATTLE_PLAN" in between
+
+    def test_skip_estimate_subcommand_documented(self) -> None:
+        """The skip-estimate opt-out path is documented in Step 1."""
+        text = self.SKILL_MD.read_text(encoding="utf-8")
+        assert "skip-estimate" in text
+        assert "--reason" in text
+
+    def test_battle_plan_step_drops_analytical_bullets(self) -> None:
+        """The Battle Plan step no longer contains the pre-Estimate analytical wording."""
+        text = self.SKILL_MD.read_text(encoding="utf-8")
+        battle_plan_idx = text.index("## 3. Draft Battle Plan")
+        next_step_idx = text.index("## 4. Form the Squadron")
+        battle_plan_body = text[battle_plan_idx:next_step_idx]
+
+        # These analytical instructions lived in the old Battle Plan step and
+        # should now be covered by Q4-Q7 of the Estimate.
+        assert "Split mission into independent tasks" not in battle_plan_body
+        assert "Map the dependency graph" not in battle_plan_body
+
+    def test_elegant_prose_direction_near_top(self) -> None:
+        """A single sentence about elegant writing appears before Step 1."""
+        text = self.SKILL_MD.read_text(encoding="utf-8")
+        intro = text[: text.index("## 1. Issue Sailing Orders")]
+        assert "elegant" in intro.lower()
+
+
+# ---------------------------------------------------------------------------
+# TestEstimateE2E — T9 (happy path) and T10 (opt-out)
+# ---------------------------------------------------------------------------
+
+
+def _full_estimate_body() -> str:
+    """Return a minimal but complete 7-section estimate.md body."""
+    sections = [
+        "# The Estimate",
+        "",
+        "## 1. Reconnaissance",
+        "What do we know?",
+        "",
+        "## 2. Task analysis",
+        "What must we achieve?",
+        "",
+        "## 3. Environment",
+        "What shapes the terrain?",
+        "",
+        "## 4. Courses of action",
+        "Single course: direct refactor.",
+        "",
+        "## 5. Coordination",
+        "One captain, one ship.",
+        "",
+        "## 6. Execution",
+        "Proceed on approved plan.",
+        "",
+        "## 7. Control",
+        "Watch for drift past the hull threshold.",
+        "",
+    ]
+    return "\n".join(sections)
+
+
+class TestEstimateE2E:
+    """End-to-end tests for the full Estimate flow (T9 happy path, T10 opt-out)."""
+
+    def test_happy_path_estimate_with_outcomes_and_analytics(
+        self, tmp_path: Path
+    ) -> None:
+        """Full flow: init -> estimate -> tasks -> outcomes -> stand-down -> analytics."""
+        # 1. Init -> SAILING_ORDERS
+        mission_dir = init_mission(tmp_path)
+
+        # 2. Advance to ESTIMATE
+        run_phase("advance", "--mission-dir", str(mission_dir))
+        assert read_json(mission_dir / "fleet-status.json")["mission"]["phase"] == "ESTIMATE"
+
+        # 3. Author a full 7-section estimate.md and advance to BATTLE_PLAN
+        (mission_dir / "estimate.md").write_text(
+            _full_estimate_body(), encoding="utf-8"
+        )
+        run_phase("advance", "--mission-dir", str(mission_dir))
+        assert read_json(mission_dir / "fleet-status.json")["mission"]["phase"] == "BATTLE_PLAN"
+
+        # 4. Add tasks, approve plan, advance to FORMATION
+        add_task(tmp_path, mission_dir, task_id=1, station_tier=1)
+        add_task(tmp_path, mission_dir, task_id=2, station_tier=1)
+        approve_plan(tmp_path, mission_dir)
+        run_phase("advance", "--mission-dir", str(mission_dir))
+
+        # 5. Form squadron, advance to PERMISSION
+        form_squadron(tmp_path, mission_dir)
+        run_phase("advance", "--mission-dir", str(mission_dir))
+
+        # 6. Grant permission, advance to UNDERWAY
+        log_permission(mission_dir)
+        run_phase("advance", "--mission-dir", str(mission_dir))
+
+        # 7. Record estimate outcomes (pass/fail mix, multiple methods)
+        outcomes = [
+            ("E1", "C1", "pass", "test", "pytest green"),
+            ("E1", "C2", "fail", "test", "pytest red — one case off"),
+            ("E1", "C3", "pass", "review", "admiral OK'd diff"),
+            ("E2", "C1", "not-verified", "visual", "no UI reviewer available"),
+        ]
+        for effect_id, crit_id, status, method, evidence in outcomes:
+            run_data(
+                "estimate-outcome",
+                "--mission-dir", str(mission_dir),
+                "--effect-id", effect_id,
+                "--criterion-id", crit_id,
+                "--status", status,
+                "--method", method,
+                "--evidence", evidence,
+                "--recorded-by", "HMS Argyll",
+                cwd=tmp_path,
+            )
+
+        # Outcomes file exists with 4 entries
+        outcomes_doc = read_json(mission_dir / "estimate-outcomes.json")
+        assert outcomes_doc["version"] == 1
+        assert len(outcomes_doc["outcomes"]) == 4
+
+        # 8. Complete both tasks, advance to STAND_DOWN
+        log_task_completed(mission_dir, task_id=1)
+        log_task_completed(mission_dir, task_id=2)
+        run_phase("advance", "--mission-dir", str(mission_dir))
+        assert read_json(mission_dir / "fleet-status.json")["mission"]["phase"] == "STAND_DOWN"
+
+        # 9. Run stand-down to persist mission terminal state
+        run_data(
+            "stand-down",
+            "--mission-dir", str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome", "Estimate E2E complete",
+            "--metric-result", "All pass",
+            cwd=tmp_path,
+        )
+
+        # 10. Index the fleet and run analytics on estimate-outcomes
+        missions_dir = mission_dir.parent
+        run_data("index", "--missions-dir", str(missions_dir), cwd=tmp_path)
+        result = run_data(
+            "analytics",
+            "--missions-dir", str(missions_dir),
+            "--metric", "estimate-outcomes",
+            "--json",
+            cwd=tmp_path,
+        )
+        data = json.loads(result.stdout)
+        assert data["total"] == 4
+        assert data["pass"] == 2
+        assert data["fail"] == 1
+        assert data["not_verified"] == 1
+        assert data["missions_with_outcomes"] == 1
+        assert data["by_method"]["test"]["total"] == 2
+        assert data["by_method"]["review"]["total"] == 1
+        assert data["by_method"]["visual"]["total"] == 1
+
+    def test_opt_out_skip_estimate_advances_through(self, tmp_path: Path) -> None:
+        """Flow: init -> skip-estimate -> advance SAILING_ORDERS->ESTIMATE->BATTLE_PLAN."""
+        mission_dir = init_mission(tmp_path)
+
+        # skip-estimate writes flag + reason on sailing-orders.json
+        run_data(
+            "skip-estimate",
+            "--mission-dir", str(mission_dir),
+            "--reason", "trivial scope",
+            cwd=tmp_path,
+        )
+
+        so = read_json(mission_dir / "sailing-orders.json")
+        assert so["estimate_skipped"] is True
+        assert so["estimate_skip_reason"] == "trivial scope"
+
+        # Advance SAILING_ORDERS -> ESTIMATE
+        run_phase("advance", "--mission-dir", str(mission_dir))
+        assert read_json(mission_dir / "fleet-status.json")["mission"]["phase"] == "ESTIMATE"
+
+        # Advance ESTIMATE -> BATTLE_PLAN without estimate.md
+        assert not (mission_dir / "estimate.md").exists()
+        result = run_phase("advance", "--mission-dir", str(mission_dir))
+        assert "ESTIMATE -> BATTLE_PLAN" in result.stdout
+        assert read_json(mission_dir / "fleet-status.json")["mission"]["phase"] == "BATTLE_PLAN"
+
+        # An estimate_skipped event was logged by skip-estimate
+        log = read_json(mission_dir / "mission-log.json")
+        skip_events = [e for e in log["events"] if e.get("type") == "estimate_skipped"]
+        assert len(skip_events) == 1
+        assert skip_events[0]["data"]["reason"] == "trivial scope"

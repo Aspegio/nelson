@@ -280,6 +280,160 @@ class TestPlanApproved:
 
 
 # ---------------------------------------------------------------------------
+# SkipEstimate
+# ---------------------------------------------------------------------------
+
+class TestSkipEstimate:
+    def test_writes_flag_and_reason(self, tmp_path: Path) -> None:
+        """skip-estimate writes estimate_skipped and estimate_skip_reason."""
+        mission_dir = init_mission(tmp_path)
+        run(
+            "skip-estimate",
+            "--mission-dir", str(mission_dir),
+            "--reason", "trivial scope",
+        )
+
+        so = read_json(mission_dir / "sailing-orders.json")
+        assert so["estimate_skipped"] is True
+        assert so["estimate_skip_reason"] == "trivial scope"
+
+    def test_logs_event(self, tmp_path: Path) -> None:
+        """skip-estimate appends an estimate_skipped event to mission-log.json."""
+        mission_dir = init_mission(tmp_path)
+        run(
+            "skip-estimate",
+            "--mission-dir", str(mission_dir),
+            "--reason", "hotfix, no estimate warranted",
+        )
+
+        log = read_json(mission_dir / "mission-log.json")
+        events = [e for e in log["events"] if e["type"] == "estimate_skipped"]
+        assert len(events) == 1
+        assert events[0]["data"]["reason"] == "hotfix, no estimate warranted"
+
+    def test_preserves_other_fields(self, tmp_path: Path) -> None:
+        """skip-estimate does not alter other sailing-orders fields."""
+        mission_dir = init_mission(tmp_path)
+        before = read_json(mission_dir / "sailing-orders.json")
+        run(
+            "skip-estimate",
+            "--mission-dir", str(mission_dir),
+            "--reason", "trivial scope",
+        )
+        after = read_json(mission_dir / "sailing-orders.json")
+
+        for key in ("outcome", "success_metric", "deadline", "budget", "created_at"):
+            assert after[key] == before[key]
+
+    def test_empty_reason_rejected(self, tmp_path: Path) -> None:
+        """skip-estimate rejects an empty --reason value."""
+        mission_dir = init_mission(tmp_path)
+        result = run(
+            "skip-estimate",
+            "--mission-dir", str(mission_dir),
+            "--reason", "   ",
+            expect_fail=True,
+        )
+        assert "reason" in result.stderr.lower()
+
+    def test_missing_sailing_orders_rejected(self, tmp_path: Path) -> None:
+        """skip-estimate fails if sailing-orders.json is absent."""
+        mission_dir = tmp_path / "bare-mission"
+        mission_dir.mkdir(parents=True)
+        result = run(
+            "skip-estimate",
+            "--mission-dir", str(mission_dir),
+            "--reason", "whatever",
+            expect_fail=True,
+        )
+        assert "sailing-orders.json" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# EstimateOutcome
+# ---------------------------------------------------------------------------
+
+
+def _record_outcome(
+    mission_dir: Path,
+    *,
+    effect_id: str = "auth-jwt",
+    criterion_id: str = "C1",
+    status: str = "pass",
+    method: str = "test",
+    evidence: str = "pytest output attached",
+    recorded_by: str = "HMS Argyll",
+    expect_fail: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    return run(
+        "estimate-outcome",
+        "--mission-dir", str(mission_dir),
+        "--effect-id", effect_id,
+        "--criterion-id", criterion_id,
+        "--status", status,
+        "--method", method,
+        "--evidence", evidence,
+        "--recorded-by", recorded_by,
+        expect_fail=expect_fail,
+    )
+
+
+class TestEstimateOutcome:
+    def test_creates_outcomes_file_on_first_record(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        _record_outcome(mission_dir)
+
+        outcomes = read_json(mission_dir / "estimate-outcomes.json")
+        assert outcomes["version"] == 1
+        assert len(outcomes["outcomes"]) == 1
+        recorded = outcomes["outcomes"][0]
+        assert recorded["effect_id"] == "auth-jwt"
+        assert recorded["criterion_id"] == "C1"
+        assert recorded["status"] == "pass"
+        assert recorded["method"] == "test"
+        assert recorded["recorded_by"] == "HMS Argyll"
+        assert "recorded_at" in recorded
+
+    def test_appends_to_existing_outcomes(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        _record_outcome(mission_dir, criterion_id="C1")
+        _record_outcome(mission_dir, criterion_id="C2", status="fail", method="review")
+
+        outcomes = read_json(mission_dir / "estimate-outcomes.json")
+        assert len(outcomes["outcomes"]) == 2
+        assert outcomes["outcomes"][1]["criterion_id"] == "C2"
+        assert outcomes["outcomes"][1]["status"] == "fail"
+        assert outcomes["outcomes"][1]["method"] == "review"
+
+    def test_logs_event(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        _record_outcome(mission_dir)
+
+        log = read_json(mission_dir / "mission-log.json")
+        events = [e for e in log["events"] if e["type"] == "estimate_outcome_recorded"]
+        assert len(events) == 1
+        assert events[0]["data"]["effect_id"] == "auth-jwt"
+        assert events[0]["data"]["status"] == "pass"
+
+    def test_rejects_invalid_status(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        # argparse rejects before our code sees it (choices enforced)
+        result = _record_outcome(mission_dir, status="almost-pass", expect_fail=True)
+        # either argparse stderr or our _die message
+        assert "almost-pass" in result.stderr or "invalid choice" in result.stderr
+
+    def test_rejects_invalid_method(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        result = _record_outcome(mission_dir, method="astrology", expect_fail=True)
+        assert "astrology" in result.stderr or "invalid choice" in result.stderr
+
+    def test_rejects_empty_required_fields(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        result = _record_outcome(mission_dir, effect_id="   ", expect_fail=True)
+        assert "required" in result.stderr.lower() or "non-empty" in result.stderr.lower()
+
+
+# ---------------------------------------------------------------------------
 # Event
 # ---------------------------------------------------------------------------
 
@@ -508,25 +662,13 @@ class TestStatus:
             "--hull-green", "2", "--hull-amber", "0", "--hull-red", "0", "--hull-critical", "0",
             "--decision", "continue", "--rationale", "Test",
         )
-        import os
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            result = run("status", "--mission-dir", "")
-            assert "Status:" in result.stdout or "nelson-data" in result.stdout
-        finally:
-            os.chdir(old_cwd)
+        result = run("status", "--mission-dir", "", cwd=tmp_path)
+        assert "Status:" in result.stdout or "nelson-data" in result.stdout
 
     def test_status_no_missions_dir_prints_message(self, tmp_path: Path) -> None:
         """Status without --mission-dir and no .nelson/missions/ prints message."""
-        import os
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            result = run("status", "--mission-dir", "")
-            assert "No active missions" in result.stdout
-        finally:
-            os.chdir(old_cwd)
+        result = run("status", "--mission-dir", "", cwd=tmp_path)
+        assert "No active missions" in result.stdout
 
 
 # ---------------------------------------------------------------------------

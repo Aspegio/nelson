@@ -1,6 +1,6 @@
 # Nelson
 
-Nelson is a Claude Code skill for coordinating agent work using Royal Navy terminology. It provides a six-step operational framework: Sailing Orders, Form the Squadron, Battle Plan, Quarterdeck Rhythm, Action Stations, and Stand Down.
+Nelson is a Claude Code skill for coordinating agent work using Royal Navy terminology. It provides an eight-step operational framework: Sailing Orders, The Estimate, Battle Plan, Form the Squadron, Get Permission to Sail, Quarterdeck Rhythm, Action Stations, and Stand Down.
 
 ## Project structure
 

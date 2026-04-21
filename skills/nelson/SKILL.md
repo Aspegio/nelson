@@ -13,6 +13,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/skills/nelson/scripts/nelson-data.py" status
 
 Execute this workflow for the user's mission.
 
+Write as Nelson's captains would write: concise, elegant, confident. Not eighteenth-century prose — the clear register of an officer who respects the reader's time. The skill's voice sets the example for the admiral's voice.
+
 ## 1. Issue Sailing Orders
 
 - Review the user's brief for ambiguity. If the outcome, scope, or constraints are unclear, ask the user to clarify before drafting sailing orders.
@@ -41,7 +43,7 @@ All mission artifacts — captain's log, quarterdeck reports, damage reports, an
 
 **Structured Data Capture:** Run the `nelson-data.py` script located in the skill's directory (e.g., `python3 .claude/skills/nelson/scripts/nelson-data.py init --outcome "..." --metric "..." --deadline "..."`). If installed globally, it may be in `~/.claude/skills/nelson/scripts/`. `init` creates the mission directory, the initial JSON files (`sailing-orders.json`, `mission-log.json`, `fleet-status.json` with initial phase `SAILING_ORDERS`), and the `.nelson/.active-{SESSION_ID}` marker in one atomic step. See `references/structured-data.md` for the full argument list.
 
-**Phase Advance:** After structured data capture, advance the mission phase from SAILING_ORDERS to BATTLE_PLAN:
+**Phase Advance:** After structured data capture, advance the mission phase from SAILING_ORDERS to ESTIMATE:
 
 ```bash
 python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
@@ -49,15 +51,56 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mis
 
 **Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
 
-## 2. Draft Battle Plan
+**The Estimate opt-in:** Before proceeding, ask the user:
 
-- Split mission into independent tasks with clear deliverables.
-    - Map the dependency graph: enumerate units of work that can run without shared state or ordering constraints. Each independent unit receives its own captain. Only group tasks onto one captain when they share files, require sequential ordering, or the context-setup cost demonstrably exceeds the work itself.
-    - The default is one captain per independent task. Grouping is the exception and requires a concrete reason.
-    - If cost-savings is a priority, also consider task inputs — avoid multiple agents independently loading the same large inputs into their contexts.
-- Assign explicit dependencies for each task.
-- Assign file ownership when implementation touches code.
-- Assign an action station tier to each task (see `references/action-stations.md`).
+> *"Shall I carry out The Estimate before drafting the Battle Plan? I would recommend it for this mission — [brief reason]."*
+
+Give an honest recommendation. For straightforward missions with clear scope in a single subsystem, proceed without the Estimate. For complex, ambiguous, or multi-system missions, recommend conducting it. If the user accepts, proceed to Step 2. If the user declines, record the decision and skip to Step 3:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py skip-estimate \
+  --mission-dir {mission-dir} --reason "[one-line rationale]"
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+```
+
+The first `advance` moves from SAILING_ORDERS to ESTIMATE. The second `advance` moves from ESTIMATE to BATTLE_PLAN; the exit validator accepts the transition because `skip-estimate` has already recorded the opt-out in `sailing-orders.json`.
+
+## 2. Conduct The Estimate
+
+Read `references/the-estimate.md` for the full thought process, and use `references/admiralty-templates/estimate.md` as the scaffold. Work through seven questions that turn a mission brief into a plan worth executing:
+
+1. **Reconnaissance** — What is the terrain? What are we working with?
+2. **Intent** — What are we really trying to achieve, and why?
+3. **Effects** — What changes must occur to fulfil the intent?
+4. **Terrain** — Where in the codebase does each effect land?
+5. **Forces** — What agents, models, and context do we need?
+6. **Coordination** — What depends on what? What runs in parallel?
+7. **Control** — Where are the quality gates and intervention points?
+
+**Q1 is the only question that dispatches sub-agents.** Send one or more Explore agents into the codebase with a scouting brief derived from the Sailing Orders; synthesise their findings into the Reconnaissance section.
+
+**Two checkpoints bracket the analytical work.** After Q1, present findings to the user and invite correction or reframing. After Q3, present intent and effects for substantive approval before planning *how*. Q4-Q7 flow from approved effects and are the admiral's professional judgement — work through them without interrupting the user. Collapse both checkpoints into a single final review only when all three conditions hold: sailing orders specify outcome, metric, and deadline; Q1 reveals no surprises; the work lands in a single subsystem. See `references/the-estimate.md` for full checkpoint discipline.
+
+Each effect in §3 must carry **commander's guidance** (how to do it) and **acceptance criteria** (what must be true when done). Criteria flow through to captains and are verified at stand-down; captains choose the verification method per criterion (test, type-check, lint, review, visual).
+
+Write the estimate to `{mission-dir}/estimate.md` with one H2 section per question. Split to `{mission-dir}/estimate/0N-name.md` only when a section grows unwieldy.
+
+**Phase Advance:** After the user approves the final estimate, advance from ESTIMATE to BATTLE_PLAN:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}
+```
+
+## 3. Draft Battle Plan
+
+When The Estimate has been conducted, the Battle Plan inherits the analytical work: terrain, forces, coordination, and control are already decided. The Battle Plan step is operational — it turns approved effects into task assignments. When the Estimate was skipped, the admiral performs the analysis inline at this step.
+
+- Translate each effect from the Estimate (§3) into one or more tasks. When the Estimate was skipped, derive tasks directly from the Sailing Orders.
+- Prepend the commander's intent paragraph (Estimate §2) to every captain's brief so each ship sails under a shared understanding of purpose.
+- Inherit acceptance criteria from the parent effect onto each task. Captains own the choice of verification method per criterion.
+- Inherit terrain (file ownership), coordination (dependencies), forces (captain sizing, model class), and control (action-station tier) from the Estimate. When the Estimate was skipped, supply these at this step.
+- If cost-savings is a priority, also consider task inputs — avoid multiple agents independently loading the same large inputs into their contexts.
 - For each task, note expected crew composition using the crew-or-direct decision tree in `references/crew-roles.md`. If crew are mustered, list crew roles with sub-tasks and sequence. If the captain implements directly (0 crew), note "Captain implements directly." If the captain anticipates needing marine support, note marine capacity (max 2).
 - For each task, consciously mark `admiralty-action-required: yes` or `no`.
 - Keep one task in progress per agent unless the mission explicitly requires multitasking.
@@ -65,9 +108,9 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mis
 Reference `references/admiralty-templates/battle-plan.md` for the battle plan template and `references/admiralty-templates/ship-manifest.md` for the ship manifest.
 
 **Battle Plan Gate — Standing Order Check:** You MUST NOT finalize task assignments until each question below is answered in writing and any triggered standing order remedy has been applied. Show your reasoning — a bare yes/no is not sufficient.
-- `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent? If yes, skip Step 3 — single-session has no squadron to form.
+- `becalmed-fleet.md`: Should this mission use single-session instead of multi-agent? If yes, skip Step 4 — single-session has no squadron to form.
 - `light-squadron.md`: Is the task count equal to the number of independent work units, or have tasks been under-split?
-- `split-keel.md`: Does each task have exclusive file ownership with no conflicts? (This will be automatically verified in Step 3).
+- `split-keel.md`: Does each task have exclusive file ownership with no conflicts? (This will be automatically verified in Step 4).
 - `unclassified-engagement.md`: Does every task have a risk tier?
 - `all-hands-on-deck.md`: Has each task been crewed only with roles its work actually demands?
 - `skeleton-crew.md`: Would any task deploy exactly one crew member for an atomic task the captain should handle directly?
@@ -79,9 +122,9 @@ Reference `references/admiralty-templates/battle-plan.md` for the battle plan te
 
 If any answer triggers a standing order, you MUST apply the corrective action and re-answer the question before proceeding. For situations not covered by this gate, consult the Standing Orders table below.
 
-**Structured Data Capture:** Task registration requires owners, which are assigned in Step 3. No `nelson-data.py` script calls at this step.
+**Structured Data Capture:** Task registration requires owners, which are assigned in Step 4. No `nelson-data.py` script calls at this step.
 
-## 3. Form the Squadron
+## 4. Form the Squadron
 
 - Select execution mode per `references/squadron-composition.md`. If the user explicitly requested a mode, use it — user preference overrides the decision matrix.
     - `single-session`: sequential tasks, low complexity, or heavy same-file editing.
@@ -100,7 +143,7 @@ For each task:
 - `description`: One-line deliverable
 - `activeForm`: Present-continuous form shown in the UI spinner (e.g., "Refactoring auth module")
 
-All tasks start as `pending`. They will be updated with owners and status as the mission progresses. In `single-session` mode (where Step 3 is otherwise skipped), the admiral still creates these entries before proceeding to Step 4.
+All tasks start as `pending`. They will be updated with owners and status as the mission progresses. In `single-session` mode (where Step 4 is otherwise skipped), the admiral still creates these entries before proceeding to Step 5.
 
 - Assign each task a captain and a ship name from `references/crew-roles.md` matching task weight (frigate for general, destroyer for high-risk, patrol vessel for small, flagship for critical-path, submarine for research).
 - Finalize ship manifests: confirm crew roles per task, or note "Captain implements directly."
@@ -159,7 +202,7 @@ This registers all tasks, records the squadron, computes DAG metrics, and runs t
 5. `python3 .claude/skills/nelson/scripts/nelson_conflict_scan.py --plan {mission-dir}/battle-plan.json` to verify there are no file ownership conflicts. If conflicts are found, you MUST resolve them and update the battle plan before proceeding.
 6. `python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mission-dir}` to advance from FORMATION to PERMISSION.
 
-**Before proceeding to Step 4:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
+**Before proceeding to Step 5:** Verify that sailing orders exist, all tasks have owners and deliverables, and every task has an action station tier.
 
 **Crew Briefing:** Spawning and task assignment are two steps. First, spawn each captain with the `Agent` tool, including a crew briefing from `references/admiralty-templates/crew-briefing.md` in their prompt. Then assign work to the existing task entries with `TaskUpdate`. Teammates do NOT inherit the lead's conversation context — they start with a clean slate and need explicit mission context. See `references/tool-mapping.md` for full parameter details by mode.
 
@@ -172,11 +215,11 @@ This registers all tasks, records the squadron, computes DAG metrics, and runs t
 
 **Turnover Briefs:** When a ship is relieved due to context exhaustion, it writes a typed handoff packet using `python3 .claude/skills/nelson/scripts/nelson-data.py handoff ...` (see `references/structured-data.md`). An optional prose companion brief may also be written using `references/admiralty-templates/turnover-brief.md`. See `references/damage-control/relief-on-station.md` for the full procedure.
 
-## 4. Get Permission to Sail
+## 5. Get Permission to Sail
 
 **Display and Permission Gate:**
 1. Display the complete battle plan to the user if `becalmed-fleet.md` is in effect.
-2. Display the complete squadron formation to the user if `becalmed-fleet.md` is not in effect. The battle plan (drafted in Step 2) should also be available for review.
+2. Display the complete squadron formation to the user if `becalmed-fleet.md` is not in effect. The battle plan (drafted in Step 3) should also be available for review.
 3. You are REQUIRED to wait for explicit permission to proceed.
 
 **Phase Advance:** After the user grants permission, log the event and advance:
@@ -189,7 +232,7 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mis
 
 This transitions the mission from PERMISSION to UNDERWAY, unlocking agent spawning and task creation.
 
-## 5. Run Quarterdeck Rhythm
+## 6. Run Quarterdeck Rhythm
 
 **Idle notification rule (immediate — do not defer to checkpoint):** Every time an idle notification arrives from a ship, ask three questions before doing anything else:
 1. Is this ship's task marked complete?
@@ -241,7 +284,7 @@ Hull: All ships green
 
 Reference `references/tool-mapping.md` for coordination tools, `references/admiralty-templates/quarterdeck-report.md` for the report template, and `references/admiralty-templates/damage-report.md` for damage report format. Use `references/commendations.md` for recognition signals and graduated correction. Consult the Standing Orders table below if admiral is doing implementation or tasks are drifting from scope.
 
-## 6. Set Action Stations
+## 7. Set Action Stations
 
 - You MUST read and apply station tiers from `references/action-stations.md`.
 - Require verification evidence before marking tasks complete:
@@ -257,7 +300,7 @@ Reference `references/tool-mapping.md` for coordination tools, `references/admir
 
 Reference `references/admiralty-templates/red-cell-review.md` for the red-cell review template. Consult the Standing Orders table below if tasks lack a tier or red-cell is assigned implementation work.
 
-## 7. Stand Down And Log Action
+## 8. Stand Down And Log Action
 
 - Stop or archive all agent sessions, including crew.
 - Write the captain's log to `{mission-dir}/captains-log.md`. The log MUST be written to disk — outputting it to chat only does not satisfy this requirement. The captain's log should contain:
@@ -276,7 +319,7 @@ Reference `references/admiralty-templates/captains-log.md` for the captain's log
 
 **Session State Cleanup:** Remove the session state file by deleting `.nelson/.active-{SESSION_ID}`.
 
-**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 7 is never permitted.
+**Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 8 is never permitted.
 
 ## Standing Orders
 

@@ -21,6 +21,8 @@ from nelson_data_memory import (
 )
 from nelson_data_utils import (
     JSON_INDENT,
+    VALID_ESTIMATE_OUTCOME_METHODS,
+    VALID_ESTIMATE_OUTCOME_STATUSES,
     _die,
     _err,
     _file_lock,
@@ -31,7 +33,9 @@ from nelson_data_utils import (
 )
 
 
-VALID_METRICS = frozenset({"success-rate", "standing-orders", "efficiency", "all"})
+VALID_METRICS = frozenset(
+    {"success-rate", "standing-orders", "efficiency", "estimate-outcomes", "all"}
+)
 
 
 # ---------------------------------------------------------------------------
@@ -685,6 +689,84 @@ def _compute_efficiency_analytics(missions: list[dict]) -> dict:
     }
 
 
+def _compute_estimate_outcome_analytics(missions: list[dict]) -> dict:
+    """Compute estimate acceptance-criterion verification analytics.
+
+    Aggregates per-criterion outcomes recorded via `nelson-data estimate-outcome`
+    across missions.  Reports pass / fail / not-verified totals, a per-method
+    breakdown with pass rates, and per-mission pass rates so the quarterdeck
+    can spot which missions skimped on verification.
+    """
+    methods = sorted(VALID_ESTIMATE_OUTCOME_METHODS)
+    statuses = sorted(VALID_ESTIMATE_OUTCOME_STATUSES)
+
+    totals = {s: 0 for s in statuses}
+    by_method: dict[str, dict[str, int]] = {
+        m: {s: 0 for s in statuses} for m in methods
+    }
+    per_mission: list[dict] = []
+    missions_with_outcomes = 0
+
+    for m in missions:
+        outcomes = m.get("estimate_outcomes", []) or []
+        if not outcomes:
+            continue
+        missions_with_outcomes += 1
+        mission_counts = {s: 0 for s in statuses}
+        for o in outcomes:
+            status = o.get("status")
+            method = o.get("method")
+            if status in totals:
+                totals[status] += 1
+                mission_counts[status] += 1
+            if method in by_method and status in by_method[method]:
+                by_method[method][status] += 1
+        m_total = sum(mission_counts.values())
+        pass_rate = (
+            round(mission_counts["pass"] / m_total * 100, 1) if m_total else None
+        )
+        per_mission.append(
+            {
+                "mission_id": m.get("mission_id", ""),
+                "total": m_total,
+                "pass": mission_counts["pass"],
+                "fail": mission_counts["fail"],
+                "not_verified": mission_counts["not-verified"],
+                "pass_rate": pass_rate,
+            }
+        )
+
+    total = sum(totals.values())
+    overall_pass_rate = (
+        round(totals["pass"] / total * 100, 1) if total else None
+    )
+
+    method_summary: dict[str, dict] = {}
+    for method, counts in by_method.items():
+        m_total = sum(counts.values())
+        method_summary[method] = {
+            "total": m_total,
+            "pass": counts["pass"],
+            "fail": counts["fail"],
+            "not_verified": counts["not-verified"],
+            "pass_rate": (
+                round(counts["pass"] / m_total * 100, 1) if m_total else None
+            ),
+        }
+
+    return {
+        "mission_count": len(missions),
+        "missions_with_outcomes": missions_with_outcomes,
+        "total": total,
+        "pass": totals["pass"],
+        "fail": totals["fail"],
+        "not_verified": totals["not-verified"],
+        "pass_rate": overall_pass_rate,
+        "by_method": method_summary,
+        "by_mission": per_mission,
+    }
+
+
 def _format_analytics_text(metric: str, data: dict) -> str:
     """Format analytics results as human-readable text."""
     lines: list[str] = []
@@ -751,6 +833,33 @@ def _format_analytics_text(metric: str, data: dict) -> str:
             lines.append(f"  Tasks per ship: {ef['tasks_per_ship']}")
         lines.append("")
 
+    if metric in ("estimate-outcomes", "all"):
+        eo = data.get("estimate_outcomes", {})
+        lines.append(
+            f"Estimate outcomes \u2014 {eo.get('missions_with_outcomes', 0)} "
+            f"of {eo.get('mission_count', 0)} missions recorded outcomes"
+        )
+        if eo.get("total", 0) > 0:
+            lines.append(
+                f"  Overall: {eo['pass_rate']}% pass "
+                f"({eo['pass']} pass, {eo['fail']} fail, "
+                f"{eo['not_verified']} not-verified of {eo['total']})"
+            )
+            by_method = eo.get("by_method", {})
+            method_lines = [
+                (method, info)
+                for method, info in by_method.items()
+                if info.get("total", 0) > 0
+            ]
+            if method_lines:
+                lines.append("  By method:")
+                for method, info in method_lines:
+                    lines.append(
+                        f"    {method}: {info['pass_rate']}% pass "
+                        f"({info['pass']}/{info['total']})"
+                    )
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -785,6 +894,8 @@ def cmd_analytics(args: argparse.Namespace) -> None:
         result["standing_orders"] = _compute_standing_order_analytics(missions, stats)
     if metric in ("efficiency", "all"):
         result["efficiency"] = _compute_efficiency_analytics(missions)
+    if metric in ("estimate-outcomes", "all"):
+        result["estimate_outcomes"] = _compute_estimate_outcome_analytics(missions)
 
     if args.json_output:
         # For single metrics, unwrap the wrapper key

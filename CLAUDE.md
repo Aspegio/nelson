@@ -1,6 +1,6 @@
 # Nelson
 
-Nelson is a Claude Code skill for coordinating agent work using Royal Navy terminology. It provides a six-step operational framework: Sailing Orders, Form the Squadron, Battle Plan, Quarterdeck Rhythm, Action Stations, and Stand Down.
+Nelson is a Claude Code skill for coordinating agent work using Royal Navy terminology. It provides an eight-step operational framework: Sailing Orders, The Estimate, Battle Plan, Form the Squadron, Get Permission to Sail, Quarterdeck Rhythm, Action Stations, and Stand Down.
 
 ## Project structure
 
@@ -18,7 +18,9 @@ skills/nelson/
   references/             — Supporting docs loaded on demand
     action-stations.md      — Risk tier definitions (Station 0–3)
     admiralty-templates/     — One file per template, loaded on demand
+      battle-plan.md          — Battle plan with commander's intent and acceptance criteria
       damage-report.md        — JSON template for hull integrity damage reports
+      estimate.md             — Estimate skeleton (~25-line H2 scaffold)
       turnover-brief.md       — Handover brief for relief on station
     commendations.md        — Recognition signals & graduated correction
     crew-roles.md           — Crew role definitions, ship names & sizing rules
@@ -37,6 +39,7 @@ skills/nelson/
     royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
     structured-data.md      — Structured fleet data capture reference
+    the-estimate.md         — 7 Question Maritime Tactical Estimate reference
     tool-mapping.md         — Nelson-to-Claude Code tool reference
     standing-orders/        — One file per anti-pattern, loaded on demand
 .nelson/
