@@ -15,3 +15,4 @@ AGENTS.local.md
 .dolt/
 *.db
 .beads-credential-key
+docs/superpowers/
