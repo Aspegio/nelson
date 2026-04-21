@@ -112,27 +112,13 @@ Marine deployments inherit the parent ship's station tier:
 - **Station 2:** Captain must signal admiral and receive approval before deploying marines.
 - **Station 3:** Marine deployment is not permitted. All Trafalgar-tier work requires explicit Admiralty (human) confirmation.
 
-## Permission Mode by Station Tier
+## Plan Mode for High-Risk Stations
 
-When spawning captains, set `mode` on the `Agent` tool deliberately. The mapping below applies the minimum constraint required for each station tier — overriding only when the task itself demands it.
+When spawning captains for Station 2 or Station 3 tasks, use `mode: "plan"` on the `Agent` tool. This forces the captain into read-only plan mode — they can explore the codebase and design their approach, but cannot write files until the admiral approves their plan.
 
-| Station tier | Default `mode` | Rationale |
-|---|---|---|
-| Station 0 (Patrol) | `acceptEdits` | Low blast radius; let the captain proceed without per-edit prompts. |
-| Station 1 (Caution) | `acceptEdits` | Moderate impact; rely on red-cell review and rollback notes for control. |
-| Station 2 (Action) | `plan` | Captain explores in read-only plan mode; admiral approves the plan via `SendMessage(type="plan_approval_response")` before execution. |
-| Station 3 (Trafalgar) | `plan` + human gate | Same as Station 2, plus the admiral must obtain explicit human confirmation before approving. |
-
-### Plan Mode Flow (Station 2 / 3)
-
-- The captain submits its plan via `ExitPlanMode`.
-- The admiral reviews and either approves via `SendMessage(type="plan_approval_response")` (agent-team mode) or by re-spawning the captain with `mode: "acceptEdits"` once the plan is approved (subagents mode).
-- Station 3 additionally requires explicit human confirmation before the admiral approves.
-
-### When to override the default
-
-- Use `mode: "plan"` for any captain whose task involves exploration before changes, regardless of tier.
-- Use `mode: "default"` (the unset value) only when the captain is a pure-read operation (Explore subagents, Coxswain, Recce Marines).
+- **Station 2 (Action):** Captain submits a plan via `ExitPlanMode`. Admiral reviews and approves via `SendMessage(type="plan_approval_response")`. This maps to the existing "admiral go/no-go" requirement.
+- **Station 3 (Trafalgar):** Same flow, but the admiral must also obtain explicit human confirmation before approving the plan. This maps to the existing "human confirmation required" requirement.
+- **Station 0-1:** Plan mode is not required. Captains execute directly.
 
 See `references/tool-mapping.md` for the full set of coordination tools.
 

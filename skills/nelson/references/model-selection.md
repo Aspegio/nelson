@@ -1,12 +1,6 @@
 # Model Selection
 
-This reference governs `model` parameter assignment for all squadron agents. **All missions** must record an explicit model per ship in the formation summary (visibility); cost-savings missions additionally apply the weight-and-threshold rules below to override defaults toward `haiku`.
-
-## Default behaviour (no cost-savings priority)
-
-- The admiral records each ship's model in the formation summary as `inherit` (i.e. the admiral's model) unless a ship's role definition recommends otherwise.
-- The `model` parameter is **omitted** from the `Agent` tool call when the ship inherits — explicit `"sonnet"` resolves to an older alias and does not match the admiral's model.
-- This makes model assignment auditable in the squadron summary even when no parameter is passed at spawn.
+Use this reference when the sailing orders express cost-savings priority. It governs model assignment for all squadron agents.
 
 ## Detecting Cost-Savings Intent
 

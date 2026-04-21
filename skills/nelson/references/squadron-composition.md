@@ -6,18 +6,6 @@ Use this file to choose execution mode and team size.
 
 **User preference override:** If the user explicitly requests a specific execution mode (e.g., "use agent teams"), that request MUST be honoured. User preference takes priority over the decision matrix below. Do not second-guess or override the user's choice.
 
-## Prerequisite for `agent-team` Mode
-
-`agent-team` mode requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable to be set when Claude Code launched. Without it, `TeamCreate`, `SendMessage` between captains, and the `team_name` parameter on `Agent` are unavailable or silently degrade.
-
-**Quick check before selecting `agent-team`:**
-
-1. Inspect the tool surface available in this session — if `TeamCreate` is not listed in the available tools, the env var is unset.
-2. If unset, fall back to `subagents` mode, or ask the admiral to relaunch Claude Code with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 claude ...`.
-3. Do not proceed past mode selection assuming agent-team capabilities will appear later — the env var is read at session start only.
-
-> **Bug status:** Even when the env var is set, `Agent(team_name=...)` may fail with an internal error per [claude-code#40270](https://github.com/anthropics/claude-code/issues/40270). See `references/damage-control/agent-team-spawn-broken.md` for the workaround.
-
 Evaluate all three conditions and select the best fit. When two modes could apply, prefer the one that gives captains more autonomy.
 
 - `single-session`: Work is sequential, tightly coupled, or mostly in the same files.
@@ -71,9 +59,3 @@ Worktree isolation is a stronger alternative to the file-ownership approach in `
 - Tasks are large enough that the merge cost is justified.
 
 **Trade-off:** Worktree isolation prevents conflicts during execution but requires merging changes afterward. The admiral is responsible for coordinating the merge.
-
-> **⚠ Known bug — do not combine `team_name` with `isolation: "worktree"`.** Per [claude-code#37549](https://github.com/anthropics/claude-code/issues/37549), the combination silently lands the captain in the main repo, defeating isolation. Choose one:
-> - `agent-team` mode → enforce file ownership via `standing-orders/split-keel.md`, no worktrees.
-> - `subagents` mode → use `isolation: "worktree"` freely (subagent spawning is unaffected).
->
-> See `references/damage-control/worktree-team-conflict.md` for the recovery procedure.
