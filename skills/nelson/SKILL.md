@@ -96,7 +96,9 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mis
 
 When The Estimate has been conducted, the Battle Plan inherits the analytical work: terrain, forces, coordination, and control are already decided. The Battle Plan step is operational — it turns approved effects into task assignments. When the Estimate was skipped, the admiral performs the analysis inline at this step.
 
-- Translate each effect from the Estimate (§3) into one or more tasks. When the Estimate was skipped, derive tasks directly from the Sailing Orders.
+**Scope preservation:** When the Sailing Orders describe extending, expanding, or modifying an existing feature, every task must modify the existing implementation — not create a parallel or replacement implementation. Each task's deliverable and file ownership must reference the existing code it extends. If the Estimate's effects already identify the existing code (and they should — that is what Reconnaissance is for), the Battle Plan must not lose that anchor. A task that creates new files where an extension of existing files would satisfy the effect is a planning error.
+
+- Translate each effect from the Estimate (§3) into one or more tasks. Each task must stay within the scope of its parent effect — do not introduce work that the effect does not call for. When the Estimate was skipped, derive tasks directly from the Sailing Orders.
 - Prepend the commander's intent paragraph (Estimate §2) to every captain's brief so each ship sails under a shared understanding of purpose.
 - Inherit acceptance criteria from the parent effect onto each task. Captains own the choice of verification method per criterion.
 - Inherit terrain (file ownership), coordination (dependencies), forces (captain sizing, model class), and control (action-station tier) from the Estimate. When the Estimate was skipped, supply these at this step.
