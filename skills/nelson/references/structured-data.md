@@ -52,7 +52,8 @@ python3 .claude/skills/nelson/scripts/nelson-data.py task \
   --id 1 --name "Auth module refactor" --owner "HMS Argyll" \
   --deliverable "Refactored auth module with JWT support" \
   --deps "" --station-tier 1 \
-  --files "src/auth/**"
+  --files "src/auth/**" \
+  --modification-targets "auth_handler, JWT_SECRET"
 ```
 
 ### `plan-approved` — Finalize battle plan
@@ -182,7 +183,8 @@ The plan JSON file must contain `squadron` and `tasks` keys:
       "deliverable": "Refactored auth module with JWT support",
       "dependencies": [],
       "station_tier": 1,
-      "file_ownership": ["src/auth/**"]
+      "file_ownership": ["src/auth/**"],
+      "modification_targets": ["auth_handler", "JWT_SECRET"]
     }
   ]
 }
@@ -461,6 +463,7 @@ All artifacts are stored in `{mission-dir}/`.
       "dependents": [4],
       "station_tier": 1,
       "file_ownership": ["src/auth/**"],
+      "modification_targets": ["auth_handler", "JWT_SECRET"],
       "validation_required": "Unit tests pass, no API surface change",
       "rollback_note_required": true,
       "admiralty_action_required": false

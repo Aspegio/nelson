@@ -347,6 +347,10 @@ def cmd_task(args: argparse.Namespace) -> None:
     if args.files:
         files = [f.strip() for f in args.files.split(",") if f.strip()]
 
+    mod_targets: list[str] = []
+    if getattr(args, "modification_targets", None):
+        mod_targets = [m.strip() for m in args.modification_targets.split(",") if m.strip()]
+
     task: dict[str, Any] = {
         "id": args.id,
         "name": args.name,
@@ -356,6 +360,7 @@ def cmd_task(args: argparse.Namespace) -> None:
         "dependents": [],
         "station_tier": args.station_tier,
         "file_ownership": files,
+        "modification_targets": mod_targets,
         "validation_required": args.validation or None,
         "rollback_note_required": bool(args.rollback_note),
         "admiralty_action_required": bool(args.admiralty_action),
@@ -1225,6 +1230,7 @@ def _build_task_record(
     deps: list[int],
     station_tier: int,
     files: list[str],
+    modification_targets: list[str] | None = None,
     validation: str | None = None,
     rollback_note: bool = False,
     admiralty_action: bool = False,
@@ -1239,6 +1245,7 @@ def _build_task_record(
         "dependents": [],
         "station_tier": station_tier,
         "file_ownership": list(files),
+        "modification_targets": list(modification_targets or []),
         "validation_required": validation or None,
         "rollback_note_required": rollback_note,
         "admiralty_action_required": admiralty_action,
@@ -1521,6 +1528,7 @@ def _do_form(
             deps=list(t.get("dependencies", [])),
             station_tier=t["station_tier"],
             files=list(t.get("file_ownership", [])),
+            modification_targets=list(t.get("modification_targets", [])),
             validation=t.get("validation_required"),
             rollback_note=bool(t.get("rollback_note_required", False)),
             admiralty_action=bool(t.get("admiralty_action_required", False)),

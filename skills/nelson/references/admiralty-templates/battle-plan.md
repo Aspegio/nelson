@@ -31,7 +31,7 @@ Task ID:
 
 **Acceptance criteria inheritance.** Each task inherits the acceptance criteria of its parent effect from the Estimate (§3). Captains own the choice of verification method per criterion (test, type-check, lint, review, or visual). The quarterdeck records each outcome (`pass` / `fail` / `not-verified`) via `nelson-data.py estimate-outcome`.
 
-JSON schema note: the battle-plan `task` object accepts an optional `acceptance_criteria: list[str]` field carrying the inherited criteria. This enables programmatic aggregation of verification outcomes.
+JSON schema note: the battle-plan `task` object accepts an optional `acceptance_criteria: list[str]` field carrying the inherited criteria. This enables programmatic aggregation of verification outcomes. The `task` object also accepts an optional `modification_targets: list[str]` field for tracking the functions, environment variables, or configuration that must be modified in place.
 
 **`admiralty-action-required`:** Mark `yes` for any task where a step cannot be completed by an agent — requires the human to interact with an external system, provide credentials or URLs, or take an action only the human can perform. Fill this field consciously for every task; leaving it blank is a claim that the task requires no human action. When marked `yes`, the admiral will surface this in the Admiralty Action List before agents launch, and the captain will invoke the `awaiting-admiralty` standing order when the step is reached.
 
