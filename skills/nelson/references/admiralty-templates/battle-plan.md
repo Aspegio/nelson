@@ -15,6 +15,7 @@ Task ID:
 - Dependencies:
 - Station tier (0-3):
 - File ownership (if code):
+- Modification targets (if extending): [specific functions, env vars, config to modify — not replace. Omit for greenfield tasks.]
 - Acceptance criteria (inherited from effect):
   - [Criterion 1 — captain chooses verification method: test | type-check | lint | review | visual]
   - [Criterion 2 — ...]
@@ -25,6 +26,8 @@ Task ID:
   - timing: before this task starts | after this task completes
   - blocks: [task name or "stand-down"]
 ```
+
+**Modification targets.** When a task extends existing code, the `Modification targets` field anchors the captain to specific functions, variables, and configuration that must be modified in place. This field flows from the Estimate's Reconnaissance (Q1) and Terrain (Q4) — if those questions identified the existing code, the Battle Plan must preserve that specificity. Omit the field for greenfield tasks where no existing code is being extended.
 
 **Acceptance criteria inheritance.** Each task inherits the acceptance criteria of its parent effect from the Estimate (§3). Captains own the choice of verification method per criterion (test, type-check, lint, review, or visual). The quarterdeck records each outcome (`pass` / `fail` / `not-verified`) via `nelson-data.py estimate-outcome`.
 
