@@ -135,6 +135,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_task.add_argument(
         "--files", default="", help="Comma-separated file glob patterns"
     )
+    p_task.add_argument(
+        "--modification-targets",
+        default="",
+        help="Comma-separated functions, env vars, or config being extended",
+    )
     p_task.add_argument("--validation", default=None, help="Validation criteria")
     p_task.add_argument(
         "--rollback-note", action="store_true", help="Rollback note required"

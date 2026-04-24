@@ -24,6 +24,10 @@ Standing Orders:
 - Do NOT implement work outside your assigned task scope
 - Do NOT edit files not assigned to you
 - If any part of your task is ambiguous, signal the admiral before implementing
+- When your task extends existing code, modify the existing implementation in place.
+  Do NOT create replacement functions, parallel implementations, or new environment
+  variables that duplicate existing ones. If you believe a rewrite is necessary,
+  signal the admiral with your rationale before proceeding.
 - Report blockers to admiral immediately with options and one recommendation
 - Execution mode: [subagents | agent-team] — your available coordination tools are listed in references/tool-mapping.md
 - When done, report: deliverable, validation evidence, failure modes, rollback note

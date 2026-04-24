@@ -96,7 +96,9 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mis
 
 When The Estimate has been conducted, the Battle Plan inherits the analytical work: terrain, forces, coordination, and control are already decided. The Battle Plan step is operational — it turns approved effects into task assignments. When the Estimate was skipped, the admiral performs the analysis inline at this step.
 
-- Translate each effect from the Estimate (§3) into one or more tasks. When the Estimate was skipped, derive tasks directly from the Sailing Orders.
+**Scope preservation:** When the Sailing Orders describe extending, expanding, or modifying an existing feature, every task must modify the existing implementation — not create a parallel or replacement implementation. Populate the `Modification targets` field in each task's brief with the specific functions, env vars, and config identified during Reconnaissance. A task that creates new files, functions, or environment variables where modification of existing ones would satisfy the effect is a planning error.
+
+- Translate each effect from the Estimate (§3) into one or more tasks. Each task must stay within the scope of its parent effect — do not introduce work that the effect does not call for. When the Estimate was skipped, derive tasks directly from the Sailing Orders.
 - Prepend the commander's intent paragraph (Estimate §2) to every captain's brief so each ship sails under a shared understanding of purpose.
 - Inherit acceptance criteria from the parent effect onto each task. Captains own the choice of verification method per criterion.
 - Inherit terrain (file ownership), coordination (dependencies), forces (captain sizing, model class), and control (action-station tier) from the Estimate. When the Estimate was skipped, supply these at this step.
@@ -258,7 +260,7 @@ If the task is complete and no pending task depends on it, proceed to shutdown p
     - Check hull integrity: collect damage reports from all ships, update the squadron readiness board, and take action per `references/damage-control/hull-integrity.md`. The admiral must also check its own hull integrity at each checkpoint. **Every ship must file a damage report at every checkpoint** to `{mission-dir}/damage-reports/{ship-name}.json` using the schema in `references/admiralty-templates/damage-report.md` — do not skip this when hull is Green.
     - Standing order scan: For each order below, ask "Has this situation arisen since the last checkpoint?" If yes, apply the corrective action now — do not defer.
         - `admiral-at-the-helm.md`: Has the admiral drifted into implementation work (excluding permitted read-only recombination)?
-        - `drifting-anchorage.md`: Has any task scope crept beyond the sailing orders?
+        - `drifting-anchorage.md`: Has any task scope crept beyond the sailing orders? Has any captain created a parallel implementation, duplicate function, or new environment variable instead of extending existing code?
         - `captain-at-the-capstan.md`: Has any captain started implementing instead of coordinating crew?
         - `pressed-crew.md`: Has any crew member been assigned work outside their role?
         - `press-ganged-navigator.md`: Has the red-cell navigator been assigned implementation work?
