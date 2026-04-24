@@ -17,6 +17,10 @@ spawned with mismatched parameters cannot communicate with the squadron.
 - Admiral attempting to retrieve results via `TaskGet` when captains were
   dispatched as teammates (agent-team mode).
 - Captains unable to update shared task state because no task list exists.
+- `TeamCreate` not listed in the available tools, indicating
+  `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` was not set at session launch
+  (agent-team mode requires this prerequisite — see
+  `references/squadron-composition.md`).
 
 **Remedy:** Before spawning any agents, review `references/tool-mapping.md` and
 confirm every planned tool call is valid for the selected execution mode:
