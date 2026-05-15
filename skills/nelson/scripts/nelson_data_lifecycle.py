@@ -24,12 +24,17 @@ from nelson_circuit_breakers import (
     format_alarm_line,
     load_config as load_circuit_breaker_config,
 )
+from nelson_data_calibration import (
+    _print_calibration_advisories,
+    _update_override_calibration,
+)
 from nelson_data_memory import _update_patterns_store, _update_standing_order_stats
 from nelson_data_utils import (
     ADMIRAL_SESSION_MARKER,
     FLEET_STATUS_EVENT_TYPES,
     FLEET_STATUS_STALENESS_THRESHOLD_SECONDS,
     JSON_INDENT,
+    VALID_DECISION_TYPES,
     VALID_DECISIONS,
     VALID_ESTIMATE_OUTCOME_METHODS,
     VALID_ESTIMATE_OUTCOME_STATUSES,
@@ -409,6 +414,7 @@ def cmd_task(args: argparse.Namespace) -> None:
         "validation_required": args.validation or None,
         "rollback_note_required": bool(args.rollback_note),
         "admiralty_action_required": bool(args.admiralty_action),
+        "task_type": getattr(args, "task_type", None) or None,
     }
 
     bp_path = mission_dir / "battle-plan.json"
@@ -470,6 +476,12 @@ def cmd_plan_approved(args: argparse.Namespace) -> None:
         "amended_at": None,
     }
     _write_json(bp_path, new_battle_plan)
+
+    # Emit trust calibration advisories (stderr, best-effort, non-fatal).
+    try:
+        _print_calibration_advisories(mission_dir, tasks)
+    except Exception as exc:
+        _err(f"Warning: trust calibration advisory failed: {exc}")
 
     # Append battle_plan_approved event
     event = {
@@ -678,6 +690,77 @@ def cmd_record_estimate_outcome(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # Subcommand: event
 # ---------------------------------------------------------------------------
+
+
+def cmd_admiralty_decision(args: argparse.Namespace) -> None:
+    """Record an admiralty action completion with a decision outcome.
+
+    Writes an ``admiralty_action_completed`` event whose data captures the
+    decision_type, task_id, task_type (resolved from battle-plan.json), and
+    ship_class (resolved via the task owner against fleet-status.json
+    squadron). Calibration aggregation runs at stand-down and consumes these
+    events.
+    """
+    mission_dir = _require_mission_dir(args)
+
+    decision_type = args.decision_type
+    if decision_type not in VALID_DECISION_TYPES:
+        _die(
+            f"Error: invalid decision-type '{decision_type}'. "
+            f"Valid: {', '.join(sorted(VALID_DECISION_TYPES))}"
+        )
+
+    task_id = int(args.task_id)
+    bp_path = mission_dir / "battle-plan.json"
+    if not bp_path.exists():
+        _die("Error: battle-plan.json does not exist. Run 'task' first.")
+    battle_plan = _read_json(bp_path)
+    task = next(
+        (t for t in battle_plan.get("tasks", []) if t.get("id") == task_id),
+        None,
+    )
+    if task is None:
+        _die(f"Error: task_id {task_id} not found in battle-plan.json")
+
+    task_type = task.get("task_type")
+
+    ship_class: str | None = None
+    owner = task.get("owner")
+    fs_path = mission_dir / "fleet-status.json"
+    if owner and fs_path.exists():
+        fleet_status = _read_json(fs_path)
+        for ship in fleet_status.get("squadron", []):
+            if ship.get("ship_name") == owner:
+                ship_class = ship.get("ship_class")
+                break
+
+    log = _read_json(mission_dir / "mission-log.json")
+    checkpoint = _get_last_checkpoint_number(log.get("events", []))
+
+    data: dict[str, Any] = {
+        "task_id": task_id,
+        "decision_type": decision_type,
+    }
+    if task_type:
+        data["task_type"] = task_type
+    if ship_class:
+        data["ship_class"] = ship_class
+    notes = (getattr(args, "notes", None) or "").strip()
+    if notes:
+        data["notes"] = notes
+
+    event = {
+        "type": "admiralty_action_completed",
+        "checkpoint": checkpoint,
+        "timestamp": _now_iso(),
+        "data": data,
+    }
+    _append_event(mission_dir, event)
+
+    print(
+        f"[nelson-data] Admiralty decision recorded: task {task_id} "
+        f"-> {decision_type}"
+    )
 
 
 def cmd_event(args: argparse.Namespace, extra: list[str]) -> None:
@@ -1069,6 +1152,7 @@ def cmd_stand_down(args: argparse.Namespace) -> None:
     try:
         _update_patterns_store(mission_dir)
         _update_standing_order_stats(mission_dir)
+        _update_override_calibration(mission_dir)
     except Exception as exc:
         _err(f"Warning: failed to update memory store: {exc}")
 
@@ -1290,6 +1374,7 @@ def _build_task_record(
     validation: str | None = None,
     rollback_note: bool = False,
     admiralty_action: bool = False,
+    task_type: str | None = None,
 ) -> dict[str, Any]:
     """Build a task dict from typed parameters."""
     return {
@@ -1305,6 +1390,7 @@ def _build_task_record(
         "validation_required": validation or None,
         "rollback_note_required": rollback_note,
         "admiralty_action_required": admiralty_action,
+        "task_type": task_type or None,
     }
 
 
@@ -1621,6 +1707,7 @@ def _do_form(
             validation=t.get("validation_required"),
             rollback_note=bool(t.get("rollback_note_required", False)),
             admiralty_action=bool(t.get("admiralty_action_required", False)),
+            task_type=t.get("task_type"),
         )
         for t in tasks
     ]

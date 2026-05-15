@@ -62,6 +62,7 @@ VALID_HANDOFF_TYPES = frozenset(
 )
 
 VALID_DECISIONS = frozenset({"continue", "rescope", "stop"})
+VALID_DECISION_TYPES = frozenset({"approved", "modified", "rejected"})
 VALID_MODES = frozenset({"single-session", "subagents", "agent-team"})
 VALID_ESTIMATE_OUTCOME_STATUSES = frozenset({"pass", "fail", "not-verified"})
 VALID_ESTIMATE_OUTCOME_METHODS = frozenset(

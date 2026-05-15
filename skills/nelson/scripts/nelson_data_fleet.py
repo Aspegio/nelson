@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from nelson_data_calibration import _sync_calibration_from_missions
 from nelson_data_memory import (
     _build_empty_index,
     _build_mission_record,
@@ -113,6 +114,12 @@ def cmd_index(args: argparse.Namespace) -> None:
         _sync_memory_from_index(missions_dir)
     except Exception as exc:
         _err(f"Warning: failed to sync memory store: {exc}")
+
+    # Sync trust calibration store from indexed missions (best-effort)
+    try:
+        _sync_calibration_from_missions(missions_dir)
+    except Exception as exc:
+        _err(f"Warning: failed to sync trust calibration store: {exc}")
 
 
 # ---------------------------------------------------------------------------

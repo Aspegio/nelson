@@ -28,8 +28,10 @@ from __future__ import annotations
 import argparse
 import sys
 
+from nelson_data_calibration import cmd_trust_report
 from nelson_data_fleet import VALID_METRICS, cmd_analytics, cmd_brief, cmd_history, cmd_index
 from nelson_data_lifecycle import (
+    cmd_admiralty_decision,
     cmd_checkpoint,
     cmd_event,
     cmd_form,
@@ -53,6 +55,7 @@ from nelson_data_patterns import (
     cmd_promote_candidate,
 )
 from nelson_data_utils import (
+    VALID_DECISION_TYPES,
     VALID_ESTIMATE_OUTCOME_METHODS,
     VALID_ESTIMATE_OUTCOME_STATUSES,
     VALID_MODES,
@@ -153,6 +156,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_task.add_argument(
         "--admiralty-action", action="store_true", help="Admiralty action required"
+    )
+    p_task.add_argument(
+        "--task-type",
+        default=None,
+        help=(
+            "Optional free-form task type (e.g. 'auth_refactor') used by the "
+            "override-learning trust calibration store"
+        ),
     )
 
     # --- plan-approved ---
@@ -474,6 +485,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Memory directory (overrides --missions-dir derivation)",
     )
 
+    # --- admiralty-decision ---
+    p_ad = subs.add_parser(
+        "admiralty-decision",
+        help="Record an admiralty action decision (approved/modified/rejected)",
+    )
+    p_ad.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_ad.add_argument(
+        "--task-id", required=True, type=int, help="Task ID the decision applies to"
+    )
+    p_ad.add_argument(
+        "--decision-type",
+        required=True,
+        choices=sorted(VALID_DECISION_TYPES),
+        help="Decision outcome: approved, modified, or rejected",
+    )
+    p_ad.add_argument(
+        "--notes", default="", help="Optional free-text rationale for the decision"
+    )
+
+    # --- trust-report ---
+    p_tr = subs.add_parser(
+        "trust-report",
+        help="Print learned trust calibration buckets sorted by override rate",
+    )
+    p_tr.add_argument("--missions-dir", default=None, help="Missions directory path")
+    p_tr.add_argument(
+        "--min-decisions",
+        type=int,
+        default=3,
+        help="Hide buckets with fewer than N decisions (default: 3)",
+    )
+    p_tr.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit JSON instead of a text table",
+    )
+
     # --- dismiss-candidate ---
     p_dc = subs.add_parser(
         "dismiss-candidate",
@@ -543,6 +592,8 @@ def main() -> None:
         "detect-patterns": lambda: cmd_detect_patterns(args),
         "promote-candidate": lambda: cmd_promote_candidate(args),
         "dismiss-candidate": lambda: cmd_dismiss_candidate(args),
+        "admiralty-decision": lambda: cmd_admiralty_decision(args),
+        "trust-report": lambda: cmd_trust_report(args),
     }
 
     handler = dispatch.get(args.command)
