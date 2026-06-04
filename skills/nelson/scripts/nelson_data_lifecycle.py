@@ -1190,6 +1190,18 @@ def cmd_stand_down(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
     except OSError:
         pass
 
+    # Best-effort cleanup of the .active-<session_id> recovery sidecar written
+    # by _do_init. The mission dir is named "{stamp}_{session_id}", so the
+    # session id is the trailing segment. Without this, stale markers
+    # accumulate in .nelson/ across missions (nelson-a06).
+    session_id = mission_dir.name.rsplit("_", 1)[-1]
+    try:
+        (mission_dir.parent.parent / f".active-{session_id}").unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
     # Print mission summary
     achieved = "ACHIEVED" if args.outcome_achieved else "NOT ACHIEVED"
     print(

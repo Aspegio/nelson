@@ -938,6 +938,51 @@ class TestStandDown:
             "Pass",
         )
 
+    def test_removes_active_sidecar(self, tmp_path: Path) -> None:
+        """The .active-<session_id> recovery sidecar is cleaned up at stand-down."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        session_id = mission_dir.name.rsplit("_", 1)[1]
+        sidecar = tmp_path / ".nelson" / f".active-{session_id}"
+        assert sidecar.exists()
+        run(
+            "stand-down",
+            "--mission-dir",
+            str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome",
+            "Done",
+            "--metric-result",
+            "Pass",
+        )
+        assert not sidecar.exists()
+
+    def test_stand_down_succeeds_without_active_sidecar(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Cleanup is best-effort: a missing sidecar must not fail stand-down."""
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        session_id = mission_dir.name.rsplit("_", 1)[1]
+        sidecar = tmp_path / ".nelson" / f".active-{session_id}"
+        sidecar.unlink()
+        assert not sidecar.exists()
+        run(
+            "stand-down",
+            "--mission-dir",
+            str(mission_dir),
+            "--outcome-achieved",
+            "--actual-outcome",
+            "Done",
+            "--metric-result",
+            "Pass",
+        )
+
 
 # ---------------------------------------------------------------------------
 # Status
