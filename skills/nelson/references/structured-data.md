@@ -132,6 +132,31 @@ python3 .claude/skills/nelson/scripts/nelson-data.py checkpoint \
   --rationale "On track. HMS Kent approaching amber but no relief needed yet."
 ```
 
+### `admiralty-decision` — Record an admiral's action decision (read/write mission log)
+
+Run when the admiral approves, modifies, or rejects an `admiralty_action_required` item raised during the mission (typically around a checkpoint). Feeds the override-learned trust calibration that aggregates at `stand-down`.
+
+Appends an `admiralty_action_completed` event to `mission-log.json`. The event `data` records `task_id`, `decision_type`, `recorded_by`, and `session_marker_present`; it also resolves `task_type` (from `battle-plan.json`) and `ship_class` (from the task owner's squadron in `fleet-status.json`) when those are available.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py admiralty-decision \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
+  --task-id 3 \
+  --decision-type modified \
+  --recorded-by Admiral \
+  --notes "Narrowed scope to the auth module only"
+```
+
+Arguments:
+
+- `--mission-dir` (required) — Mission directory path.
+- `--task-id` (required, int) — Task the decision applies to; must exist in `battle-plan.json`.
+- `--decision-type` (required) — One of `approved`, `modified`, `rejected`.
+- `--recorded-by` (required) — Ship that recorded the decision (e.g. `Admiral` or a captain's ship name). Captured into `data.recorded_by` for audit provenance; an empty value is rejected.
+- `--notes` (optional) — Free-text rationale, stored in `data.notes` when non-empty.
+
+`session_marker_present` captures whether the admiral session marker existed at record time, so the calibration pipeline can distinguish admiral-confirmed decisions from self-reported ones.
+
 ### `stand-down` — Record mission completion
 
 Run at Step 6 alongside the prose captain's log.
@@ -461,7 +486,7 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py set \
 | `standing_order_violation` | Standing order triggered | order, description, corrective_action, severity |
 | `commendation` | Signal flag or MID | ship_name, type, citation |
 | `admiralty_action_required` | Task needs human input | task_id, action, timing |
-| `admiralty_action_completed` | Human completed action | task_id, resolution |
+| `admiralty_action_completed` | Admiral decision recorded (via `admiralty-decision`) | task_id, decision_type, recorded_by, session_marker_present (+ optional task_type, ship_class, notes) |
 | `battle_plan_amended` | Admiral rescopes | changes, rationale |
 | `phase_transition` | Phase engine advances | from_phase, to_phase |
 | `phase_override` | Manual phase set (recovery) | from_phase, to_phase |
