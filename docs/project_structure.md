@@ -1,6 +1,9 @@
 # Project Structure
 
 ```
+pyproject.toml            — Ruff lint/format config (AI-targeted sensors)
+.pre-commit-config.yaml   — Gitleaks + Ruff + hygiene hooks
+.github/workflows/ci.yml  — CI sensor sweep (lint, tests, pre-commit, secret scan)
 .claude-plugin/
   plugin.json             — Plugin manifest
   marketplace.json        — Marketplace definition (self-hosted)

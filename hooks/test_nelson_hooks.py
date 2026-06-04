@@ -22,8 +22,8 @@ hooks_dir = os.path.dirname(os.path.abspath(__file__))
 if hooks_dir not in sys.path:
     sys.path.insert(0, hooks_dir)
 
-from conftest import VALID_FLAGSHIP_BRIEF, VALID_STANDARD_BRIEF  # noqa: E402
-from nelson_hooks import (  # noqa: E402
+from conftest import VALID_FLAGSHIP_BRIEF, VALID_STANDARD_BRIEF
+from nelson_hooks import (
     ADMIRAL_SESSION_MARKER,
     ROLLBACK_PATTERNS,
     VALIDATION_EVIDENCE_PATTERNS,
@@ -40,7 +40,6 @@ from nelson_hooks import (  # noqa: E402
     cmd_session_init,
     cmd_task_complete,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,7 +59,8 @@ def _make_mission(
     mission_dir = nelson_dir / "missions" / "2026-01-01_120000_test"
     mission_dir.mkdir(parents=True, exist_ok=True)
     (nelson_dir / ".active-test-session").write_text(
-        str(mission_dir), encoding="utf-8",
+        str(mission_dir),
+        encoding="utf-8",
     )
     battle_plan: dict[str, Any] = {
         "version": 1,
@@ -79,11 +79,13 @@ def _make_mission(
         "tasks": tasks or [],
     }
     (mission_dir / "battle-plan.json").write_text(
-        json.dumps(battle_plan), encoding="utf-8",
+        json.dumps(battle_plan),
+        encoding="utf-8",
     )
     if fleet_status is not None:
         (mission_dir / "fleet-status.json").write_text(
-            json.dumps(fleet_status), encoding="utf-8",
+            json.dumps(fleet_status),
+            encoding="utf-8",
         )
     return mission_dir
 
@@ -94,9 +96,8 @@ def _stdin(payload: dict[str, Any], cwd: str = ".") -> StringIO:
 
 def _run(cmd_fn: Any, payload: dict[str, Any], cwd: str = ".") -> int:
     """Run a hook command and return its exit code."""
-    with patch("sys.stdin", _stdin(payload, cwd)):
-        with pytest.raises(SystemExit) as exc:
-            cmd_fn(argparse.Namespace())
+    with patch("sys.stdin", _stdin(payload, cwd)), pytest.raises(SystemExit) as exc:
+        cmd_fn(argparse.Namespace())
     return exc.value.code
 
 
@@ -310,10 +311,13 @@ class TestPreflight:
 
 class TestBriefValidate:
     def test_non_turnover_path_allows(self, tmp_path: Path) -> None:
-        code = _run(cmd_brief_validate, {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(tmp_path / "src" / "main.py")},
-        })
+        code = _run(
+            cmd_brief_validate,
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": str(tmp_path / "src" / "main.py")},
+            },
+        )
         assert code == 0
 
     def test_valid_standard_brief_allows(self, tmp_path: Path) -> None:
@@ -335,8 +339,7 @@ class TestBriefValidate:
         brief_dir.mkdir()
         p = brief_dir / "hms-daring.md"
         content = VALID_STANDARD_BRIEF.replace(
-            "Running plot:\n- Working on refresh token rotation\n"
-            "- Current state: halfway through implementation",
+            "Running plot:\n- Working on refresh token rotation\n- Current state: halfway through implementation",
             "Running plot:\n",
         )
         p.write_text(content, encoding="utf-8")
@@ -387,59 +390,106 @@ class TestTaskComplete:
 
     def test_station_0_with_evidence_allows(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Build auth", "station_tier": 0}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t1", "task_subject": "Build auth", "task_description": _EVIDENCE_S0,
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t1",
+                "task_subject": "Build auth",
+                "task_description": _EVIDENCE_S0,
+            },
+            str(tmp_path),
+        )
         assert code == 0
 
     def test_station_1_missing_rollback_rejects(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Build auth", "station_tier": 1}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t1", "task_subject": "Build auth",
-            "task_description": "Tests passed and verified. Error case checked.",
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t1",
+                "task_subject": "Build auth",
+                "task_description": "Tests passed and verified. Error case checked.",
+            },
+            str(tmp_path),
+        )
         assert code == 2
 
     def test_station_1_with_all_evidence_allows(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Build auth", "station_tier": 1}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t1", "task_subject": "Build auth", "task_description": _EVIDENCE_S1,
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t1",
+                "task_subject": "Build auth",
+                "task_description": _EVIDENCE_S1,
+            },
+            str(tmp_path),
+        )
         assert code == 0
 
     def test_station_2_missing_red_cell_rejects(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Build auth", "station_tier": 2}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t1", "task_subject": "Build auth", "task_description": _EVIDENCE_S1,
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t1",
+                "task_subject": "Build auth",
+                "task_description": _EVIDENCE_S1,
+            },
+            str(tmp_path),
+        )
         assert code == 2
 
     def test_station_2_with_red_cell_allows(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Build auth", "station_tier": 2}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t1", "task_subject": "Build auth", "task_description": _EVIDENCE_S2,
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t1",
+                "task_subject": "Build auth",
+                "task_description": _EVIDENCE_S2,
+            },
+            str(tmp_path),
+        )
         assert code == 0
 
     def test_station_3_missing_human_confirmation_rejects(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Drop table", "station_tier": 3}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t1", "task_subject": "Drop table", "task_description": _EVIDENCE_S2,
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t1",
+                "task_subject": "Drop table",
+                "task_description": _EVIDENCE_S2,
+            },
+            str(tmp_path),
+        )
         assert code == 2
 
     def test_station_3_with_all_evidence_allows(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Drop table", "station_tier": 3}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t1", "task_subject": "Drop table", "task_description": _EVIDENCE_S3,
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t1",
+                "task_subject": "Drop table",
+                "task_description": _EVIDENCE_S3,
+            },
+            str(tmp_path),
+        )
         assert code == 0
 
     def test_unmatched_task_allows(self, tmp_path: Path) -> None:
         _make_mission(tmp_path, tasks=[{"id": "t1", "name": "Build auth", "station_tier": 2}])
-        code = _run(cmd_task_complete, {
-            "task_id": "t999", "task_subject": "Unknown", "task_description": "No evidence",
-        }, str(tmp_path))
+        code = _run(
+            cmd_task_complete,
+            {
+                "task_id": "t999",
+                "task_subject": "Unknown",
+                "task_description": "No evidence",
+            },
+            str(tmp_path),
+        )
         assert code == 0
 
 
@@ -453,22 +503,32 @@ class TestIdleShip:
         assert _run(cmd_idle_ship, {"teammate_name": "hms-daring"}, str(tmp_path)) == 0
 
     def test_complete_no_dependents_advises_paid_off(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         _make_mission(
             tmp_path,
             mode="agent-team",
             tasks=[{"id": "t1", "name": "Auth", "station_tier": 0, "dependents": []}],
-            fleet_status={"squadron": [{
-                "ship_name": "HMS Daring", "task_id": "t1",
-                "task_status": "completed", "hull_integrity_status": "Green",
-            }]},
+            fleet_status={
+                "squadron": [
+                    {
+                        "ship_name": "HMS Daring",
+                        "task_id": "t1",
+                        "task_status": "completed",
+                        "hull_integrity_status": "Green",
+                    }
+                ]
+            },
         )
         _run(cmd_idle_ship, {"teammate_name": "HMS Daring"}, str(tmp_path))
         assert "paid-off" in capsys.readouterr().err.lower()
 
     def test_complete_with_pending_dependents(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         _make_mission(
             tmp_path,
@@ -477,30 +537,46 @@ class TestIdleShip:
                 {"id": "t1", "name": "Auth", "station_tier": 0, "dependents": ["t2"]},
                 {"id": "t2", "name": "API", "station_tier": 0, "status": "pending"},
             ],
-            fleet_status={"squadron": [{
-                "ship_name": "HMS Daring", "task_id": "t1",
-                "task_status": "completed", "hull_integrity_status": "Green",
-            }]},
+            fleet_status={
+                "squadron": [
+                    {
+                        "ship_name": "HMS Daring",
+                        "task_id": "t1",
+                        "task_status": "completed",
+                        "hull_integrity_status": "Green",
+                    }
+                ]
+            },
         )
         _run(cmd_idle_ship, {"teammate_name": "HMS Daring"}, str(tmp_path))
         assert "pending dependent" in capsys.readouterr().err.lower()
 
     def test_incomplete_task_advises_check(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         _make_mission(
             tmp_path,
             tasks=[],
-            fleet_status={"squadron": [{
-                "ship_name": "HMS Daring", "task_id": "t1",
-                "task_status": "in_progress", "hull_integrity_status": "Amber",
-            }]},
+            fleet_status={
+                "squadron": [
+                    {
+                        "ship_name": "HMS Daring",
+                        "task_id": "t1",
+                        "task_status": "in_progress",
+                        "hull_integrity_status": "Amber",
+                    }
+                ]
+            },
         )
         _run(cmd_idle_ship, {"teammate_name": "HMS Daring"}, str(tmp_path))
         assert "in_progress" in capsys.readouterr().err
 
     def test_unknown_ship_advises_check(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         _make_mission(tmp_path, fleet_status={"squadron": []})
         _run(cmd_idle_ship, {"teammate_name": "HMS Unknown"}, str(tmp_path))
@@ -517,7 +593,7 @@ class TestSessionInit:
         """Non-Nelson project: no .nelson/ exists, hook is a no-op (allow)."""
         code = _run(
             cmd_session_init,
-            {"transcript_path": "/tmp/x.jsonl"},
+            {"transcript_path": "/tmp/x.jsonl"},  # noqa: S108 -- placeholder JSON value passed to a no-op hook; never written to disk
             cwd=str(tmp_path),
         )
         assert code == 0
@@ -536,7 +612,8 @@ class TestSessionInit:
         assert marker.read_text(encoding="utf-8").strip() == "/transcripts/admiral.jsonl"
 
     def test_overwrites_existing_marker_on_session_resume(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         (tmp_path / ".nelson").mkdir()
         marker = tmp_path / ".nelson" / ADMIRAL_SESSION_MARKER
@@ -566,7 +643,8 @@ def _write_marker(tmp_path: Path, transcript: str) -> None:
     nelson_dir = tmp_path / ".nelson"
     nelson_dir.mkdir(exist_ok=True)
     (nelson_dir / ADMIRAL_SESSION_MARKER).write_text(
-        transcript + "\n", encoding="utf-8",
+        transcript + "\n",
+        encoding="utf-8",
     )
 
 
@@ -611,7 +689,8 @@ class TestSessionCheck:
         assert code == 0
 
     def test_admiral_match_allows_single_session_mode(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         _make_mission(tmp_path, mode="single-session")
         _write_marker(tmp_path, "/admiral.jsonl")
@@ -623,7 +702,8 @@ class TestSessionCheck:
         assert code == 0
 
     def test_captain_mismatch_rejects_subagents_mode(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         _make_mission(tmp_path, mode="subagents")
         _write_marker(tmp_path, "/admiral.jsonl")
@@ -635,7 +715,8 @@ class TestSessionCheck:
         assert code == 2
 
     def test_captain_mismatch_rejects_single_session_mode(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         _make_mission(tmp_path, mode="single-session")
         _write_marker(tmp_path, "/admiral.jsonl")
@@ -685,15 +766,18 @@ class TestSessionCheck:
 class TestPreflightAdmiralMarkerBackfill:
     def test_backfill_writes_marker_when_missing(self, tmp_path: Path) -> None:
         """Preflight backfills admiral marker when SessionStart missed it."""
-        _make_mission(tmp_path, tasks=[
-            {
-                "id": "t1",
-                "name": "Task 1",
-                "owner": "HMS Daring",
-                "station_tier": 1,
-                "file_ownership": ["src/auth.py"],
-            },
-        ])
+        _make_mission(
+            tmp_path,
+            tasks=[
+                {
+                    "id": "t1",
+                    "name": "Task 1",
+                    "owner": "HMS Daring",
+                    "station_tier": 1,
+                    "file_ownership": ["src/auth.py"],
+                },
+            ],
+        )
         marker = tmp_path / ".nelson" / ADMIRAL_SESSION_MARKER
         assert not marker.exists()
         code = _run(
@@ -710,18 +794,22 @@ class TestPreflightAdmiralMarkerBackfill:
         assert marker.read_text(encoding="utf-8").strip() == "/transcripts/admiral.jsonl"
 
     def test_backfill_does_not_overwrite_existing_marker(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Existing marker is preserved — only writes when missing."""
-        _make_mission(tmp_path, tasks=[
-            {
-                "id": "t1",
-                "name": "Task 1",
-                "owner": "HMS Daring",
-                "station_tier": 1,
-                "file_ownership": ["src/auth.py"],
-            },
-        ])
+        _make_mission(
+            tmp_path,
+            tasks=[
+                {
+                    "id": "t1",
+                    "name": "Task 1",
+                    "owner": "HMS Daring",
+                    "station_tier": 1,
+                    "file_ownership": ["src/auth.py"],
+                },
+            ],
+        )
         marker = tmp_path / ".nelson" / ADMIRAL_SESSION_MARKER
         marker.write_text("/original/admiral.jsonl\n", encoding="utf-8")
         code = _run(

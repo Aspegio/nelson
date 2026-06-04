@@ -34,10 +34,7 @@ from nelson_data_utils import (
     _write_json,
 )
 
-
-VALID_METRICS = frozenset(
-    {"success-rate", "standing-orders", "efficiency", "estimate-outcomes", "all"}
-)
+VALID_METRICS = frozenset({"success-rate", "standing-orders", "efficiency", "estimate-outcomes", "all"})
 
 
 # ---------------------------------------------------------------------------
@@ -47,9 +44,7 @@ VALID_METRICS = frozenset(
 
 def _resolve_fleet_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     """Return (missions_dir, index_path) from parsed arguments."""
-    missions_dir = (
-        Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
-    )
+    missions_dir = Path(args.missions_dir) if args.missions_dir else Path(".nelson/missions")
     index_path = missions_dir.parent / "fleet-intelligence.json"
     return missions_dir, index_path
 
@@ -79,21 +74,13 @@ def cmd_index(args: argparse.Namespace) -> None:
         completed = _find_completed_missions(missions_dir)
 
         # Filter to new missions only (unless rebuilding)
-        new_dirs = (
-            completed
-            if rebuild
-            else [d for d in completed if d.name not in indexed_ids]
-        )
+        new_dirs = completed if rebuild else [d for d in completed if d.name not in indexed_ids]
 
         # Build records (skip missions with unreadable stand-down.json)
-        new_records = [
-            r for r in (_build_mission_record(d) for d in new_dirs) if r is not None
-        ]
+        new_records = [r for r in (_build_mission_record(d) for d in new_dirs) if r is not None]
 
         # Merge and sort
-        all_missions = (
-            new_records if rebuild else list(index.get("missions", [])) + new_records
-        )
+        all_missions = new_records if rebuild else list(index.get("missions", [])) + new_records
         all_missions.sort(key=lambda m: m["mission_id"])
 
         updated_index = {
@@ -104,10 +91,7 @@ def cmd_index(args: argparse.Namespace) -> None:
         }
         _write_json(index_path, updated_index)
 
-    print(
-        f"[nelson-data] Fleet intelligence indexed: "
-        f"{len(all_missions)} missions ({len(new_records)} new)"
-    )
+    print(f"[nelson-data] Fleet intelligence indexed: {len(all_missions)} missions ({len(new_records)} new)")
 
     # Sync memory store from indexed missions (best-effort)
     try:
@@ -115,9 +99,12 @@ def cmd_index(args: argparse.Namespace) -> None:
     except Exception as exc:
         _err(f"Warning: failed to sync memory store: {exc}")
 
-    # Sync trust calibration store from indexed missions (best-effort)
+    # Sync trust calibration store from indexed missions (best-effort).
+    # Thread rebuild through so `index --rebuild` actually recomputes the
+    # store (e.g. to drop stale pre-dedupe double-counts), mirroring the
+    # fleet-index rebuild above.
     try:
-        _sync_calibration_from_missions(missions_dir)
+        _sync_calibration_from_missions(missions_dir, rebuild=rebuild)
     except Exception as exc:
         _err(f"Warning: failed to sync trust calibration store: {exc}")
 
@@ -172,35 +159,13 @@ def _compute_analytics(missions: list[dict]) -> dict:
     not_achieved = len(missions) - achieved
     win_rate = round(achieved / len(missions) * 100, 1)
 
-    durations = [
-        m["duration_minutes"] for m in missions if m.get("duration_minutes") is not None
-    ]
-    tokens = [
-        v
-        for m in missions
-        if (v := m.get("budget", {}).get("tokens_consumed")) is not None
-    ]
-    budget_pcts = [
-        v
-        for m in missions
-        if (v := m.get("budget", {}).get("pct_consumed")) is not None
-    ]
-    ships = [
-        v for m in missions if (v := m.get("fleet", {}).get("ships_used")) is not None
-    ]
-    task_totals = [
-        v for m in missions if (v := m.get("tasks", {}).get("total")) is not None
-    ]
-    violations = [
-        v
-        for m in missions
-        if (v := m.get("quality", {}).get("standing_order_violations")) is not None
-    ]
-    blockers = [
-        v
-        for m in missions
-        if (v := m.get("quality", {}).get("blockers_raised")) is not None
-    ]
+    durations = [m["duration_minutes"] for m in missions if m.get("duration_minutes") is not None]
+    tokens = [v for m in missions if (v := m.get("budget", {}).get("tokens_consumed")) is not None]
+    budget_pcts = [v for m in missions if (v := m.get("budget", {}).get("pct_consumed")) is not None]
+    ships = [v for m in missions if (v := m.get("fleet", {}).get("ships_used")) is not None]
+    task_totals = [v for m in missions if (v := m.get("tasks", {}).get("total")) is not None]
+    violations = [v for m in missions if (v := m.get("quality", {}).get("standing_order_violations")) is not None]
+    blockers = [v for m in missions if (v := m.get("quality", {}).get("blockers_raised")) is not None]
 
     ship_class_counts = _collect_ship_class_counts(missions)
     station_tier_totals = _collect_station_tier_totals(missions)
@@ -221,7 +186,7 @@ def _compute_analytics(missions: list[dict]) -> dict:
         "avg_duration": round(avg_dur, 1) if avg_dur is not None else None,
         "min_duration": min(durations) if durations else None,
         "max_duration": max(durations) if durations else None,
-        "avg_tokens_consumed": int(round(avg_tok)) if avg_tok is not None else None,
+        "avg_tokens_consumed": round(avg_tok) if avg_tok is not None else None,
         "avg_budget_pct": round(avg_bpct, 1) if avg_bpct is not None else None,
         "avg_ships": round(avg_shp, 1) if avg_shp is not None else None,
         "avg_tasks": round(avg_tsk, 1) if avg_tsk is not None else None,
@@ -257,34 +222,24 @@ def _format_history_text(
     avg_d = analytics["avg_duration"]
     if avg_d is not None:
         lines.append(
-            f"  Duration   avg {avg_d} min "
-            f"(range: {analytics['min_duration']}\u2013{analytics['max_duration']})"
+            f"  Duration   avg {avg_d} min (range: {analytics['min_duration']}\u2013{analytics['max_duration']})"
         )
 
     # Tokens
     avg_t = analytics["avg_tokens_consumed"]
     if avg_t is not None:
         token_str = f"{round(avg_t / 1000)}K" if avg_t >= 1000 else str(avg_t)
-        lines.append(
-            f"  Tokens     avg {token_str} consumed, "
-            f"avg {analytics['avg_budget_pct']}% of budget"
-        )
+        lines.append(f"  Tokens     avg {token_str} consumed, avg {analytics['avg_budget_pct']}% of budget")
 
     # Squadron
     avg_s = analytics["avg_ships"]
     if avg_s is not None:
-        lines.append(
-            f"  Squadron   avg {avg_s} ships, "
-            f"avg {analytics['avg_tasks']} tasks per mission"
-        )
+        lines.append(f"  Squadron   avg {avg_s} ships, avg {analytics['avg_tasks']} tasks per mission")
 
     # Quality
     vpm = analytics["violations_per_mission"]
     if vpm is not None:
-        lines.append(
-            f"  Quality    {vpm} violations/mission, "
-            f"{analytics['blockers_per_mission']} blockers/mission"
-        )
+        lines.append(f"  Quality    {vpm} violations/mission, {analytics['blockers_per_mission']} blockers/mission")
 
     lines.append("")
 
@@ -335,7 +290,7 @@ def _format_history_json(analytics: dict, missions: list[dict]) -> str:
 
 def cmd_history(args: argparse.Namespace) -> None:
     """Display fleet intelligence analytics from the index."""
-    missions_dir, index_path = _resolve_fleet_paths(args)
+    _missions_dir, index_path = _resolve_fleet_paths(args)
     last_n = max(0, args.last)
 
     if not index_path.exists():
@@ -405,9 +360,7 @@ def _build_intelligence_brief(
     # Last-5 trend
     recent_5 = list(reversed(index_missions))[:5]
     r5_achieved = sum(1 for m in recent_5 if m.get("outcome_achieved"))
-    recent_win_rate = (
-        round(r5_achieved / len(recent_5) * 100, 1) if recent_5 else None
-    )
+    recent_win_rate = round(r5_achieved / len(recent_5) * 100, 1) if recent_5 else None
 
     # Aggregate patterns
     adopt_counts, avoid_counts = _aggregate_patterns(patterns)
@@ -433,30 +386,26 @@ def _build_intelligence_brief(
     if context:
         scored = []
         for m in index_missions:
-            outcome_text = m.get("actual_outcome", "") or m.get(
-                "planned_outcome", ""
-            )
+            outcome_text = m.get("actual_outcome", "") or m.get("planned_outcome", "")
             score = _keyword_overlap(context, outcome_text)
             if score > 0:
                 scored.append((score, m))
         scored.sort(key=lambda x: -x[0])
         for _score, m in scored[:3]:
             # Find matching pattern data
-            matching_patterns = [
-                p
-                for p in patterns
-                if p.get("mission_id") == m.get("mission_id")
-            ]
+            matching_patterns = [p for p in patterns if p.get("mission_id") == m.get("mission_id")]
             mp = matching_patterns[0] if matching_patterns else {}
-            precedents.append({
-                "mission_id": m.get("mission_id", ""),
-                "outcome_achieved": m.get("outcome_achieved", False),
-                "planned_outcome": m.get("planned_outcome", ""),
-                "duration_minutes": m.get("duration_minutes"),
-                "ships_used": m.get("fleet", {}).get("ships_used"),
-                "adopt": mp.get("adopt", []),
-                "avoid": mp.get("avoid", []),
-            })
+            precedents.append(
+                {
+                    "mission_id": m.get("mission_id", ""),
+                    "outcome_achieved": m.get("outcome_achieved", False),
+                    "planned_outcome": m.get("planned_outcome", ""),
+                    "duration_minutes": m.get("duration_minutes"),
+                    "ships_used": m.get("fleet", {}).get("ships_used"),
+                    "adopt": mp.get("adopt", []),
+                    "avoid": mp.get("avoid", []),
+                }
+            )
 
     return {
         "total_missions": total,
@@ -470,7 +419,7 @@ def _build_intelligence_brief(
     }
 
 
-def _format_brief_text(brief: dict, context: str) -> str:
+def _format_brief_text(brief: dict, context: str) -> str:  # noqa: C901, PLR0912 -- text-formatter with many field branches; refactor tracked in nelson-e6j
     """Format an intelligence brief as compact text for context injection."""
     lines: list[str] = []
     total = brief["total_missions"]
@@ -491,9 +440,7 @@ def _format_brief_text(brief: dict, context: str) -> str:
 
     cso = brief.get("candidate_standing_orders", 0)
     if cso > 0:
-        lines.append(
-            f"CANDIDATE STANDING ORDERS (awaiting review): {cso}"
-        )
+        lines.append(f"CANDIDATE STANDING ORDERS (awaiting review): {cso}")
         lines.append("")
 
     # Patterns to adopt
@@ -517,10 +464,7 @@ def _format_brief_text(brief: dict, context: str) -> str:
     if hot_spots:
         lines.append("Standing order hot spots:")
         for i, hs in enumerate(hot_spots, 1):
-            lines.append(
-                f"  {i}. {hs['order']}: "
-                f"{hs['count']} violations across {hs['missions_affected']} missions"
-            )
+            lines.append(f"  {i}. {hs['order']}: {hs['count']} violations across {hs['missions_affected']} missions")
         lines.append("")
 
     # Context-relevant precedents
@@ -632,9 +576,7 @@ def _compute_success_rate_analytics(missions: list[dict]) -> dict:
     }
 
 
-def _compute_standing_order_analytics(
-    missions: list[dict], stats: dict
-) -> dict:
+def _compute_standing_order_analytics(missions: list[dict], stats: dict) -> dict:
     """Compute standing order violation analytics."""
     by_order = stats.get("by_order", {})
     total_violations = stats.get("total_violations", 0)
@@ -713,7 +655,7 @@ def _compute_efficiency_analytics(missions: list[dict]) -> dict:
 
     return {
         "mission_count": len(missions),
-        "tokens_per_task": int(round(tpt)) if tpt is not None else None,
+        "tokens_per_task": round(tpt) if tpt is not None else None,
         "duration_per_task": round(dpt, 1) if dpt is not None else None,
         "avg_budget_utilization": round(abu, 1) if abu is not None else None,
         "avg_ships_per_mission": round(aspm, 1) if aspm is not None else None,
@@ -733,9 +675,7 @@ def _compute_estimate_outcome_analytics(missions: list[dict]) -> dict:
     statuses = sorted(VALID_ESTIMATE_OUTCOME_STATUSES)
 
     totals = {s: 0 for s in statuses}
-    by_method: dict[str, dict[str, int]] = {
-        m: {s: 0 for s in statuses} for m in methods
-    }
+    by_method: dict[str, dict[str, int]] = {m: {s: 0 for s in statuses} for m in methods}
     per_mission: list[dict] = []
     missions_with_outcomes = 0
 
@@ -754,9 +694,7 @@ def _compute_estimate_outcome_analytics(missions: list[dict]) -> dict:
             if method in by_method and status in by_method[method]:
                 by_method[method][status] += 1
         m_total = sum(mission_counts.values())
-        pass_rate = (
-            round(mission_counts["pass"] / m_total * 100, 1) if m_total else None
-        )
+        pass_rate = round(mission_counts["pass"] / m_total * 100, 1) if m_total else None
         per_mission.append(
             {
                 "mission_id": m.get("mission_id", ""),
@@ -769,9 +707,7 @@ def _compute_estimate_outcome_analytics(missions: list[dict]) -> dict:
         )
 
     total = sum(totals.values())
-    overall_pass_rate = (
-        round(totals["pass"] / total * 100, 1) if total else None
-    )
+    overall_pass_rate = round(totals["pass"] / total * 100, 1) if total else None
 
     method_summary: dict[str, dict] = {}
     for method, counts in by_method.items():
@@ -781,9 +717,7 @@ def _compute_estimate_outcome_analytics(missions: list[dict]) -> dict:
             "pass": counts["pass"],
             "fail": counts["fail"],
             "not_verified": counts["not-verified"],
-            "pass_rate": (
-                round(counts["pass"] / m_total * 100, 1) if m_total else None
-            ),
+            "pass_rate": (round(counts["pass"] / m_total * 100, 1) if m_total else None),
         }
 
     return {
@@ -799,7 +733,7 @@ def _compute_estimate_outcome_analytics(missions: list[dict]) -> dict:
     }
 
 
-def _format_analytics_text(metric: str, data: dict) -> str:
+def _format_analytics_text(metric: str, data: dict) -> str:  # noqa: C901, PLR0912 -- analytics text-formatter with many metric branches; refactor tracked in nelson-e6j
     """Format analytics results as human-readable text."""
     lines: list[str] = []
 
@@ -807,10 +741,7 @@ def _format_analytics_text(metric: str, data: dict) -> str:
         sr = data.get("success_rate", {})
         lines.append(f"Success Rate \u2014 {sr['total']} missions")
         if sr.get("win_rate") is not None:
-            lines.append(
-                f"  Win rate: {sr['win_rate']}% "
-                f"({sr['achieved']} achieved, {sr['not_achieved']} not)"
-            )
+            lines.append(f"  Win rate: {sr['win_rate']}% ({sr['achieved']} achieved, {sr['not_achieved']} not)")
             if sr.get("recent_trend") is not None:
                 lines.append(f"  Recent trend (last 5): {sr['recent_trend']}%")
             by_size = sr.get("by_fleet_size", {})
@@ -818,10 +749,7 @@ def _format_analytics_text(metric: str, data: dict) -> str:
                 lines.append("  By fleet size:")
                 for bucket in sorted(by_size.keys()):
                     info = by_size[bucket]
-                    lines.append(
-                        f"    {bucket} ships: {info['win_rate']}% "
-                        f"({info['total']} missions)"
-                    )
+                    lines.append(f"    {bucket} ships: {info['win_rate']}% ({info['total']} missions)")
         lines.append("")
 
     if metric in ("standing-orders", "all"):
@@ -832,10 +760,7 @@ def _format_analytics_text(metric: str, data: dict) -> str:
             f"({so['violations_per_mission']}/mission)"
         )
         for item in so.get("top_offenders", []):
-            lines.append(
-                f"  {item['order']}: {item['count']} violations "
-                f"({item['missions_affected']} missions)"
-            )
+            lines.append(f"  {item['order']}: {item['count']} violations ({item['missions_affected']} missions)")
         corr = so.get("correlation", {})
         if corr:
             lines.append(
@@ -878,18 +803,11 @@ def _format_analytics_text(metric: str, data: dict) -> str:
                 f"{eo['not_verified']} not-verified of {eo['total']})"
             )
             by_method = eo.get("by_method", {})
-            method_lines = [
-                (method, info)
-                for method, info in by_method.items()
-                if info.get("total", 0) > 0
-            ]
+            method_lines = [(method, info) for method, info in by_method.items() if info.get("total", 0) > 0]
             if method_lines:
                 lines.append("  By method:")
                 for method, info in method_lines:
-                    lines.append(
-                        f"    {method}: {info['pass_rate']}% pass "
-                        f"({info['pass']}/{info['total']})"
-                    )
+                    lines.append(f"    {method}: {info['pass_rate']}% pass ({info['pass']}/{info['total']})")
         lines.append("")
 
     return "\n".join(lines)

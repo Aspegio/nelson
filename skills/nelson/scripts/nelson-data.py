@@ -58,17 +58,15 @@ from nelson_data_utils import (
     VALID_ADMIRALTY_OUTCOMES,
     VALID_ESTIMATE_OUTCOME_METHODS,
     VALID_ESTIMATE_OUTCOME_STATUSES,
-    VALID_MODES,
     _die,
 )
-
 
 # ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915 -- argparse subcommand registration is inherently long; refactor tracked in nelson-e6j
     """Build the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
         prog="nelson-data",
@@ -80,25 +78,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_init = subs.add_parser("init", help="Create mission directory and sailing orders")
     p_init.add_argument("--outcome", required=True, help="Mission outcome statement")
     p_init.add_argument("--metric", required=True, help="Success metric")
-    p_init.add_argument(
-        "--deadline", required=True, help="Deadline (e.g. this_session)"
-    )
+    p_init.add_argument("--deadline", required=True, help="Deadline (e.g. this_session)")
     p_init.add_argument("--token-budget", type=int, default=None, help="Token budget")
-    p_init.add_argument(
-        "--time-limit", type=int, default=None, help="Time limit in minutes"
-    )
-    p_init.add_argument(
-        "--constraints", action="append", help="Constraint (repeatable)"
-    )
-    p_init.add_argument(
-        "--out-of-scope", action="append", help="Out of scope item (repeatable)"
-    )
-    p_init.add_argument(
-        "--stop-criteria", action="append", help="Stop criterion (repeatable)"
-    )
-    p_init.add_argument(
-        "--handoff-artifacts", action="append", help="Handoff artifact (repeatable)"
-    )
+    p_init.add_argument("--time-limit", type=int, default=None, help="Time limit in minutes")
+    p_init.add_argument("--constraints", action="append", help="Constraint (repeatable)")
+    p_init.add_argument("--out-of-scope", action="append", help="Out of scope item (repeatable)")
+    p_init.add_argument("--stop-criteria", action="append", help="Stop criterion (repeatable)")
+    p_init.add_argument("--handoff-artifacts", action="append", help="Handoff artifact (repeatable)")
     p_init.add_argument(
         "--session-id",
         default=None,
@@ -142,27 +128,20 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[0, 1, 2, 3],
         help="Station tier (0-3)",
     )
-    p_task.add_argument(
-        "--files", default="", help="Comma-separated file glob patterns"
-    )
+    p_task.add_argument("--files", default="", help="Comma-separated file glob patterns")
     p_task.add_argument(
         "--modification-targets",
         default="",
         help="Comma-separated functions, env vars, or config being extended",
     )
     p_task.add_argument("--validation", default=None, help="Validation criteria")
-    p_task.add_argument(
-        "--rollback-note", action="store_true", help="Rollback note required"
-    )
-    p_task.add_argument(
-        "--admiralty-action", action="store_true", help="Admiralty action required"
-    )
+    p_task.add_argument("--rollback-note", action="store_true", help="Rollback note required")
+    p_task.add_argument("--admiralty-action", action="store_true", help="Admiralty action required")
     p_task.add_argument(
         "--task-type",
         default=None,
         help=(
-            "Optional free-form task type (e.g. 'auth_refactor') used by the "
-            "override-learning trust calibration store"
+            "Optional free-form task type (e.g. 'auth_refactor') used by the override-learning trust calibration store"
         ),
     )
 
@@ -171,9 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pa.add_argument("--mission-dir", required=True, help="Mission directory path")
 
     # --- skip-estimate ---
-    p_se = subs.add_parser(
-        "skip-estimate", help="Record that the ESTIMATE phase is being skipped"
-    )
+    p_se = subs.add_parser("skip-estimate", help="Record that the ESTIMATE phase is being skipped")
     p_se.add_argument("--mission-dir", required=True, help="Mission directory path")
     p_se.add_argument(
         "--reason",
@@ -187,9 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Record a per-criterion verification outcome for The Estimate",
     )
     p_eo.add_argument("--mission-dir", required=True, help="Mission directory path")
-    p_eo.add_argument(
-        "--effect-id", required=True, help="Effect identifier from the Estimate"
-    )
+    p_eo.add_argument("--effect-id", required=True, help="Effect identifier from the Estimate")
     p_eo.add_argument(
         "--criterion-id",
         required=True,
@@ -207,9 +182,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(VALID_ESTIMATE_OUTCOME_METHODS),
         help="Verification method used",
     )
-    p_eo.add_argument(
-        "--evidence", default="", help="Free-text evidence supporting the outcome"
-    )
+    p_eo.add_argument("--evidence", default="", help="Free-text evidence supporting the outcome")
     p_eo.add_argument(
         "--recorded-by",
         required=True,
@@ -244,63 +217,33 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         help="Partial output: subtask:progress:notes (repeatable)",
     )
-    p_ho.add_argument(
-        "--known-blocker", action="append", help="Known blocker (repeatable)"
-    )
-    p_ho.add_argument(
-        "--file-ownership", action="append", help="Owned file path (repeatable)"
-    )
-    p_ho.add_argument(
-        "--next-step", action="append", help="Next step (repeatable, at least one required)"
-    )
-    p_ho.add_argument(
-        "--open-decision", action="append", help="Open decision (repeatable)"
-    )
-    p_ho.add_argument(
-        "--hull-at-handoff", required=True, type=int, help="Hull integrity % at handoff"
-    )
-    p_ho.add_argument(
-        "--tokens-consumed", required=True, type=int, help="Tokens consumed at handoff"
-    )
-    p_ho.add_argument(
-        "--key-finding", action="append", help="Key finding (repeatable)"
-    )
+    p_ho.add_argument("--known-blocker", action="append", help="Known blocker (repeatable)")
+    p_ho.add_argument("--file-ownership", action="append", help="Owned file path (repeatable)")
+    p_ho.add_argument("--next-step", action="append", help="Next step (repeatable, at least one required)")
+    p_ho.add_argument("--open-decision", action="append", help="Open decision (repeatable)")
+    p_ho.add_argument("--hull-at-handoff", required=True, type=int, help="Hull integrity % at handoff")
+    p_ho.add_argument("--tokens-consumed", required=True, type=int, help="Tokens consumed at handoff")
+    p_ho.add_argument("--key-finding", action="append", help="Key finding (repeatable)")
     p_ho.add_argument(
         "--relief-entry",
         action="append",
         help="Relief chain entry: ship:reason:time (repeatable, max 3)",
     )
-    p_ho.add_argument(
-        "--incoming-ship", default=None, help="Replacement ship name"
-    )
+    p_ho.add_argument("--incoming-ship", default=None, help="Replacement ship name")
 
     # --- checkpoint ---
     p_cp = subs.add_parser("checkpoint", help="Record a quarterdeck checkpoint")
     p_cp.add_argument("--mission-dir", required=True, help="Mission directory path")
     p_cp.add_argument("--pending", required=True, type=int, help="Pending task count")
-    p_cp.add_argument(
-        "--in-progress", required=True, type=int, help="In-progress task count"
-    )
-    p_cp.add_argument(
-        "--completed", required=True, type=int, help="Completed task count"
-    )
+    p_cp.add_argument("--in-progress", required=True, type=int, help="In-progress task count")
+    p_cp.add_argument("--completed", required=True, type=int, help="Completed task count")
     p_cp.add_argument("--blocked", type=int, default=0, help="Blocked task count")
-    p_cp.add_argument(
-        "--tokens-spent", required=True, type=int, help="Tokens spent so far"
-    )
-    p_cp.add_argument(
-        "--tokens-remaining", required=True, type=int, help="Tokens remaining"
-    )
-    p_cp.add_argument(
-        "--hull-green", required=True, type=int, help="Ships at green hull"
-    )
-    p_cp.add_argument(
-        "--hull-amber", required=True, type=int, help="Ships at amber hull"
-    )
+    p_cp.add_argument("--tokens-spent", required=True, type=int, help="Tokens spent so far")
+    p_cp.add_argument("--tokens-remaining", required=True, type=int, help="Tokens remaining")
+    p_cp.add_argument("--hull-green", required=True, type=int, help="Ships at green hull")
+    p_cp.add_argument("--hull-amber", required=True, type=int, help="Ships at amber hull")
     p_cp.add_argument("--hull-red", required=True, type=int, help="Ships at red hull")
-    p_cp.add_argument(
-        "--hull-critical", required=True, type=int, help="Ships at critical hull"
-    )
+    p_cp.add_argument("--hull-critical", required=True, type=int, help="Ships at critical hull")
     p_cp.add_argument(
         "--decision",
         required=True,
@@ -311,17 +254,11 @@ def build_parser() -> argparse.ArgumentParser:
     # --- stand-down ---
     p_sd = subs.add_parser("stand-down", help="Record mission completion")
     p_sd.add_argument("--mission-dir", required=True, help="Mission directory path")
-    p_sd.add_argument(
-        "--outcome-achieved", action="store_true", help="Was the outcome achieved?"
-    )
+    p_sd.add_argument("--outcome-achieved", action="store_true", help="Was the outcome achieved?")
     p_sd.add_argument("--actual-outcome", default="", help="Actual outcome description")
     p_sd.add_argument("--metric-result", default="", help="Success metric result")
-    p_sd.add_argument(
-        "--adopt", action="append", default=None, help="Pattern to adopt (repeatable)"
-    )
-    p_sd.add_argument(
-        "--avoid", action="append", default=None, help="Pattern to avoid (repeatable)"
-    )
+    p_sd.add_argument("--adopt", action="append", default=None, help="Pattern to adopt (repeatable)")
+    p_sd.add_argument("--avoid", action="append", default=None, help="Pattern to avoid (repeatable)")
 
     # --- form ---
     p_form = subs.add_parser("form", help="Composite formation: tasks + squadron + plan")
@@ -335,12 +272,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # --- headless ---
     p_hl = subs.add_parser("headless", help="Headless mission: init + form in one step")
-    p_hl.add_argument(
-        "--sailing-orders", required=True, help="Path to sailing orders JSON file"
-    )
-    p_hl.add_argument(
-        "--battle-plan", required=True, help="Path to battle plan JSON file"
-    )
+    p_hl.add_argument("--sailing-orders", required=True, help="Path to sailing orders JSON file")
+    p_hl.add_argument("--battle-plan", required=True, help="Path to battle plan JSON file")
     p_hl.add_argument(
         "--mode",
         default="subagents",
@@ -391,9 +324,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_brief = subs.add_parser("brief", help="Intelligence brief from past missions")
     p_brief.add_argument("--missions-dir", default=None, help="Missions directory path")
     p_brief.add_argument("--mission-dir", dest="missions_dir", help=argparse.SUPPRESS)
-    p_brief.add_argument(
-        "--context", default="", help="Context for upcoming mission"
-    )
+    p_brief.add_argument("--context", default="", help="Context for upcoming mission")
     p_brief.add_argument(
         "--json",
         dest="json_output",
@@ -417,9 +348,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Output as JSON",
     )
-    p_an.add_argument(
-        "--last", type=int, default=0, help="Limit to last N missions (0=all)"
-    )
+    p_an.add_argument("--last", type=int, default=0, help="Limit to last N missions (0=all)")
 
     # --- detect-patterns ---
     p_dp = subs.add_parser(
@@ -451,10 +380,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--confidence-threshold",
         type=float,
         default=DEFAULT_CONFIDENCE_THRESHOLD,
-        help=(
-            "Drop candidates below this confidence "
-            f"(default: {DEFAULT_CONFIDENCE_THRESHOLD})"
-        ),
+        help=(f"Drop candidates below this confidence (default: {DEFAULT_CONFIDENCE_THRESHOLD})"),
     )
     p_dp.add_argument(
         "--json",
@@ -491,9 +417,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Record an admiralty action decision (approved/modified/rejected)",
     )
     p_ad.add_argument("--mission-dir", required=True, help="Mission directory path")
-    p_ad.add_argument(
-        "--task-id", required=True, type=int, help="Task ID the decision applies to"
-    )
+    p_ad.add_argument("--task-id", required=True, type=int, help="Task ID the decision applies to")
     p_ad.add_argument(
         "--decision-type",
         required=True,
@@ -505,9 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Ship that recorded the decision (e.g. 'Admiral' or captain ship name)",
     )
-    p_ad.add_argument(
-        "--notes", default="", help="Optional free-text rationale for the decision"
-    )
+    p_ad.add_argument("--notes", default="", help="Optional free-text rationale for the decision")
 
     # --- trust-report ---
     p_tr = subs.add_parser(

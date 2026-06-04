@@ -20,6 +20,33 @@ The skill lives in `.claude/skills/nelson/`. The key files:
 - `references/` — Supporting docs loaded on demand (risk tiers, templates, team sizing)
 - `agents/` — Agent interface definitions
 
+## Local development
+
+The repo ships AI-targeted sensors (linter, formatter, pre-commit hooks,
+secret scanner) so the same checks run locally and in CI. Set them up
+once after cloning:
+
+```bash
+# Install pre-commit hooks (runs on every `git commit`)
+pre-commit install
+```
+
+Day-to-day commands:
+
+```bash
+ruff check                              # Lint with AI-targeted thresholds
+ruff format                             # Apply formatting
+pre-commit run --all-files              # Run every hook on every file
+pytest skills/nelson/scripts/ -v        # Tests — one directory at a
+pytest hooks/ -v                        #   time (each dir has its
+pytest scripts/ -v                      #   own conftest.py)
+```
+
+See [CLAUDE.md](./CLAUDE.md) → *Maintainability sensors* for the
+suppress-with-reason and bump-threshold conventions. If a sensor
+disagrees with you, propose the threshold change rather than reaching
+for `--no-verify`.
+
 ## Development tooling (optional)
 
 Nelson's development uses [beads](https://github.com/gastownhall/beads) for dependency-aware task tracking across agent sessions. Beads is **not required** — you can contribute without it.

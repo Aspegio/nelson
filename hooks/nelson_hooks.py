@@ -32,9 +32,9 @@ import argparse
 import json
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
-
 
 # ---------------------------------------------------------------------------
 # Shared utilities
@@ -138,7 +138,8 @@ def _write_admiral_marker(nelson_dir: Path, transcript_path: str) -> bool:
         return False
     try:
         (nelson_dir / ADMIRAL_SESSION_MARKER).write_text(
-            transcript_path.strip() + "\n", encoding="utf-8",
+            transcript_path.strip() + "\n",
+            encoding="utf-8",
         )
         return True
     except OSError:
@@ -155,9 +156,7 @@ def _check_station_tiers(tasks: list[dict[str, Any]]) -> str | None:
     unclassified = [t for t in tasks if t.get("station_tier") is None]
     if not unclassified:
         return None
-    names = ", ".join(
-        f"'{t.get('name', t.get('id', 'unknown'))}'" for t in unclassified
-    )
+    names = ", ".join(f"'{t.get('name', t.get('id', 'unknown'))}'" for t in unclassified)
     return (
         f"Standing order violation (unclassified-engagement): "
         f"Tasks without station tier: {names}. "
@@ -174,15 +173,10 @@ def _check_file_ownership(tasks: list[dict[str, Any]]) -> str | None:
         for filepath in task.get("file_ownership", []):
             file_owners.setdefault(filepath, []).append(owner)
 
-    conflicts = {
-        fp: owners for fp, owners in file_owners.items() if len(set(owners)) > 1
-    }
+    conflicts = {fp: owners for fp, owners in file_owners.items() if len(set(owners)) > 1}
     if not conflicts:
         return None
-    details = "; ".join(
-        f"'{fp}' owned by {', '.join(sorted(set(owners)))}"
-        for fp, owners in conflicts.items()
-    )
+    details = "; ".join(f"'{fp}' owned by {', '.join(sorted(set(owners)))}" for fp, owners in conflicts.items())
     return (
         f"Standing order violation (split-keel): "
         f"File ownership conflicts detected: {details}. "
@@ -191,7 +185,8 @@ def _check_file_ownership(tasks: list[dict[str, Any]]) -> str | None:
 
 
 def _check_mode_tool_consistency(
-    mode: str, tool_input: dict[str, Any],
+    mode: str,
+    tool_input: dict[str, Any],
 ) -> str | None:
     """Return rejection message if tool input mismatches execution mode."""
     has_subagent_type = "subagent_type" in tool_input
@@ -447,7 +442,9 @@ def _gather_evidence(payload: dict[str, Any]) -> str:
 
 
 def _check_tier_controls(
-    tier: int, task_name: str, evidence: str,
+    tier: int,
+    task_name: str,
+    evidence: str,
 ) -> str | None:
     """Return rejection message if station tier controls are unsatisfied."""
     if not _has_evidence(evidence, VALIDATION_EVIDENCE_PATTERNS):
@@ -502,8 +499,7 @@ def cmd_task_complete(args: argparse.Namespace) -> None:
     tasks = _get_tasks(battle_plan)
 
     matched = next(
-        (t for t in tasks
-         if t.get("id") == task_id or t.get("name") == task_subject),
+        (t for t in tasks if t.get("id") == task_id or t.get("name") == task_subject),
         None,
     )
     if matched is None:
@@ -525,7 +521,8 @@ def cmd_task_complete(args: argparse.Namespace) -> None:
 
 
 def _find_ship(
-    squadron: list[dict[str, Any]], teammate_name: str,
+    squadron: list[dict[str, Any]],
+    teammate_name: str,
 ) -> dict[str, Any] | None:
     """Find a ship in the squadron by exact or partial name match."""
     name_lower = teammate_name.lower()
@@ -541,7 +538,8 @@ def _find_ship(
 
 
 def _has_pending_dependents(
-    task_id: str, tasks: list[dict[str, Any]],
+    task_id: str,
+    tasks: list[dict[str, Any]],
 ) -> bool:
     """Check whether a task has incomplete dependent tasks."""
     for task in tasks:
@@ -575,8 +573,7 @@ def cmd_idle_ship(args: argparse.Namespace) -> None:
     ship = _find_ship(fleet_status.get("squadron", []), teammate_name)
     if ship is None:
         print(
-            f"Ship '{teammate_name}' idle — not found in fleet status. "
-            f"Check hull integrity and task status.",
+            f"Ship '{teammate_name}' idle — not found in fleet status. Check hull integrity and task status.",
             file=sys.stderr,
         )
         _check_idle_circuit_breaker(mission_dir, teammate_name)
@@ -624,10 +621,8 @@ def _check_idle_circuit_breaker(mission_dir: Path, ship_name: str) -> None:
     if not ship_name:
         return
     try:
-        sys.path.insert(
-            0, str(Path(__file__).resolve().parent.parent / "skills" / "nelson" / "scripts")
-        )
-        from nelson_circuit_breakers import (  # type: ignore[import-not-found]
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "nelson" / "scripts"))
+        from nelson_circuit_breakers import (  # type: ignore[import-not-found]  # noqa: PLC0415 -- sibling-package import after sys.path mutation
             evaluate_idle_timeout,
             load_config,
         )
@@ -639,9 +634,7 @@ def _check_idle_circuit_breaker(mission_dir: Path, ship_name: str) -> None:
     if not config.get("enabled", True):
         return
 
-    from datetime import datetime, timezone
-
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     trip = evaluate_idle_timeout(mission_dir, ship_name, now_iso, config)
     if trip is None:
         return
@@ -655,10 +648,10 @@ def _check_idle_circuit_breaker(mission_dir: Path, ship_name: str) -> None:
 def _clear_idle_tracker(mission_dir: Path, ship_name: str) -> None:
     """Best-effort: clear the idle tracker entry for a completed ship."""
     try:
-        sys.path.insert(
-            0, str(Path(__file__).resolve().parent.parent / "skills" / "nelson" / "scripts")
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "nelson" / "scripts"))
+        from nelson_circuit_breakers import (  # type: ignore[import-not-found]  # noqa: PLC0415 -- sibling-package import after sys.path mutation (same pattern as the earlier import on line 625)
+            clear_idle_tracker,
         )
-        from nelson_circuit_breakers import clear_idle_tracker  # type: ignore[import-not-found]
     except ImportError:
         return
     clear_idle_tracker(mission_dir, ship_name)

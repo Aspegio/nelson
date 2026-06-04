@@ -29,12 +29,12 @@ No external dependencies — stdlib only.
 
 from __future__ import annotations
 
+import json
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Defaults & config
@@ -131,9 +131,7 @@ def evaluate(
     return trips
 
 
-def _check_hull_integrity(
-    fleet_status: dict[str, Any], config: dict[str, Any]
-) -> list[BreakerTrip]:
+def _check_hull_integrity(fleet_status: dict[str, Any], config: dict[str, Any]) -> list[BreakerTrip]:
     """Any ship at or below the hull integrity threshold trips the breaker."""
     threshold = config["hull_integrity_threshold"]
     trips: list[BreakerTrip] = []
@@ -150,8 +148,7 @@ def _check_hull_integrity(
                     threshold=threshold,
                     action="hull-integrity",
                     message=(
-                        f"{name} hull integrity {pct}% <= threshold {threshold}%. "
-                        f"See damage-control/hull-integrity.md."
+                        f"{name} hull integrity {pct}% <= threshold {threshold}%. See damage-control/hull-integrity.md."
                     ),
                     context={"ship_name": name},
                 )
@@ -214,9 +211,7 @@ def _check_budget_alarm(
     return []
 
 
-def _check_cost_per_task_overrun(
-    events: list[dict[str, Any]], config: dict[str, Any]
-) -> list[BreakerTrip]:
+def _check_cost_per_task_overrun(events: list[dict[str, Any]], config: dict[str, Any]) -> list[BreakerTrip]:
     """Trip when the latest burn-rate-per-task is N times the rolling median."""
     min_history = config["cost_per_task_min_history"]
     multiplier = config["cost_per_task_multiplier"]
@@ -262,9 +257,7 @@ def _check_cost_per_task_overrun(
     return []
 
 
-def _check_consecutive_failures(
-    events: list[dict[str, Any]], config: dict[str, Any]
-) -> list[BreakerTrip]:
+def _check_consecutive_failures(events: list[dict[str, Any]], config: dict[str, Any]) -> list[BreakerTrip]:
     """Trip on N consecutive blockers without resolution."""
     threshold = config["consecutive_failures"]
     run_length = 0
@@ -311,12 +304,8 @@ def _check_time_limit(
         return []
 
     try:
-        start_dt = datetime.strptime(started_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
-        )
-        now_dt = datetime.strptime(now_iso, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
-        )
+        start_dt = datetime.strptime(started_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        now_dt = datetime.strptime(now_iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except (ValueError, TypeError):
         return []
 
@@ -363,8 +352,6 @@ def evaluate_idle_timeout(
     tracker: dict[str, str] = {}
     if tracker_path.exists():
         try:
-            import json
-
             tracker = json.loads(tracker_path.read_text(encoding="utf-8"))
             if not isinstance(tracker, dict):
                 tracker = {}
@@ -379,12 +366,8 @@ def evaluate_idle_timeout(
         return None
 
     try:
-        start_dt = datetime.strptime(first_seen, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
-        )
-        now_dt = datetime.strptime(now_iso, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
-        )
+        start_dt = datetime.strptime(first_seen, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        now_dt = datetime.strptime(now_iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except (ValueError, TypeError):
         # Bad tracker state — reset.
         tracker[ship_name] = now_iso
@@ -415,8 +398,6 @@ def clear_idle_tracker(mission_dir: Path, ship_name: str | None = None) -> None:
     if not tracker_path.exists():
         return
 
-    import json
-
     try:
         tracker = json.loads(tracker_path.read_text(encoding="utf-8"))
         if not isinstance(tracker, dict):
@@ -434,13 +415,9 @@ def clear_idle_tracker(mission_dir: Path, ship_name: str | None = None) -> None:
 
 def _write_tracker(tracker_path: Path, tracker: dict[str, str]) -> None:
     """Write the idle tracker atomically (best effort — non-fatal on error)."""
-    import json
-
     try:
         tracker_path.parent.mkdir(parents=True, exist_ok=True)
-        tracker_path.write_text(
-            json.dumps(tracker, indent=2) + "\n", encoding="utf-8"
-        )
+        tracker_path.write_text(json.dumps(tracker, indent=2) + "\n", encoding="utf-8")
     except OSError:
         pass
 
@@ -471,9 +448,9 @@ def compute_budget_metrics(
     burn_rate = tokens_spent / completed
     projected = None
     if total > 0:
-        projected = int(round(burn_rate * total))
+        projected = round(burn_rate * total)
     return {
-        "burn_rate_per_task": int(round(burn_rate)),
+        "burn_rate_per_task": round(burn_rate),
         "projected_budget_at_completion": projected,
     }
 

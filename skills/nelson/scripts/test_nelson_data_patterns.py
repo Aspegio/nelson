@@ -19,7 +19,6 @@ import json
 from pathlib import Path
 
 from conftest import read_json, run
-
 from nelson_data_patterns import (
     Candidate,
     _fisher_exact_pvalue,
@@ -36,7 +35,6 @@ from nelson_data_patterns import (
     promote_candidate,
     rank_for_review,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -64,32 +62,38 @@ def _make_patterns_file(
     counter = 0
     for _ in range(with_pattern_failing):
         counter += 1
-        patterns.append({
-            "mission_id": f"2026-01-01_{counter:06d}",
-            "outcome_achieved": False,
-            "adopt": [],
-            "avoid": [PLANTED, *(extra_noise_avoid or [])],
-            "standing_order_violations": [],
-            "damage_control_events": 0,
-        })
+        patterns.append(
+            {
+                "mission_id": f"2026-01-01_{counter:06d}",
+                "outcome_achieved": False,
+                "adopt": [],
+                "avoid": [PLANTED, *(extra_noise_avoid or [])],
+                "standing_order_violations": [],
+                "damage_control_events": 0,
+            }
+        )
     for _ in range(without_pattern_succeeding):
         counter += 1
-        patterns.append({
-            "mission_id": f"2026-01-01_{counter:06d}",
-            "outcome_achieved": True,
-            "adopt": ["Clean dispatch"],
-            "avoid": [],
-            "standing_order_violations": [],
-            "damage_control_events": 0,
-        })
+        patterns.append(
+            {
+                "mission_id": f"2026-01-01_{counter:06d}",
+                "outcome_achieved": True,
+                "adopt": ["Clean dispatch"],
+                "avoid": [],
+                "standing_order_violations": [],
+                "damage_control_events": 0,
+            }
+        )
     memory_dir.mkdir(parents=True, exist_ok=True)
     (memory_dir / "patterns.json").write_text(
-        json.dumps({
-            "version": 1,
-            "updated_at": "2026-01-02T00:00:00Z",
-            "pattern_count": len(patterns),
-            "patterns": patterns,
-        }),
+        json.dumps(
+            {
+                "version": 1,
+                "updated_at": "2026-01-02T00:00:00Z",
+                "pattern_count": len(patterns),
+                "patterns": patterns,
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -137,9 +141,7 @@ class TestMining:
         }
         clusters = _mine_event_sequences(data, similarity_threshold=0.3)
         # The two "shell" phrases should cluster; the token-ration phrase stands alone
-        shell_clusters = [
-            c for c in clusters if "shells" in c.canonical_text.lower()
-        ]
+        shell_clusters = [c for c in clusters if "shells" in c.canonical_text.lower()]
         assert len(shell_clusters) == 1
         assert len(shell_clusters[0].mission_ids) == 2
 
@@ -155,21 +157,15 @@ class TestMining:
 class TestScoring:
     def test_correlated_pattern_high_confidence(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
-        patterns_data = json.loads(
-            (memory_dir / "patterns.json").read_text(encoding="utf-8")
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
+        patterns_data = json.loads((memory_dir / "patterns.json").read_text(encoding="utf-8"))
         clusters = _mine_event_sequences(patterns_data)
         assert len(clusters) == 1, f"Expected one cluster, got {len(clusters)}"
         scored = _score_pattern(clusters[0], patterns_data["patterns"])
         assert scored.missions_with == 4
         assert scored.failures_with == 4
         assert scored.successes_with == 0
-        assert scored.confidence > 0.95, (
-            f"Expected high confidence, got {scored.confidence}"
-        )
+        assert scored.confidence > 0.95, f"Expected high confidence, got {scored.confidence}"
 
 
 # ---------------------------------------------------------------------------
@@ -178,9 +174,7 @@ class TestScoring:
 
 
 class TestNovelty:
-    def test_pattern_covered_by_existing_order_is_low_novelty(
-        self, tmp_path: Path
-    ) -> None:
+    def test_pattern_covered_by_existing_order_is_low_novelty(self, tmp_path: Path) -> None:
         so_dir = _empty_standing_orders_dir(tmp_path)
         (so_dir / "split-keel.md").write_text(
             "# Standing Order: Split Keel\n\n"
@@ -204,9 +198,7 @@ class TestNovelty:
 
     def test_unrelated_pattern_is_high_novelty(self, tmp_path: Path) -> None:
         so_dir = _empty_standing_orders_dir(tmp_path)
-        (so_dir / "split-keel.md").write_text(
-            "# Split Keel — file ownership\n", encoding="utf-8"
-        )
+        (so_dir / "split-keel.md").write_text("# Split Keel — file ownership\n", encoding="utf-8")
         data = {"patterns": [{"mission_id": "m1", "avoid": [PLANTED]}]}
         clusters = _mine_event_sequences(data)
         existing = [(p.stem, p.read_text(encoding="utf-8")) for p in so_dir.glob("*.md")]
@@ -222,9 +214,7 @@ class TestNovelty:
 class TestDetectCandidateOrders:
     def test_planted_pattern_is_detected(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
         candidates = detect_candidate_orders(
@@ -240,33 +230,23 @@ class TestDetectCandidateOrders:
 
     def test_below_min_missions_returns_nothing(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=2, without_pattern_succeeding=3
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=2, without_pattern_succeeding=3)
         so_dir = _empty_standing_orders_dir(tmp_path)
-        assert detect_candidate_orders(
-            memory_dir, standing_orders_dir=so_dir, min_missions=10
-        ) == []
+        assert detect_candidate_orders(memory_dir, standing_orders_dir=so_dir, min_missions=10) == []
 
     def test_empty_memory_returns_nothing(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
         memory_dir.mkdir()
         (memory_dir / "patterns.json").write_text('{"patterns": []}', encoding="utf-8")
         so_dir = _empty_standing_orders_dir(tmp_path)
-        assert detect_candidate_orders(
-            memory_dir, standing_orders_dir=so_dir, min_missions=0
-        ) == []
+        assert detect_candidate_orders(memory_dir, standing_orders_dir=so_dir, min_missions=0) == []
 
     def test_all_success_returns_nothing(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=0, without_pattern_succeeding=12
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=0, without_pattern_succeeding=12)
         so_dir = _empty_standing_orders_dir(tmp_path)
         # No failures at all → no anti-pattern is correlated with failure
-        assert detect_candidate_orders(
-            memory_dir, standing_orders_dir=so_dir, min_missions=10
-        ) == []
+        assert detect_candidate_orders(memory_dir, standing_orders_dir=so_dir, min_missions=10) == []
 
     def test_pattern_matching_existing_order_dropped(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
@@ -279,23 +259,27 @@ class TestDetectCandidateOrders:
 
         patterns = []
         for i in range(4):
-            patterns.append({
-                "mission_id": f"m{i}",
-                "outcome_achieved": False,
-                "avoid": ["file captain assignment overwrite ownership"],
-                "adopt": [],
-                "standing_order_violations": [],
-                "damage_control_events": 0,
-            })
+            patterns.append(
+                {
+                    "mission_id": f"m{i}",
+                    "outcome_achieved": False,
+                    "avoid": ["file captain assignment overwrite ownership"],
+                    "adopt": [],
+                    "standing_order_violations": [],
+                    "damage_control_events": 0,
+                }
+            )
         for i in range(8):
-            patterns.append({
-                "mission_id": f"n{i}",
-                "outcome_achieved": True,
-                "avoid": [],
-                "adopt": [],
-                "standing_order_violations": [],
-                "damage_control_events": 0,
-            })
+            patterns.append(
+                {
+                    "mission_id": f"n{i}",
+                    "outcome_achieved": True,
+                    "avoid": [],
+                    "adopt": [],
+                    "standing_order_violations": [],
+                    "damage_control_events": 0,
+                }
+            )
         memory_dir.mkdir(parents=True, exist_ok=True)
         (memory_dir / "patterns.json").write_text(
             json.dumps({"version": 1, "pattern_count": 12, "patterns": patterns}),
@@ -307,39 +291,33 @@ class TestDetectCandidateOrders:
             standing_orders_dir=so_dir,
             min_missions=10,
         )
-        assert candidates == [], (
-            "Existing-order coverage should suppress the candidate"
-        )
+        assert candidates == [], "Existing-order coverage should suppress the candidate"
 
     def test_dismissed_pattern_not_resurfaced(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
-        first = detect_candidate_orders(
-            memory_dir, standing_orders_dir=so_dir, min_missions=10
-        )
+        first = detect_candidate_orders(memory_dir, standing_orders_dir=so_dir, min_missions=10)
         assert len(first) == 1
         cand = first[0]
 
         # Persist the candidate so dismiss_candidate can find it
         queue_path = memory_dir / "candidate-standing-orders.json"
         queue_path.write_text(
-            json.dumps({
-                "version": 1,
-                "updated_at": "2026-01-02T00:00:00Z",
-                "candidate_count": 1,
-                "candidates": [cand.to_dict()],
-            }),
+            json.dumps(
+                {
+                    "version": 1,
+                    "updated_at": "2026-01-02T00:00:00Z",
+                    "candidate_count": 1,
+                    "candidates": [cand.to_dict()],
+                }
+            ),
             encoding="utf-8",
         )
 
         dismiss_candidate(cand.id, memory_dir=memory_dir, reason="duplicate")
-        assert detect_candidate_orders(
-            memory_dir, standing_orders_dir=so_dir, min_missions=10
-        ) == []
+        assert detect_candidate_orders(memory_dir, standing_orders_dir=so_dir, min_missions=10) == []
 
 
 # ---------------------------------------------------------------------------
@@ -350,33 +328,29 @@ class TestDetectCandidateOrders:
 class TestSynthesis:
     def test_heuristic_stub_used_when_no_fm(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
-        candidates = detect_candidate_orders(
-            memory_dir, standing_orders_dir=so_dir, min_missions=10, fm_client=None
-        )
+        candidates = detect_candidate_orders(memory_dir, standing_orders_dir=so_dir, min_missions=10, fm_client=None)
         assert candidates[0].source == "heuristic-stub"
         assert candidates[0].title  # slug derived from canonical text
 
     def test_fm_client_supplies_prose(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
         def fake_fm(prompt: str) -> str:
-            return json.dumps({
-                "title": "shell-spawning",
-                "trigger": "When the captain proposes more than 3 parallel shells.",
-                "anti_pattern": "Shells without a coordination plan.",
-                "symptoms": ["High shell count", "Tokens consumed coordinating shells"],
-                "remedy": "Consolidate shell work into a single dispatch.",
-                "related_orders": ["light-squadron"],
-            })
+            return json.dumps(
+                {
+                    "title": "shell-spawning",
+                    "trigger": "When the captain proposes more than 3 parallel shells.",
+                    "anti_pattern": "Shells without a coordination plan.",
+                    "symptoms": ["High shell count", "Tokens consumed coordinating shells"],
+                    "remedy": "Consolidate shell work into a single dispatch.",
+                    "related_orders": ["light-squadron"],
+                }
+            )
 
         candidates = detect_candidate_orders(
             memory_dir,
@@ -390,9 +364,7 @@ class TestSynthesis:
 
     def test_fm_malformed_falls_back_to_stub(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
         def bad_fm(prompt: str) -> str:
@@ -408,9 +380,7 @@ class TestSynthesis:
 
     def test_fm_exception_falls_back_to_stub(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
         def crashing_fm(prompt: str) -> str:
@@ -425,12 +395,13 @@ class TestSynthesis:
         assert candidates[0].source == "heuristic-stub"
 
     def test_parse_fm_response_strips_fences(self) -> None:
-        fenced = "```json\n{\"title\": \"foo\"}\n```"
+        fenced = '```json\n{"title": "foo"}\n```'
         parsed = _parse_fm_response(fenced)
         assert parsed == {"title": "foo"}
 
     def test_heuristic_stub_carries_evidence(self) -> None:
         from nelson_data_patterns import RawPattern, ScoredPattern
+
         raw = RawPattern(
             cluster_id="abc123",
             canonical_text="planted text",
@@ -463,24 +434,30 @@ class TestSynthesis:
 
 class TestRanking:
     def test_high_confidence_high_novelty_ranks_first(self) -> None:
-        a = Candidate.from_dict({
-            "id": "cand-a",
-            "title": "a",
-            "pattern_fingerprint": "a",
-            "scores": {"confidence": 0.95, "novelty": 0.9},
-        })
-        b = Candidate.from_dict({
-            "id": "cand-b",
-            "title": "b",
-            "pattern_fingerprint": "b",
-            "scores": {"confidence": 0.95, "novelty": 0.1},
-        })
-        c = Candidate.from_dict({
-            "id": "cand-c",
-            "title": "c",
-            "pattern_fingerprint": "c",
-            "scores": {"confidence": 0.3, "novelty": 0.9},
-        })
+        a = Candidate.from_dict(
+            {
+                "id": "cand-a",
+                "title": "a",
+                "pattern_fingerprint": "a",
+                "scores": {"confidence": 0.95, "novelty": 0.9},
+            }
+        )
+        b = Candidate.from_dict(
+            {
+                "id": "cand-b",
+                "title": "b",
+                "pattern_fingerprint": "b",
+                "scores": {"confidence": 0.95, "novelty": 0.1},
+            }
+        )
+        c = Candidate.from_dict(
+            {
+                "id": "cand-c",
+                "title": "c",
+                "pattern_fingerprint": "c",
+                "scores": {"confidence": 0.3, "novelty": 0.9},
+            }
+        )
         ranked = rank_for_review([b, c, a])
         # a (high conf, high nov) > b (high conf, low nov) > c (low conf, high nov)
         assert [r.id for r in ranked] == ["cand-a", "cand-b", "cand-c"]
@@ -495,12 +472,14 @@ def _seed_candidate(memory_dir: Path, candidate: Candidate) -> None:
     memory_dir.mkdir(parents=True, exist_ok=True)
     queue_path = memory_dir / "candidate-standing-orders.json"
     queue_path.write_text(
-        json.dumps({
-            "version": 1,
-            "updated_at": "2026-01-02T00:00:00Z",
-            "candidate_count": 1,
-            "candidates": [candidate.to_dict()],
-        }),
+        json.dumps(
+            {
+                "version": 1,
+                "updated_at": "2026-01-02T00:00:00Z",
+                "candidate_count": 1,
+                "candidates": [candidate.to_dict()],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -511,10 +490,7 @@ def _make_candidate(**overrides) -> Candidate:
         "title": "echoing-decks",
         "pattern_fingerprint": "test123",
         "trigger": "When the admiral repeats orders rather than issuing fresh ones.",
-        "anti_pattern": (
-            "The admiral re-issues the same brief rather than diagnosing why the "
-            "first dispatch failed."
-        ),
+        "anti_pattern": ("The admiral re-issues the same brief rather than diagnosing why the first dispatch failed."),
         "symptoms": ["Same brief dispatched twice", "Captain reports no progress"],
         "remedy": "Diagnose first; only re-dispatch with a fixed brief.",
         "related_orders": ["pulling-the-oar"],
@@ -653,9 +629,7 @@ class TestDismissal:
         _seed_candidate(memory_dir, cand)
 
         dismiss_candidate(cand.id, memory_dir=memory_dir, reason="too vague")
-        archive = json.loads(
-            (memory_dir / "dismissed-candidates.json").read_text(encoding="utf-8")
-        )
+        archive = json.loads((memory_dir / "dismissed-candidates.json").read_text(encoding="utf-8"))
         assert archive["dismissed_count"] == 1
         assert archive["dismissed"][0]["pattern_fingerprint"] == cand.pattern_fingerprint
         assert archive["dismissed"][0]["reason"] == "too vague"
@@ -681,24 +655,27 @@ class TestCLI:
     def test_detect_patterns_empty_memory(self, tmp_path: Path) -> None:
         result = run(
             "detect-patterns",
-            "--memory-dir", str(tmp_path / ".nelson" / "memory"),
+            "--memory-dir",
+            str(tmp_path / ".nelson" / "memory"),
             cwd=tmp_path,
         )
         assert "No patterns.json" in result.stdout
 
     def test_detect_patterns_synthetic_dataset(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / ".nelson" / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
         result = run(
             "detect-patterns",
-            "--memory-dir", str(memory_dir),
-            "--standing-orders-dir", str(so_dir),
-            "--min-missions", "10",
-            "--confidence-threshold", "0.7",
+            "--memory-dir",
+            str(memory_dir),
+            "--standing-orders-dir",
+            str(so_dir),
+            "--min-missions",
+            "10",
+            "--confidence-threshold",
+            "0.7",
             cwd=tmp_path,
         )
         assert "Detected 1 new candidate" in result.stdout
@@ -707,16 +684,17 @@ class TestCLI:
 
     def test_dismiss_then_redetect_excludes_candidate(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / ".nelson" / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
 
         run(
             "detect-patterns",
-            "--memory-dir", str(memory_dir),
-            "--standing-orders-dir", str(so_dir),
-            "--min-missions", "10",
+            "--memory-dir",
+            str(memory_dir),
+            "--standing-orders-dir",
+            str(so_dir),
+            "--min-missions",
+            "10",
             cwd=tmp_path,
         )
         queue = read_json(memory_dir / "candidate-standing-orders.json")
@@ -724,16 +702,22 @@ class TestCLI:
 
         run(
             "dismiss-candidate",
-            "--candidate-id", cid,
-            "--reason", "duplicate of split-keel",
-            "--memory-dir", str(memory_dir),
+            "--candidate-id",
+            cid,
+            "--reason",
+            "duplicate of split-keel",
+            "--memory-dir",
+            str(memory_dir),
             cwd=tmp_path,
         )
         result = run(
             "detect-patterns",
-            "--memory-dir", str(memory_dir),
-            "--standing-orders-dir", str(so_dir),
-            "--min-missions", "10",
+            "--memory-dir",
+            str(memory_dir),
+            "--standing-orders-dir",
+            str(so_dir),
+            "--min-missions",
+            "10",
             cwd=tmp_path,
         )
         assert "Detected 0 new candidate" in result.stdout
@@ -743,8 +727,10 @@ class TestCLI:
         memory_dir.mkdir(parents=True)
         run(
             "promote-candidate",
-            "--candidate-id", "cand-missing",
-            "--memory-dir", str(memory_dir),
+            "--candidate-id",
+            "cand-missing",
+            "--memory-dir",
+            str(memory_dir),
             cwd=tmp_path,
             expect_fail=True,
         )
@@ -759,9 +745,12 @@ class TestBriefSurfacing:
     def test_brief_omits_line_when_zero_candidates(self, tmp_path: Path) -> None:
         # Build an index from a single completed mission so the brief has body
         from conftest import create_completed_mission
+
         create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
         run(
-            "index", "--missions-dir", str(tmp_path / ".nelson" / "missions"),
+            "index",
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
             cwd=tmp_path,
         )
         result = run("brief", "--missions-dir", str(tmp_path / ".nelson" / "missions"), cwd=tmp_path)
@@ -769,9 +758,12 @@ class TestBriefSurfacing:
 
     def test_brief_includes_line_when_candidate_present(self, tmp_path: Path) -> None:
         from conftest import create_completed_mission
+
         create_completed_mission(tmp_path, mission_id="2026-03-29_100000")
         run(
-            "index", "--missions-dir", str(tmp_path / ".nelson" / "missions"),
+            "index",
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
             cwd=tmp_path,
         )
         memory_dir = tmp_path / ".nelson" / "memory"
@@ -804,11 +796,7 @@ class TestClusterStability:
             "b": "shells coordination",
             "c": "parallel spawn workflow",
         }
-        return {
-            "patterns": [
-                {"mission_id": f"m-{k}", "avoid": [bank[k]]} for k in ordering
-            ]
-        }
+        return {"patterns": [{"mission_id": f"m-{k}", "avoid": [bank[k]]} for k in ordering]}
 
     def test_cluster_id_invariant_under_reordering(self) -> None:
         order1 = _mine_event_sequences(self._data(["a", "b", "c"]))
@@ -817,9 +805,7 @@ class TestClusterStability:
         ids1 = sorted(c.cluster_id for c in order1)
         ids2 = sorted(c.cluster_id for c in order2)
         ids3 = sorted(c.cluster_id for c in order3)
-        assert ids1 == ids2 == ids3, (
-            f"Cluster IDs diverged under reordering: {ids1} vs {ids2} vs {ids3}"
-        )
+        assert ids1 == ids2 == ids3, f"Cluster IDs diverged under reordering: {ids1} vs {ids2} vs {ids3}"
 
     def test_bridge_pattern_groups_consistently(self) -> None:
         # The bridge text "b" must connect "a" and "c" regardless of order.
@@ -832,32 +818,34 @@ class TestPolarityGate:
     """Standing orders are 'avoid this' — the candidate gate must require
     that the pattern correlate with failure (negative log-odds)."""
 
-    def test_success_correlated_avoid_text_is_filtered_out(
-        self, tmp_path: Path
-    ) -> None:
+    def test_success_correlated_avoid_text_is_filtered_out(self, tmp_path: Path) -> None:
         # Build a synthetic dataset where the avoid-text only appears in
         # SUCCESSFUL missions.  Old impl: confidence 0.998 → candidate surfaces.
         # New impl: correlation > 0 → filtered out at the gate.
         memory_dir = tmp_path / "memory"
         patterns: list[dict] = []
         for i in range(8):
-            patterns.append({
-                "mission_id": f"win-{i}",
-                "outcome_achieved": True,
-                "avoid": ["wardroom timetable was burned"],
-                "adopt": [],
-                "standing_order_violations": [],
-                "damage_control_events": 0,
-            })
+            patterns.append(
+                {
+                    "mission_id": f"win-{i}",
+                    "outcome_achieved": True,
+                    "avoid": ["wardroom timetable was burned"],
+                    "adopt": [],
+                    "standing_order_violations": [],
+                    "damage_control_events": 0,
+                }
+            )
         for i in range(4):
-            patterns.append({
-                "mission_id": f"loss-{i}",
-                "outcome_achieved": False,
-                "avoid": [],
-                "adopt": [],
-                "standing_order_violations": [],
-                "damage_control_events": 0,
-            })
+            patterns.append(
+                {
+                    "mission_id": f"loss-{i}",
+                    "outcome_achieved": False,
+                    "avoid": [],
+                    "adopt": [],
+                    "standing_order_violations": [],
+                    "damage_control_events": 0,
+                }
+            )
         memory_dir.mkdir(parents=True)
         (memory_dir / "patterns.json").write_text(
             json.dumps({"version": 1, "pattern_count": len(patterns), "patterns": patterns}),
@@ -870,8 +858,7 @@ class TestPolarityGate:
             min_missions=10,
         )
         assert candidates == [], (
-            "Success-correlated avoid texts must not surface as anti-pattern "
-            "candidates; remedy would invert the data."
+            "Success-correlated avoid texts must not surface as anti-pattern candidates; remedy would invert the data."
         )
 
 
@@ -901,7 +888,7 @@ class TestPathTraversalGuard:
         assert "/" not in out_path.name
         # And nothing escaped the standing-orders directory.
         outside_files = list(tmp_path.glob("**/pwn.md"))
-        assert outside_files == [out_path] or outside_files == []
+        assert outside_files in ([out_path], [])
 
 
 class TestSkillMdInjectionGuard:
@@ -913,9 +900,7 @@ class TestSkillMdInjectionGuard:
         # And pipe escaping survives the flatten
         assert "\\|" in cleaned
 
-    def test_promote_inserts_into_standing_orders_section_only(
-        self, tmp_path: Path
-    ) -> None:
+    def test_promote_inserts_into_standing_orders_section_only(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
         so_dir = _empty_standing_orders_dir(tmp_path)
         skill_md = tmp_path / "SKILL.md"
@@ -975,9 +960,7 @@ class TestPromoteIdempotency:
         assert result is None  # already present → no-op
         assert text_after_first.count("`references/standing-orders/echoing-decks.md`") == 1
 
-    def test_promote_missing_skill_md_raises_before_writing_md(
-        self, tmp_path: Path
-    ) -> None:
+    def test_promote_missing_skill_md_raises_before_writing_md(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
         so_dir = _empty_standing_orders_dir(tmp_path)
         cand = _make_candidate()
@@ -1029,9 +1012,7 @@ class TestAddOnlyInvariant:
     """The headline DGM safety claim: candidates may ADD standing orders but
     never modify or delete existing ones (DGM Appendix H mitigation)."""
 
-    def test_existing_standing_orders_files_are_untouched_after_promote(
-        self, tmp_path: Path
-    ) -> None:
+    def test_existing_standing_orders_files_are_untouched_after_promote(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / "memory"
         so_dir = _empty_standing_orders_dir(tmp_path)
         existing_path = so_dir / "split-keel.md"
@@ -1091,44 +1072,37 @@ class TestAddOnlyInvariant:
 
 
 class TestEmptyQueueSkipsWrite:
-    def test_detect_patterns_does_not_create_empty_queue_on_first_run(
-        self, tmp_path: Path
-    ) -> None:
+    def test_detect_patterns_does_not_create_empty_queue_on_first_run(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / ".nelson" / "memory"
         # patterns.json exists but has no failure correlation → 0 candidates.
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=0, without_pattern_succeeding=12
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=0, without_pattern_succeeding=12)
         so_dir = _empty_standing_orders_dir(tmp_path)
         run(
             "detect-patterns",
-            "--memory-dir", str(memory_dir),
-            "--standing-orders-dir", str(so_dir),
-            "--min-missions", "10",
+            "--memory-dir",
+            str(memory_dir),
+            "--standing-orders-dir",
+            str(so_dir),
+            "--min-missions",
+            "10",
             cwd=tmp_path,
         )
         queue_path = memory_dir / "candidate-standing-orders.json"
-        assert not queue_path.exists(), (
-            "First-run with no candidates must not litter the memory dir."
-        )
+        assert not queue_path.exists(), "First-run with no candidates must not litter the memory dir."
 
 
 class TestMissionDirDerivation:
     """detect-patterns and brief must read the same memory dir when given the
     same --missions-dir, even when it is not the default location."""
 
-    def test_detect_patterns_with_missions_dir_finds_queue_seen_by_brief(
-        self, tmp_path: Path
-    ) -> None:
+    def test_detect_patterns_with_missions_dir_finds_queue_seen_by_brief(self, tmp_path: Path) -> None:
         # Non-default layout: project_root/.nelson/missions and memory siblings
         missions_dir = tmp_path / "project" / ".nelson" / "missions"
         missions_dir.mkdir(parents=True)
         memory_dir = missions_dir.parent / "memory"  # The derived path
         memory_dir.mkdir()
 
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
         # Run from a CWD that is NOT the project root — old impl would use
         # cwd-relative .nelson/memory and miss the queue entirely.
@@ -1136,9 +1110,12 @@ class TestMissionDirDerivation:
         elsewhere.mkdir()
         result = run(
             "detect-patterns",
-            "--missions-dir", str(missions_dir),
-            "--standing-orders-dir", str(so_dir),
-            "--min-missions", "10",
+            "--missions-dir",
+            str(missions_dir),
+            "--standing-orders-dir",
+            str(so_dir),
+            "--min-missions",
+            "10",
             cwd=elsewhere,
         )
         assert "Detected 1 new candidate" in result.stdout
@@ -1163,15 +1140,16 @@ class TestMalformedRecordTolerance:
 class TestDetectPatternsJsonOutput:
     def test_json_flag_emits_machine_readable_summary(self, tmp_path: Path) -> None:
         memory_dir = tmp_path / ".nelson" / "memory"
-        _make_patterns_file(
-            memory_dir, with_pattern_failing=4, without_pattern_succeeding=8
-        )
+        _make_patterns_file(memory_dir, with_pattern_failing=4, without_pattern_succeeding=8)
         so_dir = _empty_standing_orders_dir(tmp_path)
         result = run(
             "detect-patterns",
-            "--memory-dir", str(memory_dir),
-            "--standing-orders-dir", str(so_dir),
-            "--min-missions", "10",
+            "--memory-dir",
+            str(memory_dir),
+            "--standing-orders-dir",
+            str(so_dir),
+            "--min-missions",
+            "10",
             "--json",
             cwd=tmp_path,
         )

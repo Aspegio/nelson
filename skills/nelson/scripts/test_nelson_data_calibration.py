@@ -23,9 +23,12 @@ def _stand_down(mission_dir: Path, outcome_achieved: bool = True) -> None:
     """Run stand-down with default arguments."""
     args = [
         "stand-down",
-        "--mission-dir", str(mission_dir),
-        "--actual-outcome", "Done",
-        "--metric-result", "Pass",
+        "--mission-dir",
+        str(mission_dir),
+        "--actual-outcome",
+        "Done",
+        "--metric-result",
+        "Pass",
     ]
     if outcome_achieved:
         args.append("--outcome-achieved")
@@ -63,10 +66,7 @@ class TestAdmiraltyDecisionCommand:
         )
 
         log = read_json(mission_dir / "mission-log.json")
-        matching = [
-            e for e in log["events"]
-            if e.get("type") == "admiralty_action_completed"
-        ]
+        matching = [e for e in log["events"] if e.get("type") == "admiralty_action_completed"]
         assert len(matching) == 1
         data = matching[0]["data"]
         assert data["decision_type"] == "modified"
@@ -83,10 +83,14 @@ class TestAdmiraltyDecisionCommand:
 
         result = run(
             "admiralty-decision",
-            "--mission-dir", str(mission_dir),
-            "--task-id", "1",
-            "--decision-type", "weasel",
-            "--recorded-by", "Admiral Test",
+            "--mission-dir",
+            str(mission_dir),
+            "--task-id",
+            "1",
+            "--decision-type",
+            "weasel",
+            "--recorded-by",
+            "Admiral Test",
             expect_fail=True,
         )
         assert "decision-type" in result.stderr.lower() or "invalid choice" in result.stderr.lower()
@@ -99,31 +103,28 @@ class TestAdmiraltyDecisionCommand:
 
         result = run(
             "admiralty-decision",
-            "--mission-dir", str(mission_dir),
-            "--task-id", "999",
-            "--decision-type", "approved",
-            "--recorded-by", "Admiral Test",
+            "--mission-dir",
+            str(mission_dir),
+            "--task-id",
+            "999",
+            "--decision-type",
+            "approved",
+            "--recorded-by",
+            "Admiral Test",
             expect_fail=True,
         )
         assert "999" in result.stderr
 
-    def test_captures_task_type_and_ship_class_from_state(
-        self, tmp_path: Path
-    ) -> None:
+    def test_captures_task_type_and_ship_class_from_state(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path)
         add_squadron(mission_dir, captains=["HMS Iron Duke:battleship:opus:1"])
         add_task(mission_dir, owner="HMS Iron Duke", task_type="db_migration")
         run("plan-approved", "--mission-dir", str(mission_dir))
 
-        record_admiralty_decision(
-            mission_dir, task_id=1, decision_type="rejected"
-        )
+        record_admiralty_decision(mission_dir, task_id=1, decision_type="rejected")
 
         log = read_json(mission_dir / "mission-log.json")
-        ev = next(
-            e for e in log["events"]
-            if e.get("type") == "admiralty_action_completed"
-        )
+        ev = next(e for e in log["events"] if e.get("type") == "admiralty_action_completed")
         assert ev["data"]["task_type"] == "db_migration"
         assert ev["data"]["ship_class"] == "battleship"
 
@@ -139,9 +140,7 @@ class TestCalibrationStore:
         add_squadron(mission_dir)
         add_task(mission_dir, task_type="auth_refactor")
         run("plan-approved", "--mission-dir", str(mission_dir))
-        record_admiralty_decision(
-            mission_dir, task_id=1, decision_type="modified"
-        )
+        record_admiralty_decision(mission_dir, task_id=1, decision_type="modified")
         _stand_down(mission_dir)
 
         cal_path = _calibration_path(tmp_path)
@@ -165,9 +164,7 @@ class TestCalibrationStore:
         add_squadron(mission_dir)
         add_task(mission_dir, task_type="auth_refactor")
         run("plan-approved", "--mission-dir", str(mission_dir))
-        record_admiralty_decision(
-            mission_dir, task_id=1, decision_type="approved"
-        )
+        record_admiralty_decision(mission_dir, task_id=1, decision_type="approved")
         _stand_down(mission_dir)
         _stand_down(mission_dir)  # second call should not double-count
 
@@ -183,7 +180,7 @@ class TestCalibrationStore:
             "2026-04-03_000001_ee55ff66",
         ]
         decisions = ["approved", "modified", "rejected"]
-        for mid, decision in zip(mission_ids, decisions):
+        for mid, decision in zip(mission_ids, decisions, strict=True):
             md = init_mission(tmp_path)
             md = _rename_mission(md, mid)
             add_squadron(md)
@@ -209,9 +206,12 @@ class TestCalibrationStore:
         # Bare event has no decision_type
         run(
             "event",
-            "--mission-dir", str(mission_dir),
-            "--type", "admiralty_action_completed",
-            "--task-id", "1",
+            "--mission-dir",
+            str(mission_dir),
+            "--type",
+            "admiralty_action_completed",
+            "--task-id",
+            "1",
         )
         _stand_down(mission_dir)
 
@@ -227,9 +227,7 @@ class TestCalibrationStore:
         add_squadron(mission_dir)
         add_task(mission_dir)  # no task_type
         run("plan-approved", "--mission-dir", str(mission_dir))
-        record_admiralty_decision(
-            mission_dir, task_id=1, decision_type="modified"
-        )
+        record_admiralty_decision(mission_dir, task_id=1, decision_type="modified")
         _stand_down(mission_dir)
 
         data = read_json(_calibration_path(tmp_path))
@@ -356,9 +354,7 @@ class TestPlanApprovedAdvisory:
 class TestTrustReport:
     def test_text_report_sorted_by_override_rate(self, tmp_path: Path) -> None:
         # auth_refactor frigate: 2/3 override (high)
-        _accrue_history(
-            tmp_path, ["modified", "rejected", "modified"]
-        )
+        _accrue_history(tmp_path, ["modified", "rejected", "modified"])
         # db_migration battleship: all approved -> 0% override
         for i in range(3):
             mid = f"2026-05-{i + 1:02d}_000001_kk{i:02d}{i:02d}llmm"
@@ -376,7 +372,8 @@ class TestTrustReport:
 
         result = run(
             "trust-report",
-            "--missions-dir", str(tmp_path / ".nelson" / "missions"),
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
         )
         out = result.stdout
         # High-override row comes first
@@ -388,7 +385,8 @@ class TestTrustReport:
 
         result = run(
             "trust-report",
-            "--missions-dir", str(tmp_path / ".nelson" / "missions"),
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
             "--json",
         )
         payload = json.loads(result.stdout)
@@ -406,7 +404,8 @@ class TestTrustReport:
 
         result = run(
             "trust-report",
-            "--missions-dir", str(tmp_path / ".nelson" / "missions"),
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
             "--json",
         )
         payload = json.loads(result.stdout)
@@ -415,8 +414,10 @@ class TestTrustReport:
         # Lowering the threshold reveals the bucket.
         result = run(
             "trust-report",
-            "--missions-dir", str(tmp_path / ".nelson" / "missions"),
-            "--min-decisions", "1",
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
+            "--min-decisions",
+            "1",
             "--json",
         )
         payload = json.loads(result.stdout)
@@ -431,35 +432,82 @@ class TestTrustReport:
 
 class TestRebuildAgreesWithIncremental:
     def test_rebuild_equals_incremental(self, tmp_path: Path) -> None:
-        # Build store via 3 stand-downs (incremental path).
-        _accrue_history(tmp_path, ["modified", "rejected", "approved"])
+        # One mission emits TWO decisions for the same task_id, so the dedupe
+        # rule (latest wins) is exercised on BOTH the incremental and rebuild
+        # path. Rebuild runs over the EXISTING store (no unlink), so it must
+        # reset-and-recompute rather than skip already-tracked missions.
+        ids = [
+            "2026-05-01_000001_aa11bb22",
+            "2026-05-02_000001_cc33dd44",
+            "2026-05-03_000001_ee55ff66",
+        ]
+        per_mission = [["modified"], ["rejected", "approved"], ["approved"]]
+        for mid, mission_decisions in zip(ids, per_mission, strict=True):
+            md = init_mission(tmp_path)
+            md = _rename_mission(md, mid)
+            add_squadron(md)
+            add_task(md, task_type="auth_refactor")
+            run("plan-approved", "--mission-dir", str(md))
+            for decision in mission_decisions:
+                record_admiralty_decision(md, task_id=1, decision_type=decision)
+            _stand_down(md)
 
         cal_path = _calibration_path(tmp_path)
         incremental = read_json(cal_path)
+        # Dedupe held incrementally: the 2nd mission's 'rejected' is superseded
+        # by its later 'approved', so 3 missions => 3 decisions, 2 approved.
+        bucket = incremental["buckets"]["auth_refactor::frigate"]
+        assert bucket["total_decisions"] == 3
+        assert bucket["approved"] == 2
+        assert bucket["modified"] == 1
+        assert bucket["rejected"] == 0
 
-        # Delete and rebuild via `index` (rebuild path).
-        cal_path.unlink()
+        # Rebuild over the existing store; counts must match (deduped), not
+        # double. Ignore wall-clock `last_updated` and `_tracked_missions`
+        # ordering.
         run(
             "index",
-            "--missions-dir", str(tmp_path / ".nelson" / "missions"),
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
             "--rebuild",
         )
         rebuilt = read_json(cal_path)
 
-        # Buckets and rollups must be byte-identical (ignoring wall-clock
-        # `updated_at` / per-bucket `last_updated` timestamps and the
-        # mission ordering inside `_tracked_missions`).
         assert rebuilt["buckets"].keys() == incremental["buckets"].keys()
         for key in incremental["buckets"]:
-            a = dict(incremental["buckets"][key])
-            b = dict(rebuilt["buckets"][key])
-            a.pop("last_updated", None)
-            b.pop("last_updated", None)
+            a = {k: v for k, v in incremental["buckets"][key].items() if k != "last_updated"}
+            b = {k: v for k, v in rebuilt["buckets"][key].items() if k != "last_updated"}
             assert a == b, f"bucket {key} differs: incremental={a} rebuilt={b}"
         assert rebuilt["by_task_type"] == incremental["by_task_type"]
-        assert sorted(rebuilt["_tracked_missions"]) == sorted(
-            incremental["_tracked_missions"]
+        assert sorted(rebuilt["_tracked_missions"]) == sorted(incremental["_tracked_missions"])
+
+    def test_rebuild_resets_stale_store(self, tmp_path: Path) -> None:
+        # A store written before per-task dedupe existed can carry inflated
+        # counts. `index --rebuild` must discard the persisted store and
+        # recompute from the missions — not skip them as already-tracked.
+        _accrue_history(tmp_path, ["modified", "rejected", "approved"])
+        cal_path = _calibration_path(tmp_path)
+
+        stale = read_json(cal_path)
+        bkey = "auth_refactor::frigate"
+        stale["buckets"][bkey]["total_decisions"] = 99
+        stale["buckets"][bkey]["approved"] = 99
+        stale["by_task_type"]["auth_refactor"]["total_decisions"] = 99
+        cal_path.write_text(json.dumps(stale), encoding="utf-8")
+
+        run(
+            "index",
+            "--missions-dir",
+            str(tmp_path / ".nelson" / "missions"),
+            "--rebuild",
         )
+
+        rebuilt = read_json(cal_path)
+        bucket = rebuilt["buckets"][bkey]
+        # Recomputed from the 3 real missions, not the injected 99s.
+        assert bucket["total_decisions"] == 3
+        assert bucket["approved"] == 1
+        assert rebuilt["by_task_type"]["auth_refactor"]["total_decisions"] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -476,12 +524,8 @@ class TestDuplicateDecisionsDeduped:
 
         # Two decisions for the same task: 'rejected' then later 'approved'.
         # Latest event wins, so the bucket should reflect one approval.
-        record_admiralty_decision(
-            mission_dir, task_id=1, decision_type="rejected"
-        )
-        record_admiralty_decision(
-            mission_dir, task_id=1, decision_type="approved"
-        )
+        record_admiralty_decision(mission_dir, task_id=1, decision_type="rejected")
+        record_admiralty_decision(mission_dir, task_id=1, decision_type="approved")
         _stand_down(mission_dir)
 
         data = read_json(_calibration_path(tmp_path))
@@ -498,9 +542,7 @@ class TestDuplicateDecisionsDeduped:
 
 
 class TestBackwardsCompatEvent:
-    def test_backwards_compat_event_without_embedded_attrs(
-        self, tmp_path: Path
-    ) -> None:
+    def test_backwards_compat_event_without_embedded_attrs(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path)
         add_squadron(mission_dir)
         add_task(mission_dir, task_type="auth_refactor")
@@ -510,10 +552,14 @@ class TestBackwardsCompatEvent:
         # + decision_type — no task_type / ship_class baked in.
         run(
             "event",
-            "--mission-dir", str(mission_dir),
-            "--type", "admiralty_action_completed",
-            "--task-id", "1",
-            "--decision-type", "modified",
+            "--mission-dir",
+            str(mission_dir),
+            "--type",
+            "admiralty_action_completed",
+            "--task-id",
+            "1",
+            "--decision-type",
+            "modified",
         )
         _stand_down(mission_dir)
 
@@ -529,9 +575,7 @@ class TestBackwardsCompatEvent:
 
 
 class TestRollupFallbackWording:
-    def test_rollup_fallback_with_undersampled_bucket(
-        self, tmp_path: Path
-    ) -> None:
+    def test_rollup_fallback_with_undersampled_bucket(self, tmp_path: Path) -> None:
         # 2 frigate decisions for auth_refactor — below the n=3 advisory
         # threshold so the frigate bucket alone is silent.
         _accrue_history(
@@ -604,9 +648,7 @@ class TestCorruptCalibrationRotated:
         add_squadron(mission_dir)
         add_task(mission_dir, task_type="auth_refactor")
         run("plan-approved", "--mission-dir", str(mission_dir))
-        record_admiralty_decision(
-            mission_dir, task_id=1, decision_type="modified"
-        )
+        record_admiralty_decision(mission_dir, task_id=1, decision_type="modified")
         _stand_down(mission_dir)
 
         # The store rebuilt clean with the new decision; the corrupt
@@ -631,15 +673,24 @@ class TestTaskTypeValidation:
         add_squadron(mission_dir)
         result = run(
             "task",
-            "--mission-dir", str(mission_dir),
-            "--id", "1",
-            "--name", "Bad task",
-            "--owner", "HMS Argyll",
-            "--deliverable", "x",
-            "--deps", "",
-            "--station-tier", "0",
-            "--files", "",
-            "--task-type", "foo::bar",
+            "--mission-dir",
+            str(mission_dir),
+            "--id",
+            "1",
+            "--name",
+            "Bad task",
+            "--owner",
+            "HMS Argyll",
+            "--deliverable",
+            "x",
+            "--deps",
+            "",
+            "--station-tier",
+            "0",
+            "--files",
+            "",
+            "--task-type",
+            "foo::bar",
             expect_fail=True,
         )
         assert "task_type" in result.stderr.lower()
@@ -650,15 +701,24 @@ class TestTaskTypeValidation:
         add_squadron(mission_dir)
         result = run(
             "task",
-            "--mission-dir", str(mission_dir),
-            "--id", "1",
-            "--name", "Bad task",
-            "--owner", "HMS Argyll",
-            "--deliverable", "x",
-            "--deps", "",
-            "--station-tier", "0",
-            "--files", "",
-            "--task-type", "foo\nbar",
+            "--mission-dir",
+            str(mission_dir),
+            "--id",
+            "1",
+            "--name",
+            "Bad task",
+            "--owner",
+            "HMS Argyll",
+            "--deliverable",
+            "x",
+            "--deps",
+            "",
+            "--station-tier",
+            "0",
+            "--files",
+            "",
+            "--task-type",
+            "foo\nbar",
             expect_fail=True,
         )
         assert "task_type" in result.stderr.lower()
@@ -669,15 +729,24 @@ class TestTaskTypeValidation:
         add_squadron(mission_dir)
         result = run(
             "task",
-            "--mission-dir", str(mission_dir),
-            "--id", "1",
-            "--name", "Bad task",
-            "--owner", "HMS Argyll",
-            "--deliverable", "x",
-            "--deps", "",
-            "--station-tier", "0",
-            "--files", "",
-            "--task-type", "foo\tbar",
+            "--mission-dir",
+            str(mission_dir),
+            "--id",
+            "1",
+            "--name",
+            "Bad task",
+            "--owner",
+            "HMS Argyll",
+            "--deliverable",
+            "x",
+            "--deps",
+            "",
+            "--station-tier",
+            "0",
+            "--files",
+            "",
+            "--task-type",
+            "foo\tbar",
             expect_fail=True,
         )
         assert "control character" in result.stderr.lower()
@@ -698,9 +767,12 @@ class TestRecordedByRequired:
         # Without --recorded-by, the command must fail.
         result = run(
             "admiralty-decision",
-            "--mission-dir", str(mission_dir),
-            "--task-id", "1",
-            "--decision-type", "approved",
+            "--mission-dir",
+            str(mission_dir),
+            "--task-id",
+            "1",
+            "--decision-type",
+            "approved",
             expect_fail=True,
         )
         assert "recorded-by" in result.stderr.lower()
@@ -713,10 +785,7 @@ class TestRecordedByRequired:
             recorded_by="HMS Victory",
         )
         log = read_json(mission_dir / "mission-log.json")
-        ev = next(
-            e for e in log["events"]
-            if e.get("type") == "admiralty_action_completed"
-        )
+        ev = next(e for e in log["events"] if e.get("type") == "admiralty_action_completed")
         assert ev["data"]["recorded_by"] == "HMS Victory"
         assert "session_marker_present" in ev["data"]
         # No marker exists in the tmp_path, so it must be False.
@@ -737,18 +806,19 @@ class TestMissingTaskTypeWarning:
 
         result = run(
             "admiralty-decision",
-            "--mission-dir", str(mission_dir),
-            "--task-id", "1",
-            "--decision-type", "modified",
-            "--recorded-by", "Admiral Test",
+            "--mission-dir",
+            str(mission_dir),
+            "--task-id",
+            "1",
+            "--decision-type",
+            "modified",
+            "--recorded-by",
+            "Admiral Test",
         )
         assert "will not feed calibration" in result.stderr
 
         # Event was still written, sans task_type.
         log = read_json(mission_dir / "mission-log.json")
-        ev = next(
-            e for e in log["events"]
-            if e.get("type") == "admiralty_action_completed"
-        )
+        ev = next(e for e in log["events"] if e.get("type") == "admiralty_action_completed")
         assert ev["data"]["decision_type"] == "modified"
         assert "task_type" not in ev["data"]

@@ -23,8 +23,16 @@ from conftest import (
     run,
 )
 
-from nelson_data_utils import _write_json
-
+# Subprocess body used by the _write_json crash-cleanup tests below.
+# Reads paths via the environment so the argv stays fully literal (no
+# fixture-derived interpolation into a `python -c` script).
+_WRITE_JSON_PROBE = (
+    "import os, sys;"
+    "sys.path.insert(0, os.environ['SCRIPT_DIR']);"
+    "from pathlib import Path;"
+    "from nelson_data_utils import _write_json;"
+    "_write_json(Path(os.environ['TARGET']), {'version': 2})"
+)
 
 # ---------------------------------------------------------------------------
 # C1: _write_json crash/cleanup — original file preserved, no .tmp leftovers
@@ -53,17 +61,15 @@ class TestWriteJsonCrashCleanup:
             # failure because _write_json cannot write the tmp file
             # inside the read-only directory.
             result = subprocess.run(
-                [
-                    sys.executable, "-c",
-                    (
-                        f"import sys; sys.path.insert(0, '{SCRIPT.parent}');"
-                        "from pathlib import Path;"
-                        "from nelson_data_utils import _write_json;"
-                        f"_write_json(Path('{locked_target}'), {{'version': 2}})"
-                    ),
-                ],
+                [sys.executable, "-c", _WRITE_JSON_PROBE],
+                env={
+                    **os.environ,
+                    "SCRIPT_DIR": str(SCRIPT.parent),
+                    "TARGET": str(locked_target),
+                },
                 capture_output=True,
                 text=True,
+                check=False,
             )
             assert result.returncode != 0, "Expected _write_json to fail"
 
@@ -87,17 +93,15 @@ class TestWriteJsonCrashCleanup:
         sub.chmod(stat.S_IRUSR | stat.S_IXUSR)
         try:
             result = subprocess.run(
-                [
-                    sys.executable, "-c",
-                    (
-                        f"import sys; sys.path.insert(0, '{SCRIPT.parent}');"
-                        "from pathlib import Path;"
-                        "from nelson_data_utils import _write_json;"
-                        f"_write_json(Path('{target}'), {{'v': 1}})"
-                    ),
-                ],
+                [sys.executable, "-c", _WRITE_JSON_PROBE],
+                env={
+                    **os.environ,
+                    "SCRIPT_DIR": str(SCRIPT.parent),
+                    "TARGET": str(target),
+                },
                 capture_output=True,
                 text=True,
+                check=False,
             )
             assert result.returncode != 0
         finally:
@@ -119,9 +123,12 @@ class TestReadJsonOptionalOSError:
         sd_path = mission_dir / "stand-down.json"
         sd_path.chmod(0o000)
         try:
-            result = run(
-                "index", "--missions-dir", str(missions_dir),
-                "--rebuild", cwd=tmp_path,
+            run(
+                "index",
+                "--missions-dir",
+                str(missions_dir),
+                "--rebuild",
+                cwd=tmp_path,
             )
             # The mission should be skipped (no crash), and we may see a warning
             # Either stderr has a warning OR the mission was simply skipped
@@ -147,11 +154,15 @@ class TestMemoryStore:
         run("plan-approved", "--mission-dir", str(mission_dir))
         run(
             "stand-down",
-            "--mission-dir", str(mission_dir),
+            "--mission-dir",
+            str(mission_dir),
             "--outcome-achieved",
-            "--actual-outcome", "Done",
-            "--metric-result", "Pass",
-            "--adopt", "Good pattern",
+            "--actual-outcome",
+            "Done",
+            "--metric-result",
+            "Pass",
+            "--adopt",
+            "Good pattern",
         )
         patterns_path = tmp_path / ".nelson" / "memory" / "patterns.json"
         assert patterns_path.exists()
@@ -175,11 +186,15 @@ class TestMemoryStore:
             run("plan-approved", "--mission-dir", str(mission_dir))
             run(
                 "stand-down",
-                "--mission-dir", str(mission_dir),
+                "--mission-dir",
+                str(mission_dir),
                 "--outcome-achieved",
-                "--actual-outcome", f"Mission {i}",
-                "--metric-result", "Pass",
-                "--adopt", f"Pattern {i}",
+                "--actual-outcome",
+                f"Mission {i}",
+                "--metric-result",
+                "Pass",
+                "--adopt",
+                f"Pattern {i}",
             )
         patterns_path = tmp_path / ".nelson" / "memory" / "patterns.json"
         data = read_json(patterns_path)
@@ -193,19 +208,28 @@ class TestMemoryStore:
         run("plan-approved", "--mission-dir", str(mission_dir))
         run(
             "event",
-            "--mission-dir", str(mission_dir),
-            "--type", "standing_order_violation",
-            "--order", "split-keel",
-            "--description", "File overlap",
-            "--severity", "medium",
-            "--corrective-action", "Reassigned",
+            "--mission-dir",
+            str(mission_dir),
+            "--type",
+            "standing_order_violation",
+            "--order",
+            "split-keel",
+            "--description",
+            "File overlap",
+            "--severity",
+            "medium",
+            "--corrective-action",
+            "Reassigned",
         )
         run(
             "stand-down",
-            "--mission-dir", str(mission_dir),
+            "--mission-dir",
+            str(mission_dir),
             "--outcome-achieved",
-            "--actual-outcome", "Done",
-            "--metric-result", "Pass",
+            "--actual-outcome",
+            "Done",
+            "--metric-result",
+            "Pass",
         )
         stats_path = tmp_path / ".nelson" / "memory" / "standing-order-stats.json"
         assert stats_path.exists()
@@ -229,10 +253,13 @@ class TestMemoryStore:
         try:
             result = run(
                 "stand-down",
-                "--mission-dir", str(mission_dir),
+                "--mission-dir",
+                str(mission_dir),
                 "--outcome-achieved",
-                "--actual-outcome", "Done",
-                "--metric-result", "Pass",
+                "--actual-outcome",
+                "Done",
+                "--metric-result",
+                "Pass",
             )
             # Stand-down should succeed despite memory store failure
             sd = read_json(mission_dir / "stand-down.json")
@@ -249,20 +276,30 @@ class TestMemoryStore:
         run("plan-approved", "--mission-dir", str(mission_dir))
         run(
             "event",
-            "--mission-dir", str(mission_dir),
-            "--type", "standing_order_violation",
-            "--order", "skeleton-crew",
-            "--description", "Too few agents",
-            "--severity", "low",
-            "--corrective-action", "Added crew",
+            "--mission-dir",
+            str(mission_dir),
+            "--type",
+            "standing_order_violation",
+            "--order",
+            "skeleton-crew",
+            "--description",
+            "Too few agents",
+            "--severity",
+            "low",
+            "--corrective-action",
+            "Added crew",
         )
         run(
             "stand-down",
-            "--mission-dir", str(mission_dir),
+            "--mission-dir",
+            str(mission_dir),
             "--outcome-achieved",
-            "--actual-outcome", "Done",
-            "--metric-result", "Pass",
-            "--avoid", "Under-crewing ships",
+            "--actual-outcome",
+            "Done",
+            "--metric-result",
+            "Pass",
+            "--avoid",
+            "Under-crewing ships",
         )
         patterns_path = tmp_path / ".nelson" / "memory" / "patterns.json"
         data = read_json(patterns_path)
@@ -280,11 +317,15 @@ class TestMemoryStore:
 
         sd_args = [
             "stand-down",
-            "--mission-dir", str(mission_dir),
+            "--mission-dir",
+            str(mission_dir),
             "--outcome-achieved",
-            "--actual-outcome", "Done",
-            "--metric-result", "Pass",
-            "--adopt", "Good pattern",
+            "--actual-outcome",
+            "Done",
+            "--metric-result",
+            "Pass",
+            "--adopt",
+            "Good pattern",
         ]
         run(*sd_args)
         run(*sd_args)  # second call — should be idempotent

@@ -38,7 +38,7 @@ A Claude Code skill that organises multi-agent work into structured naval operat
 ## Quick Start
 
 ```
-/plugin marketplace add aspegio/nelson
+/plugin marketplace add harrymunro/nelson
 /plugin install nelson@nelson-marketplace
 ```
 

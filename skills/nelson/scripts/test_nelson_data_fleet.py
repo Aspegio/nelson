@@ -15,7 +15,6 @@ from conftest import (
     run,
 )
 
-
 # ---------------------------------------------------------------------------
 # Index
 # ---------------------------------------------------------------------------
@@ -53,8 +52,11 @@ class TestIndex:
         run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
 
         result = run(
-            "index", "--missions-dir", self._missions_dir(tmp_path),
-            "--rebuild", cwd=tmp_path,
+            "index",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--rebuild",
+            cwd=tmp_path,
         )
         index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
         assert index["mission_count"] == 2
@@ -129,7 +131,7 @@ class TestIndex:
         corrupt_dir.mkdir(parents=True)
         (corrupt_dir / "stand-down.json").write_text("NOT VALID JSON{{{", encoding="utf-8")
 
-        result = run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
+        run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
         index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
         assert index["mission_count"] == 1
         # No .bak file — _read_json_optional doesn't rename
@@ -143,8 +145,11 @@ class TestIndex:
         bp_path.write_text("CORRUPT{{{", encoding="utf-8")
 
         result = run(
-            "index", "--missions-dir", self._missions_dir(tmp_path),
-            "--rebuild", cwd=tmp_path,
+            "index",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--rebuild",
+            cwd=tmp_path,
         )
         assert "corrupt JSON" in result.stderr
         index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
@@ -158,8 +163,11 @@ class TestIndex:
         bp_path.unlink()
 
         result = run(
-            "index", "--missions-dir", self._missions_dir(tmp_path),
-            "--rebuild", cwd=tmp_path,
+            "index",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--rebuild",
+            cwd=tmp_path,
         )
         assert "Warning" not in result.stderr
         index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
@@ -186,14 +194,19 @@ class TestIndex:
         assert index["version"] == 1
         assert index["mission_count"] == 3
         assert {m["mission_id"] for m in index["missions"]} == {
-            "2026-03-28_100000", "2026-03-29_100000", "2026-03-30_100000",
+            "2026-03-28_100000",
+            "2026-03-29_100000",
+            "2026-03-30_100000",
         }
 
     def test_accepts_mission_dir_singular(self, tmp_path: Path) -> None:
         """--mission-dir alias works for index."""
         create_completed_mission(tmp_path, mission_id="2026-03-28_100000")
-        result = run(
-            "index", "--mission-dir", self._missions_dir(tmp_path), cwd=tmp_path,
+        run(
+            "index",
+            "--mission-dir",
+            self._missions_dir(tmp_path),
+            cwd=tmp_path,
         )
         index = read_json(tmp_path / ".nelson" / "fleet-intelligence.json")
         assert index["mission_count"] == 1
@@ -236,8 +249,11 @@ class TestHistory:
     def test_json_output(self, tmp_path: Path) -> None:
         self._setup_indexed(tmp_path, count=2)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--json", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--json",
+            cwd=tmp_path,
         )
         data = json.loads(result.stdout)
         assert "analytics" in data
@@ -246,8 +262,11 @@ class TestHistory:
 
     def test_no_index_shows_message(self, tmp_path: Path) -> None:
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            cwd=tmp_path, expect_fail=True,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            cwd=tmp_path,
+            expect_fail=True,
         )
         assert "No fleet intelligence index" in result.stderr
 
@@ -264,8 +283,11 @@ class TestHistory:
         create_completed_mission(tmp_path, mission_id="2026-03-30_100000", outcome_achieved=False)
         run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--json", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--json",
+            cwd=tmp_path,
         )
         data = json.loads(result.stdout)
         assert data["analytics"]["win_rate"] == 66.7
@@ -278,8 +300,12 @@ class TestHistory:
             )
         run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--last", "2", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--last",
+            "2",
+            cwd=tmp_path,
         )
         # Extract dates from the recent missions section
         lines = result.stdout.split("\n")
@@ -315,8 +341,13 @@ class TestHistory:
         """--json --last 2 with 4 missions → 2 missions in JSON, analytics covers all 4."""
         self._setup_indexed(tmp_path, count=4)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--json", "--last", "2", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--json",
+            "--last",
+            "2",
+            cwd=tmp_path,
         )
         data = json.loads(result.stdout)
         assert len(data["missions"]) == 2
@@ -328,8 +359,12 @@ class TestHistory:
         """--last -1 → no crash, no recent missions shown."""
         self._setup_indexed(tmp_path, count=2)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--last", "-1", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--last",
+            "-1",
+            cwd=tmp_path,
         )
         # Should not crash
         assert result.returncode == 0
@@ -340,8 +375,12 @@ class TestHistory:
         """--last 0 → empty recent section."""
         self._setup_indexed(tmp_path, count=2)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--last", "0", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--last",
+            "0",
+            cwd=tmp_path,
         )
         assert "Recent missions" not in result.stdout
 
@@ -349,8 +388,12 @@ class TestHistory:
         """--last 999 with 2 missions shows all 2."""
         self._setup_indexed(tmp_path, count=2)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--last", "999", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--last",
+            "999",
+            cwd=tmp_path,
         )
         assert result.returncode == 0
         assert "2 missions indexed" in result.stdout
@@ -359,8 +402,13 @@ class TestHistory:
         """--json --last 0 returns empty missions list."""
         self._setup_indexed(tmp_path, count=2)
         result = run(
-            "history", "--missions-dir", self._missions_dir(tmp_path),
-            "--json", "--last", "0", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--json",
+            "--last",
+            "0",
+            cwd=tmp_path,
         )
         data = json.loads(result.stdout)
         assert data["missions"] == []
@@ -370,7 +418,9 @@ class TestHistory:
         """--mission-dir alias works for history."""
         self._setup_indexed(tmp_path, count=2)
         result = run(
-            "history", "--mission-dir", self._missions_dir(tmp_path),
+            "history",
+            "--mission-dir",
+            self._missions_dir(tmp_path),
             cwd=tmp_path,
         )
         assert "Fleet Intelligence" in result.stdout
@@ -388,7 +438,8 @@ class TestAnalyticsNoneFiltering:
     def test_missing_duration_and_budget_yield_none(self, tmp_path: Path) -> None:
         """Missions with no duration_minutes or budget should produce None analytics."""
         mission_dir = create_completed_mission(
-            tmp_path, mission_id="2026-04-01_100000",
+            tmp_path,
+            mission_id="2026-04-01_100000",
         )
         # Strip duration_minutes and budget from stand-down.json
         sd_path = mission_dir / "stand-down.json"
@@ -400,8 +451,11 @@ class TestAnalyticsNoneFiltering:
         missions_dir = self._missions_dir(tmp_path)
         run("index", "--missions-dir", missions_dir, cwd=tmp_path)
         result = run(
-            "history", "--missions-dir", missions_dir,
-            "--json", cwd=tmp_path,
+            "history",
+            "--missions-dir",
+            missions_dir,
+            "--json",
+            cwd=tmp_path,
         )
         data = json.loads(result.stdout)
         analytics = data["analytics"]
@@ -432,8 +486,11 @@ class TestHistoryCorruptIndex:
         index_path.write_text("NOT VALID JSON{{{", encoding="utf-8")
 
         result = run(
-            "history", "--missions-dir", missions_dir,
-            cwd=tmp_path, expect_fail=True,
+            "history",
+            "--missions-dir",
+            missions_dir,
+            cwd=tmp_path,
+            expect_fail=True,
         )
         assert "corrupt" in result.stderr.lower() or "json" in result.stderr.lower() or "error" in result.stderr.lower()
 
@@ -448,14 +505,17 @@ class TestBrief:
         return str(tmp_path / ".nelson" / "missions")
 
     def _setup_missions(
-        self, tmp_path: Path, count: int = 2, adopt: list[str] | None = None,
+        self,
+        tmp_path: Path,
+        count: int = 2,
+        adopt: list[str] | None = None,
     ) -> None:
         """Create, index, and populate memory for *count* missions."""
         from conftest import add_squadron, add_task, init_mission
 
         for i in range(count):
             adopt_args: list[str] = []
-            for a in (adopt or []):
+            for a in adopt or []:
                 adopt_args.extend(["--adopt", a])
             mission_dir = init_mission(tmp_path)
             add_squadron(mission_dir)
@@ -463,20 +523,42 @@ class TestBrief:
             run("plan-approved", "--mission-dir", str(mission_dir))
             run(
                 "checkpoint",
-                "--mission-dir", str(mission_dir),
-                "--pending", "0", "--in-progress", "0", "--completed", "1",
-                "--blocked", "0",
-                "--tokens-spent", "50000", "--tokens-remaining", "50000",
-                "--hull-green", "1", "--hull-amber", "0",
-                "--hull-red", "0", "--hull-critical", "0",
-                "--decision", "continue", "--rationale", "OK",
+                "--mission-dir",
+                str(mission_dir),
+                "--pending",
+                "0",
+                "--in-progress",
+                "0",
+                "--completed",
+                "1",
+                "--blocked",
+                "0",
+                "--tokens-spent",
+                "50000",
+                "--tokens-remaining",
+                "50000",
+                "--hull-green",
+                "1",
+                "--hull-amber",
+                "0",
+                "--hull-red",
+                "0",
+                "--hull-critical",
+                "0",
+                "--decision",
+                "continue",
+                "--rationale",
+                "OK",
             )
             run(
                 "stand-down",
-                "--mission-dir", str(mission_dir),
+                "--mission-dir",
+                str(mission_dir),
                 "--outcome-achieved",
-                "--actual-outcome", f"Mission {i} done",
-                "--metric-result", "Pass",
+                "--actual-outcome",
+                f"Mission {i} done",
+                "--metric-result",
+                "Pass",
                 *adopt_args,
             )
         run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
@@ -492,7 +574,10 @@ class TestBrief:
         """Brief with indexed missions shows win rate."""
         self._setup_missions(tmp_path, count=3, adopt=["Use TDD"])
         result = run(
-            "brief", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path,
+            "brief",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            cwd=tmp_path,
         )
         assert "Intelligence Brief" in result.stdout
         assert "win rate" in result.stdout
@@ -502,8 +587,11 @@ class TestBrief:
         """--json outputs valid JSON with expected keys."""
         self._setup_missions(tmp_path, count=2, adopt=["Good pattern"])
         result = run(
-            "brief", "--missions-dir", self._missions_dir(tmp_path),
-            "--json", cwd=tmp_path,
+            "brief",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--json",
+            cwd=tmp_path,
         )
         data = json.loads(result.stdout)
         assert "total_missions" in data
@@ -517,35 +605,58 @@ class TestBrief:
         from conftest import add_squadron, add_task, init_mission
 
         # Create a mission with a specific outcome
-        mission_dir = init_mission(
-            tmp_path, **{"--outcome": "Refactor auth module to use JWT tokens"}
-        )
+        mission_dir = init_mission(tmp_path, **{"--outcome": "Refactor auth module to use JWT tokens"})
         add_squadron(mission_dir)
         add_task(mission_dir)
         run("plan-approved", "--mission-dir", str(mission_dir))
         run(
             "checkpoint",
-            "--mission-dir", str(mission_dir),
-            "--pending", "0", "--in-progress", "0", "--completed", "1",
-            "--blocked", "0",
-            "--tokens-spent", "50000", "--tokens-remaining", "50000",
-            "--hull-green", "1", "--hull-amber", "0",
-            "--hull-red", "0", "--hull-critical", "0",
-            "--decision", "continue", "--rationale", "OK",
+            "--mission-dir",
+            str(mission_dir),
+            "--pending",
+            "0",
+            "--in-progress",
+            "0",
+            "--completed",
+            "1",
+            "--blocked",
+            "0",
+            "--tokens-spent",
+            "50000",
+            "--tokens-remaining",
+            "50000",
+            "--hull-green",
+            "1",
+            "--hull-amber",
+            "0",
+            "--hull-red",
+            "0",
+            "--hull-critical",
+            "0",
+            "--decision",
+            "continue",
+            "--rationale",
+            "OK",
         )
         run(
             "stand-down",
-            "--mission-dir", str(mission_dir),
+            "--mission-dir",
+            str(mission_dir),
             "--outcome-achieved",
-            "--actual-outcome", "Auth module refactored with JWT",
-            "--metric-result", "All tests pass",
-            "--adopt", "JWT rotation tested separately",
+            "--actual-outcome",
+            "Auth module refactored with JWT",
+            "--metric-result",
+            "All tests pass",
+            "--adopt",
+            "JWT rotation tested separately",
         )
         run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
         result = run(
             "brief",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--context", "auth module refactor",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--context",
+            "auth module refactor",
             cwd=tmp_path,
         )
         assert "Relevant precedents" in result.stdout
@@ -575,8 +686,10 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=3)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "success-rate",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "success-rate",
             cwd=tmp_path,
         )
         assert "Success Rate" in result.stdout
@@ -586,8 +699,10 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=2)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "standing-orders",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "standing-orders",
             cwd=tmp_path,
         )
         assert "Standing Orders" in result.stdout
@@ -596,8 +711,10 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=2)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "efficiency",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "efficiency",
             cwd=tmp_path,
         )
         assert "Efficiency" in result.stdout
@@ -606,8 +723,10 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=2)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "all",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "all",
             cwd=tmp_path,
         )
         assert "Success Rate" in result.stdout
@@ -618,8 +737,10 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=2)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "success-rate",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "success-rate",
             "--json",
             cwd=tmp_path,
         )
@@ -632,8 +753,10 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=2)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "all",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "all",
             "--json",
             cwd=tmp_path,
         )
@@ -647,10 +770,13 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=4)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "success-rate",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "success-rate",
             "--json",
-            "--last", "2",
+            "--last",
+            "2",
             cwd=tmp_path,
         )
         data = json.loads(result.stdout)
@@ -679,8 +805,10 @@ class TestAnalyticsCommand:
 
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "estimate-outcomes",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "estimate-outcomes",
             "--json",
             cwd=tmp_path,
         )
@@ -718,8 +846,10 @@ class TestAnalyticsCommand:
         run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "estimate-outcomes",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "estimate-outcomes",
             cwd=tmp_path,
         )
         assert "Estimate outcomes" in result.stdout
@@ -733,8 +863,10 @@ class TestAnalyticsCommand:
         self._setup_indexed(tmp_path, count=2)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "estimate-outcomes",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "estimate-outcomes",
             "--json",
             cwd=tmp_path,
         )
@@ -755,8 +887,10 @@ class TestAnalyticsCommand:
         run("index", "--missions-dir", self._missions_dir(tmp_path), cwd=tmp_path)
         result = run(
             "analytics",
-            "--missions-dir", self._missions_dir(tmp_path),
-            "--metric", "all",
+            "--missions-dir",
+            self._missions_dir(tmp_path),
+            "--metric",
+            "all",
             "--json",
             cwd=tmp_path,
         )
@@ -770,8 +904,10 @@ class TestAnalyticsCommand:
         missions_dir.mkdir(parents=True)
         result = run(
             "analytics",
-            "--missions-dir", str(missions_dir),
-            "--metric", "success-rate",
+            "--missions-dir",
+            str(missions_dir),
+            "--metric",
+            "success-rate",
             cwd=tmp_path,
             expect_fail=True,
         )

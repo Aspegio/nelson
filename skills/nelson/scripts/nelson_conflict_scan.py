@@ -18,10 +18,10 @@ Known limitations of the regex-based import parser:
 For production use, consider AST-based parsers or tools like madge/pydeps.
 """
 
-import sys
-import re
-import json
 import argparse
+import json
+import re
+import sys
 from pathlib import Path
 
 # Common Python stdlib modules that should never be treated as local dependencies
@@ -109,7 +109,7 @@ PYTHON_STDLIB = frozenset(
 )
 
 
-def parse_battle_plan(path: Path) -> dict:
+def parse_battle_plan(path: Path) -> dict:  # noqa: C901, PLR0912 -- ad-hoc markdown parser; refactor tracked in nelson-e6j
     """Parse battle-plan.md or battle-plan.json to extract file ownership per captain."""
     if not path.exists():
         raise FileNotFoundError(f"Battle plan not found at {path}")
@@ -135,12 +135,10 @@ def parse_battle_plan(path: Path) -> dict:
 
     # We look for lines like "- Ship (if crewed): HMS Victory"
     # and "- File ownership (if code): src/main.py, src/utils.py"
-    for line in content.splitlines():
-        line = line.strip()
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
 
-        ship_match = re.match(
-            r"^-\s*Ship(?:\s*\(if crewed\))?:\s*(.+)$", line, re.IGNORECASE
-        )
+        ship_match = re.match(r"^-\s*Ship(?:\s*\(if crewed\))?:\s*(.+)$", line, re.IGNORECASE)
         if ship_match:
             ship_name = ship_match.group(1).strip()
             # Handle placeholder "[assigned at Step 3 — Formation]"
@@ -148,9 +146,7 @@ def parse_battle_plan(path: Path) -> dict:
                 current_ship = ship_name
             continue
 
-        file_match = re.match(
-            r"^-\s*File ownership(?:\s*\(if code\))?:\s*(.+)$", line, re.IGNORECASE
-        )
+        file_match = re.match(r"^-\s*File ownership(?:\s*\(if code\))?:\s*(.+)$", line, re.IGNORECASE)
         if file_match and current_ship:
             files_str = file_match.group(1).strip()
             # Ignore placeholder
@@ -180,11 +176,9 @@ def parse_imports(filepath: Path) -> set[str]:
     if filepath.suffix == ".py":
         # import foo
         # from foo import bar
-        for line in content.splitlines():
-            line = line.strip()
-            match = re.match(
-                r"^(?:from\s+([a-zA-Z0-9_\.]+)\s+)?import\s+([a-zA-Z0-9_\.,\s]+)", line
-            )
+        for raw_line in content.splitlines():
+            line = raw_line.strip()
+            match = re.match(r"^(?:from\s+([a-zA-Z0-9_\.]+)\s+)?import\s+([a-zA-Z0-9_\.,\s]+)", line)
             if match:
                 module = match.group(1) or match.group(2).split(",")[0].strip()
                 # Skip empty strings (e.g. from relative imports like "from . import x")
@@ -223,7 +217,7 @@ def build_dependency_graph(files: set[str], project_root: Path) -> dict[str, set
     return graph
 
 
-def detect_conflicts(
+def detect_conflicts(  # noqa: C901, PLR0912 -- conflict-detection graph walk; refactor tracked in nelson-e6j
     ownership: dict[str, set[str]], graph: dict[str, set[str]]
 ) -> list[tuple[str, ...]]:
     """Detect if files owned by different captains import each other.
@@ -264,22 +258,14 @@ def detect_conflicts(
                 if imp in PYTHON_STDLIB:
                     continue
                 imp_path = imp.replace(".", "/")
-                if (
-                    imp == other_stem
-                    or imp == other_no_ext
-                    or imp == other_full
-                    or imp_path == other_no_ext
-                    or imp_path == other_full
-                ):
+                if imp_path in (other_no_ext, other_full) or imp in (other_stem, other_no_ext, other_full):
                     conflicts.append((owner, file, other_owner, other_file))
 
     return conflicts
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Pre-flight conflict scan for Nelson battle plans."
-    )
+    parser = argparse.ArgumentParser(description="Pre-flight conflict scan for Nelson battle plans.")
     parser.add_argument("--plan", required=True, help="Path to battle-plan.md")
     parser.add_argument("--root", default=".", help="Project root directory")
     args = parser.parse_args()
@@ -317,9 +303,7 @@ def main():
                 # Duplicate ownership — two captains claim the same file
                 print(f"  {c[0]} and {c[2]} both claim ownership of {c[1]}.")
             else:
-                print(
-                    f"  Captain {c[0]} owns {c[1]} which appears to import {c[3]} owned by Captain {c[2]}."
-                )
+                print(f"  Captain {c[0]} owns {c[1]} which appears to import {c[3]} owned by Captain {c[2]}.")
         print("\nRemedy: Re-assign files to eliminate cross-captain dependencies.")
         # Exit 0 — the scan is best-effort; use exit code for parse errors only
         sys.exit(0)

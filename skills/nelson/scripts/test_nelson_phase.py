@@ -11,8 +11,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 PHASE_SCRIPT = Path(__file__).parent / "nelson-phase.py"
 DATA_SCRIPT = Path(__file__).parent / "nelson-data.py"
 
@@ -33,6 +31,7 @@ def run_phase(
         capture_output=True,
         text=True,
         cwd=cwd,
+        check=False,
     )
     if expect_fail:
         assert result.returncode != 0, (
@@ -56,6 +55,7 @@ def run_data(
         capture_output=True,
         text=True,
         cwd=cwd,
+        check=False,
     )
     if expect_fail:
         assert result.returncode != 0, (
@@ -72,10 +72,14 @@ def init_mission(cwd: Path) -> Path:
     """Create a mission via nelson-data.py init and return its absolute path."""
     result = run_data(
         "init",
-        "--outcome", "Test mission",
-        "--metric", "All tests pass",
-        "--deadline", "this_session",
-        "--token-budget", "100000",
+        "--outcome",
+        "Test mission",
+        "--metric",
+        "All tests pass",
+        "--deadline",
+        "this_session",
+        "--token-budget",
+        "100000",
         cwd=cwd,
     )
     mission_dir = cwd / result.stdout.strip()
@@ -98,14 +102,22 @@ def add_task(cwd: Path, mission_dir: Path, task_id: int = 1, station_tier: int =
     """Add a task to the battle plan."""
     run_data(
         "task",
-        "--mission-dir", str(mission_dir),
-        "--id", str(task_id),
-        "--name", f"Task {task_id}",
-        "--owner", "HMS Argyll",
-        "--deliverable", f"Deliverable for task {task_id}",
-        "--deps", "",
-        "--station-tier", str(station_tier),
-        "--files", "src/**",
+        "--mission-dir",
+        str(mission_dir),
+        "--id",
+        str(task_id),
+        "--name",
+        f"Task {task_id}",
+        "--owner",
+        "HMS Argyll",
+        "--deliverable",
+        f"Deliverable for task {task_id}",
+        "--deps",
+        "",
+        "--station-tier",
+        str(station_tier),
+        "--files",
+        "src/**",
         cwd=cwd,
     )
 
@@ -132,11 +144,16 @@ def form_squadron(cwd: Path, mission_dir: Path) -> None:
     """Record squadron formation."""
     run_data(
         "squadron",
-        "--mission-dir", str(mission_dir),
-        "--admiral", "HMS Victory",
-        "--admiral-model", "opus",
-        "--captain", "HMS Argyll:frigate:sonnet:1",
-        "--mode", "subagents",
+        "--mission-dir",
+        str(mission_dir),
+        "--admiral",
+        "HMS Victory",
+        "--admiral-model",
+        "opus",
+        "--captain",
+        "HMS Argyll:frigate:sonnet:1",
+        "--mode",
+        "subagents",
         cwd=cwd,
     )
 
@@ -145,14 +162,13 @@ def log_permission(mission_dir: Path) -> None:
     """Add a permission_granted event to mission-log.json."""
     log_path = mission_dir / "mission-log.json"
     log = read_json(log_path)
-    new_events = list(log.get("events", [])) + [
-        {
-            "type": "permission_granted",
-            "checkpoint": 0,
-            "timestamp": "2026-04-09T12:00:00Z",
-            "data": {},
-        }
-    ]
+    permission_event = {
+        "type": "permission_granted",
+        "checkpoint": 0,
+        "timestamp": "2026-04-09T12:00:00Z",
+        "data": {},
+    }
+    new_events = [*list(log.get("events", [])), permission_event]
     write_json(log_path, {**log, "events": new_events})
 
 
@@ -160,20 +176,19 @@ def log_task_completed(mission_dir: Path, task_id: int = 1) -> None:
     """Add a task_completed event to mission-log.json."""
     log_path = mission_dir / "mission-log.json"
     log = read_json(log_path)
-    new_events = list(log.get("events", [])) + [
-        {
-            "type": "task_completed",
-            "checkpoint": 1,
-            "timestamp": "2026-04-09T13:00:00Z",
-            "data": {
-                "task_id": task_id,
-                "task_name": f"Task {task_id}",
-                "owner": "HMS Argyll",
-                "station_tier": 1,
-                "verification": "passed",
-            },
-        }
-    ]
+    task_event = {
+        "type": "task_completed",
+        "checkpoint": 1,
+        "timestamp": "2026-04-09T13:00:00Z",
+        "data": {
+            "task_id": task_id,
+            "task_name": f"Task {task_id}",
+            "owner": "HMS Argyll",
+            "station_tier": 1,
+            "verification": "passed",
+        },
+    }
+    new_events = [*list(log.get("events", [])), task_event]
     write_json(log_path, {**log, "events": new_events})
 
 
@@ -188,7 +203,9 @@ class TestCurrent:
     def test_nonexistent_mission_dir_fails(self, tmp_path: Path) -> None:
         """When --mission-dir points to a nonexistent directory, current fails."""
         result = run_phase(
-            "current", "--mission-dir", str(tmp_path / "nonexistent"),
+            "current",
+            "--mission-dir",
+            str(tmp_path / "nonexistent"),
             expect_fail=True,
         )
         assert "does not exist" in result.stderr
@@ -217,10 +234,13 @@ class TestCurrent:
         """fleet-status.json without phase field is a silent no-op."""
         mission_dir = tmp_path / "old-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"status": "underway"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"status": "underway"},
+            },
+        )
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == ""
 
@@ -247,10 +267,13 @@ class TestAdvance:
         """Cannot advance from SAILING_ORDERS if sailing-orders.json is missing."""
         mission_dir = tmp_path / "bare-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "SAILING_ORDERS"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "SAILING_ORDERS"},
+            },
+        )
         result = run_phase("advance", "--mission-dir", str(mission_dir), expect_fail=True)
         assert "sailing-orders.json" in result.stderr
 
@@ -271,10 +294,13 @@ class TestAdvance:
         mission_dir = init_mission(tmp_path)
         # Set phase to BATTLE_PLAN without any tasks
         fs = read_json(mission_dir / "fleet-status.json")
-        write_json(mission_dir / "fleet-status.json", {
-            **fs,
-            "mission": {**fs["mission"], "phase": "BATTLE_PLAN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                **fs,
+                "mission": {**fs["mission"], "phase": "BATTLE_PLAN"},
+            },
+        )
         result = run_phase("advance", "--mission-dir", str(mission_dir), expect_fail=True)
         assert "battle-plan.json" in result.stderr
 
@@ -282,15 +308,21 @@ class TestAdvance:
         """Cannot advance from BATTLE_PLAN when tasks lack station_tier."""
         mission_dir = init_mission(tmp_path)
         # Write battle-plan with a task missing station_tier
-        write_json(mission_dir / "battle-plan.json", {
-            "version": 1,
-            "tasks": [{"id": 1, "name": "Test"}],
-        })
+        write_json(
+            mission_dir / "battle-plan.json",
+            {
+                "version": 1,
+                "tasks": [{"id": 1, "name": "Test"}],
+            },
+        )
         fs = read_json(mission_dir / "fleet-status.json")
-        write_json(mission_dir / "fleet-status.json", {
-            **fs,
-            "mission": {**fs["mission"], "phase": "BATTLE_PLAN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                **fs,
+                "mission": {**fs["mission"], "phase": "BATTLE_PLAN"},
+            },
+        )
         result = run_phase("advance", "--mission-dir", str(mission_dir), expect_fail=True)
         assert "station_tier" in result.stderr
 
@@ -316,10 +348,13 @@ class TestAdvance:
         # plan-approved sets BATTLE_PLAN, no squadron yet
         # Force phase to FORMATION
         fs = read_json(mission_dir / "fleet-status.json")
-        write_json(mission_dir / "fleet-status.json", {
-            **fs,
-            "mission": {**fs["mission"], "phase": "FORMATION"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                **fs,
+                "mission": {**fs["mission"], "phase": "FORMATION"},
+            },
+        )
         result = run_phase("advance", "--mission-dir", str(mission_dir), expect_fail=True)
         assert "squadron" in result.stderr
 
@@ -393,10 +428,13 @@ class TestAdvance:
         """Cannot advance past STAND_DOWN (terminal state)."""
         mission_dir = tmp_path / "terminal-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "STAND_DOWN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "STAND_DOWN"},
+            },
+        )
         result = run_phase("advance", "--mission-dir", str(mission_dir), expect_fail=True)
         assert "terminal phase" in result.stderr
 
@@ -436,8 +474,11 @@ class TestValidateTool:
         """Agent is blocked during SAILING_ORDERS phase."""
         mission_dir = init_mission(tmp_path)
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -447,8 +488,11 @@ class TestValidateTool:
         """TeamCreate is blocked during SAILING_ORDERS phase."""
         mission_dir = init_mission(tmp_path)
         result = run_phase(
-            "validate-tool", "--tool", "TeamCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TeamCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -457,8 +501,11 @@ class TestValidateTool:
         """TaskCreate is blocked during SAILING_ORDERS phase."""
         mission_dir = init_mission(tmp_path)
         result = run_phase(
-            "validate-tool", "--tool", "TaskCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TaskCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -467,8 +514,11 @@ class TestValidateTool:
         """Bash is allowed during SAILING_ORDERS phase."""
         mission_dir = init_mission(tmp_path)
         result = run_phase(
-            "validate-tool", "--tool", "Bash",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Bash",
+            "--mission-dir",
+            str(mission_dir),
         )
         assert result.returncode == 0
 
@@ -476,8 +526,11 @@ class TestValidateTool:
         """Read is allowed during SAILING_ORDERS phase."""
         mission_dir = init_mission(tmp_path)
         result = run_phase(
-            "validate-tool", "--tool", "Read",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Read",
+            "--mission-dir",
+            str(mission_dir),
         )
         assert result.returncode == 0
 
@@ -485,14 +538,20 @@ class TestValidateTool:
         """All tools are allowed during UNDERWAY phase."""
         mission_dir = tmp_path / "underway-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "UNDERWAY"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "UNDERWAY"},
+            },
+        )
         for tool in ["Agent", "TeamCreate", "TaskCreate", "Bash", "Read", "Write"]:
             result = run_phase(
-                "validate-tool", "--tool", tool,
-                "--mission-dir", str(mission_dir),
+                "validate-tool",
+                "--tool",
+                tool,
+                "--mission-dir",
+                str(mission_dir),
             )
             assert result.returncode == 0, f"{tool} should be allowed in UNDERWAY"
 
@@ -500,13 +559,19 @@ class TestValidateTool:
         """TeamCreate is blocked during STAND_DOWN phase."""
         mission_dir = tmp_path / "standdown-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "STAND_DOWN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "STAND_DOWN"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "TeamCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TeamCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -515,13 +580,19 @@ class TestValidateTool:
         """Agent is allowed during STAND_DOWN phase (for cleanup)."""
         mission_dir = tmp_path / "standdown-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "STAND_DOWN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "STAND_DOWN"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
         )
         assert result.returncode == 0
 
@@ -529,13 +600,19 @@ class TestValidateTool:
         """Agent is blocked during FORMATION phase."""
         mission_dir = tmp_path / "formation-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "FORMATION"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "FORMATION"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -544,13 +621,19 @@ class TestValidateTool:
         """TaskCreate is allowed during FORMATION phase (for creating tasks)."""
         mission_dir = tmp_path / "formation-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "FORMATION"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "FORMATION"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "TaskCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TaskCreate",
+            "--mission-dir",
+            str(mission_dir),
         )
         assert result.returncode == 0
 
@@ -558,13 +641,19 @@ class TestValidateTool:
         """Agent is blocked during BATTLE_PLAN phase."""
         mission_dir = tmp_path / "battleplan-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "BATTLE_PLAN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "BATTLE_PLAN"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -573,13 +662,19 @@ class TestValidateTool:
         """TeamCreate is blocked during BATTLE_PLAN phase."""
         mission_dir = tmp_path / "battleplan-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "BATTLE_PLAN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "BATTLE_PLAN"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "TeamCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TeamCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -588,13 +683,19 @@ class TestValidateTool:
         """TaskCreate is blocked during BATTLE_PLAN phase."""
         mission_dir = tmp_path / "battleplan-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "BATTLE_PLAN"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "BATTLE_PLAN"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "TaskCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TaskCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -603,13 +704,19 @@ class TestValidateTool:
         """Agent is blocked during PERMISSION phase."""
         mission_dir = tmp_path / "permission-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "PERMISSION"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "PERMISSION"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -618,13 +725,19 @@ class TestValidateTool:
         """TeamCreate is blocked during PERMISSION phase."""
         mission_dir = tmp_path / "permission-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "PERMISSION"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "PERMISSION"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "TeamCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TeamCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -633,13 +746,19 @@ class TestValidateTool:
         """TaskCreate is blocked during PERMISSION phase."""
         mission_dir = tmp_path / "permission-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"phase": "PERMISSION"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"phase": "PERMISSION"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "TaskCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TaskCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -648,13 +767,19 @@ class TestValidateTool:
         """fleet-status.json without phase field allows all tools (backward compat)."""
         mission_dir = tmp_path / "old-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"status": "underway"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"status": "underway"},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
         )
         assert result.returncode == 0
 
@@ -685,7 +810,11 @@ class TestSet:
         """Set rejects invalid phase names."""
         mission_dir = init_mission(tmp_path)
         result = run_phase(
-            "set", "--mission-dir", str(mission_dir), "--phase", "INVALID",
+            "set",
+            "--mission-dir",
+            str(mission_dir),
+            "--phase",
+            "INVALID",
             expect_fail=True,
         )
         assert "invalid phase" in result.stderr
@@ -729,13 +858,19 @@ class TestBackwardCompatibility:
         """Old fleet-status.json without phase allows all tools."""
         mission_dir = tmp_path / "old-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"status": "underway", "checkpoint_number": 3},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"status": "underway", "checkpoint_number": 3},
+            },
+        )
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
         )
         assert result.returncode == 0
 
@@ -743,10 +878,13 @@ class TestBackwardCompatibility:
         """Old fleet-status.json without phase: current is silent no-op."""
         mission_dir = tmp_path / "old-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"status": "underway"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"status": "underway"},
+            },
+        )
         result = run_phase("current", "--mission-dir", str(mission_dir))
         assert result.stdout.strip() == ""
 
@@ -754,10 +892,13 @@ class TestBackwardCompatibility:
         """Set works on fleet-status.json that had no phase field."""
         mission_dir = tmp_path / "old-mission"
         mission_dir.mkdir(parents=True)
-        write_json(mission_dir / "fleet-status.json", {
-            "version": 1,
-            "mission": {"status": "underway"},
-        })
+        write_json(
+            mission_dir / "fleet-status.json",
+            {
+                "version": 1,
+                "mission": {"status": "underway"},
+            },
+        )
         run_phase("set", "--mission-dir", str(mission_dir), "--phase", "UNDERWAY")
         fs = read_json(mission_dir / "fleet-status.json")
         assert fs["mission"]["phase"] == "UNDERWAY"
@@ -813,22 +954,33 @@ class TestPhasePreservation:
         # Log task events and stand down
         run_data(
             "event",
-            "--mission-dir", str(mission_dir),
-            "--type", "task_completed",
-            "--checkpoint", "1",
-            "--task-id", "1",
-            "--task-name", "Task 1",
-            "--owner", "HMS Argyll",
-            "--station-tier", "1",
-            "--verification", "passed",
+            "--mission-dir",
+            str(mission_dir),
+            "--type",
+            "task_completed",
+            "--checkpoint",
+            "1",
+            "--task-id",
+            "1",
+            "--task-name",
+            "Task 1",
+            "--owner",
+            "HMS Argyll",
+            "--station-tier",
+            "1",
+            "--verification",
+            "passed",
             cwd=tmp_path,
         )
         run_data(
             "stand-down",
-            "--mission-dir", str(mission_dir),
+            "--mission-dir",
+            str(mission_dir),
             "--outcome-achieved",
-            "--actual-outcome", "Test complete",
-            "--metric-result", "All pass",
+            "--actual-outcome",
+            "Test complete",
+            "--metric-result",
+            "All pass",
             cwd=tmp_path,
         )
 
@@ -849,19 +1001,32 @@ class TestPhasePreservation:
         # Write a checkpoint
         run_data(
             "checkpoint",
-            "--mission-dir", str(mission_dir),
-            "--pending", "0",
-            "--in-progress", "1",
-            "--completed", "0",
-            "--blocked", "0",
-            "--tokens-spent", "50000",
-            "--tokens-remaining", "50000",
-            "--hull-green", "1",
-            "--hull-amber", "0",
-            "--hull-red", "0",
-            "--hull-critical", "0",
-            "--decision", "continue",
-            "--rationale", "On track",
+            "--mission-dir",
+            str(mission_dir),
+            "--pending",
+            "0",
+            "--in-progress",
+            "1",
+            "--completed",
+            "0",
+            "--blocked",
+            "0",
+            "--tokens-spent",
+            "50000",
+            "--tokens-remaining",
+            "50000",
+            "--hull-green",
+            "1",
+            "--hull-amber",
+            "0",
+            "--hull-red",
+            "0",
+            "--hull-critical",
+            "0",
+            "--decision",
+            "continue",
+            "--rationale",
+            "On track",
             cwd=tmp_path,
         )
 
@@ -981,7 +1146,7 @@ class TestFullLifecycle:
             ("PERMISSION", "UNDERWAY"),
             ("UNDERWAY", "STAND_DOWN"),
         ]
-        for transition, (from_phase, to_phase) in zip(transitions, expected_transitions):
+        for transition, (from_phase, to_phase) in zip(transitions, expected_transitions, strict=True):
             assert transition["data"]["from_phase"] == from_phase
             assert transition["data"]["to_phase"] == to_phase
 
@@ -1014,11 +1179,14 @@ class TestEstimatePhase:
         # Set opt-out flag directly on sailing-orders.json
         so_path = mission_dir / "sailing-orders.json"
         so = read_json(so_path)
-        write_json(so_path, {
-            **so,
-            "estimate_skipped": True,
-            "estimate_skip_reason": "trivial scope",
-        })
+        write_json(
+            so_path,
+            {
+                **so,
+                "estimate_skipped": True,
+                "estimate_skip_reason": "trivial scope",
+            },
+        )
 
         result = run_phase("advance", "--mission-dir", str(mission_dir))
         assert "ESTIMATE -> BATTLE_PLAN" in result.stdout
@@ -1044,8 +1212,11 @@ class TestEstimatePhase:
         run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
 
         result = run_phase(
-            "validate-tool", "--tool", "Agent",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "Agent",
+            "--mission-dir",
+            str(mission_dir),
         )
         assert result.returncode == 0
 
@@ -1055,8 +1226,11 @@ class TestEstimatePhase:
         run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
 
         result = run_phase(
-            "validate-tool", "--tool", "TeamCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TeamCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -1068,8 +1242,11 @@ class TestEstimatePhase:
         run_phase("advance", "--mission-dir", str(mission_dir))  # SAILING_ORDERS -> ESTIMATE
 
         result = run_phase(
-            "validate-tool", "--tool", "TaskCreate",
-            "--mission-dir", str(mission_dir),
+            "validate-tool",
+            "--tool",
+            "TaskCreate",
+            "--mission-dir",
+            str(mission_dir),
             expect_fail=True,
         )
         assert "BLOCKED" in result.stdout
@@ -1105,7 +1282,7 @@ class TestSkillMdEstimateStep:
         ]
         positions = [text.find(h) for h in expected_headings]
         assert all(p >= 0 for p in positions), (
-            f"Missing headings: {[h for h, p in zip(expected_headings, positions) if p < 0]}"
+            f"Missing headings: {[h for h, p in zip(expected_headings, positions, strict=True) if p < 0]}"
         )
         assert positions == sorted(positions), "Step headings are out of order"
 
@@ -1184,9 +1361,7 @@ def _full_estimate_body() -> str:
 class TestEstimateE2E:
     """End-to-end tests for the full Estimate flow (T9 happy path, T10 opt-out)."""
 
-    def test_happy_path_estimate_with_outcomes_and_analytics(
-        self, tmp_path: Path
-    ) -> None:
+    def test_happy_path_estimate_with_outcomes_and_analytics(self, tmp_path: Path) -> None:
         """Full flow: init -> estimate -> tasks -> outcomes -> stand-down -> analytics."""
         # 1. Init -> SAILING_ORDERS
         mission_dir = init_mission(tmp_path)
@@ -1196,9 +1371,7 @@ class TestEstimateE2E:
         assert read_json(mission_dir / "fleet-status.json")["mission"]["phase"] == "ESTIMATE"
 
         # 3. Author a full 7-section estimate.md and advance to BATTLE_PLAN
-        (mission_dir / "estimate.md").write_text(
-            _full_estimate_body(), encoding="utf-8"
-        )
+        (mission_dir / "estimate.md").write_text(_full_estimate_body(), encoding="utf-8")
         run_phase("advance", "--mission-dir", str(mission_dir))
         assert read_json(mission_dir / "fleet-status.json")["mission"]["phase"] == "BATTLE_PLAN"
 
@@ -1226,13 +1399,20 @@ class TestEstimateE2E:
         for effect_id, crit_id, status, method, evidence in outcomes:
             run_data(
                 "estimate-outcome",
-                "--mission-dir", str(mission_dir),
-                "--effect-id", effect_id,
-                "--criterion-id", crit_id,
-                "--status", status,
-                "--method", method,
-                "--evidence", evidence,
-                "--recorded-by", "HMS Argyll",
+                "--mission-dir",
+                str(mission_dir),
+                "--effect-id",
+                effect_id,
+                "--criterion-id",
+                crit_id,
+                "--status",
+                status,
+                "--method",
+                method,
+                "--evidence",
+                evidence,
+                "--recorded-by",
+                "HMS Argyll",
                 cwd=tmp_path,
             )
 
@@ -1250,10 +1430,13 @@ class TestEstimateE2E:
         # 9. Run stand-down to persist mission terminal state
         run_data(
             "stand-down",
-            "--mission-dir", str(mission_dir),
+            "--mission-dir",
+            str(mission_dir),
             "--outcome-achieved",
-            "--actual-outcome", "Estimate E2E complete",
-            "--metric-result", "All pass",
+            "--actual-outcome",
+            "Estimate E2E complete",
+            "--metric-result",
+            "All pass",
             cwd=tmp_path,
         )
 
@@ -1262,8 +1445,10 @@ class TestEstimateE2E:
         run_data("index", "--missions-dir", str(missions_dir), cwd=tmp_path)
         result = run_data(
             "analytics",
-            "--missions-dir", str(missions_dir),
-            "--metric", "estimate-outcomes",
+            "--missions-dir",
+            str(missions_dir),
+            "--metric",
+            "estimate-outcomes",
             "--json",
             cwd=tmp_path,
         )
@@ -1284,8 +1469,10 @@ class TestEstimateE2E:
         # skip-estimate writes flag + reason on sailing-orders.json
         run_data(
             "skip-estimate",
-            "--mission-dir", str(mission_dir),
-            "--reason", "trivial scope",
+            "--mission-dir",
+            str(mission_dir),
+            "--reason",
+            "trivial scope",
             cwd=tmp_path,
         )
 

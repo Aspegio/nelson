@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # count_tokens_from_jsonl
 # ---------------------------------------------------------------------------
@@ -85,8 +84,7 @@ class TestCountTokensFromJsonl:
     def test_skips_assistant_records_without_usage(self, tmp_path: Path, count_tokens):
         path = tmp_path / "session.jsonl"
         path.write_text(
-            json.dumps({"type": "assistant", "message": {"content": "no usage"}})
-            + "\n",
+            json.dumps({"type": "assistant", "message": {"content": "no usage"}}) + "\n",
             encoding="utf-8",
         )
         assert count_tokens.count_tokens_from_jsonl(path) is None
@@ -94,10 +92,7 @@ class TestCountTokensFromJsonl:
     def test_treats_missing_usage_fields_as_zero(self, tmp_path: Path, count_tokens):
         path = tmp_path / "session.jsonl"
         path.write_text(
-            json.dumps(
-                {"type": "assistant", "message": {"usage": {"input_tokens": 50}}}
-            )
-            + "\n",
+            json.dumps({"type": "assistant", "message": {"usage": {"input_tokens": 50}}}) + "\n",
             encoding="utf-8",
         )
         assert count_tokens.count_tokens_from_jsonl(path) == 50
@@ -155,9 +150,7 @@ class TestHullIntegrityStatus:
 
 class TestBuildReport:
     def test_green_status_does_not_request_relief(self, count_tokens):
-        report = count_tokens.build_report(
-            "HMS Victory", 50_000, 200_000, "jsonl_usage"
-        )
+        report = count_tokens.build_report("HMS Victory", 50_000, 200_000, "jsonl_usage")
         assert report["ship_name"] == "HMS Victory"
         assert report["token_count"] == 50_000
         assert report["token_limit"] == 200_000
@@ -228,12 +221,8 @@ class TestScanSquadron:
         (session_dir / "subagents").mkdir(parents=True)
         flagship = tmp_path / "session-xyz.jsonl"
         self._write_assistant_jsonl(flagship, 50)
-        self._write_assistant_jsonl(
-            session_dir / "subagents" / "agent-first.jsonl", 77
-        )
-        self._write_assistant_jsonl(
-            session_dir / "subagents" / "agent-second.jsonl", 99
-        )
+        self._write_assistant_jsonl(session_dir / "subagents" / "agent-first.jsonl", 77)
+        self._write_assistant_jsonl(session_dir / "subagents" / "agent-second.jsonl", 99)
 
         reports = count_tokens.scan_squadron(str(session_dir), 200_000)
         ships = [r["ship_name"] for r in reports]
@@ -243,16 +232,12 @@ class TestScanSquadron:
         assert "agent-second" in ships
         assert len(reports) == 3
 
-    def test_missing_flagship_and_subagents_returns_empty(
-        self, tmp_path: Path, count_tokens
-    ):
+    def test_missing_flagship_and_subagents_returns_empty(self, tmp_path: Path, count_tokens):
         session_dir = tmp_path / "session-empty"
         session_dir.mkdir()
         assert count_tokens.scan_squadron(str(session_dir), 200_000) == []
 
-    def test_trailing_slash_on_session_dir_is_handled(
-        self, tmp_path: Path, count_tokens
-    ):
+    def test_trailing_slash_on_session_dir_is_handled(self, tmp_path: Path, count_tokens):
         session_dir = tmp_path / "session-slash"
         session_dir.mkdir()
         self._write_assistant_jsonl(tmp_path / "session-slash.jsonl", 25)

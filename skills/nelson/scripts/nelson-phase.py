@@ -26,10 +26,9 @@ import os
 import stat
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 try:
     import fcntl
@@ -70,8 +69,7 @@ BLOCKED_TOOLS: dict[str, frozenset[str]] = {
 EXIT_CRITERIA_DESC: dict[str, str] = {
     "SAILING_ORDERS": "sailing-orders.json must exist in the mission directory",
     "ESTIMATE": (
-        "estimate.md must exist in the mission directory, "
-        "or sailing-orders.json must carry estimate_skipped: true"
+        "estimate.md must exist in the mission directory, or sailing-orders.json must carry estimate_skipped: true"
     ),
     "BATTLE_PLAN": "battle-plan.json must have tasks, all with station_tier assigned",
     "FORMATION": "battle-plan.json must have a squadron section",
@@ -90,7 +88,7 @@ JSON_INDENT = 2
 
 def _now_iso() -> str:
     """Return the current UTC time as an ISO 8601 string."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _err(msg: str) -> None:
@@ -142,7 +140,7 @@ def _write_json(path: Path, data: Any) -> None:
             os.chmod(tmp, existing_mode)
         os.replace(tmp, path)
     except Exception:
-        try:
+        try:  # noqa: SIM105 -- nested cleanup; the outer raise dominates the control flow
             os.unlink(tmp)
         except OSError:
             pass
@@ -154,7 +152,7 @@ def _append_event(mission_dir: Path, event: dict) -> None:
     log_path = mission_dir / "mission-log.json"
     lock_path = mission_dir / ".mission-log.lock"
 
-    lock_file = open(lock_path, "w")
+    lock_file = open(lock_path, "w")  # noqa: SIM115 -- file handle's lifetime spans the lock window; cannot use `with`
     try:
         if fcntl:
             fcntl.flock(lock_file, fcntl.LOCK_EX)
@@ -162,14 +160,14 @@ def _append_event(mission_dir: Path, event: dict) -> None:
             log = _read_json(log_path)
         else:
             log = {"version": 1, "events": []}
-        new_events = list(log.get("events", [])) + [event]
+        new_events = [*list(log.get("events", [])), event]
         new_log = {**log, "events": new_events}
         _write_json(log_path, new_log)
     finally:
         if fcntl:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
         lock_file.close()
-        try:
+        try:  # noqa: SIM105 -- contextlib.suppress shadows the lock cleanup intent; explicit try/except reads clearer here
             lock_path.unlink()
         except OSError:
             pass
@@ -289,10 +287,7 @@ def _check_estimate_exit(mission_dir: Path) -> str | None:
         so = _read_json(so_path)
         if so.get("estimate_skipped") is True:
             return None
-    return (
-        "estimate.md does not exist and sailing-orders.json does not "
-        "record estimate_skipped: true"
-    )
+    return "estimate.md does not exist and sailing-orders.json does not record estimate_skipped: true"
 
 
 def _check_battle_plan_exit(mission_dir: Path) -> str | None:
@@ -546,9 +541,7 @@ def cmd_set(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser."""
-    parser = argparse.ArgumentParser(
-        description="Deterministic phase engine for Nelson missions."
-    )
+    parser = argparse.ArgumentParser(description="Deterministic phase engine for Nelson missions.")
     subs = parser.add_subparsers(dest="command")
 
     # --- current ---

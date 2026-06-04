@@ -26,10 +26,11 @@ Opt-in hook configuration (add to settings.json PostToolUse hooks if desired):
 Depends on: nelson_conflict_scan.py (shared parse_battle_plan logic from PR #73).
 """
 
-import sys
-import subprocess
 import argparse
+import subprocess
+import sys
 from pathlib import Path
+
 from nelson_conflict_scan import parse_battle_plan
 
 
@@ -43,7 +44,7 @@ def get_git_changes(project_root: Path) -> set[str]:
     """
     try:
         result = subprocess.run(
-            ["git", "status", "--porcelain", "-z"],
+            ["git", "status", "--porcelain", "-z"],  # noqa: S607 -- git is a developer tool resolved via PATH; this script is dev-only and not run with untrusted PATH
             cwd=project_root,
             capture_output=True,
             text=True,
@@ -98,7 +99,7 @@ def _paths_match(changed: Path, owned: Path) -> bool:
     owned_parts = owned.parts
     if len(owned_parts) > len(changed_parts):
         return False
-    return changed_parts[-len(owned_parts):] == owned_parts
+    return changed_parts[-len(owned_parts) :] == owned_parts
 
 
 def radar_scan(ownership: dict[str, set[str]], changed_files: set[str]) -> list[str]:
@@ -117,13 +118,9 @@ def radar_scan(ownership: dict[str, set[str]], changed_files: set[str]) -> list[
     alerts: list[str] = []
     for changed in changed_files:
         changed_path = Path(changed)
-        found_owner = any(
-            _paths_match(changed_path, Path(f)) for f in file_to_owner
-        )
+        found_owner = any(_paths_match(changed_path, Path(f)) for f in file_to_owner)
         if not found_owner:
-            alerts.append(
-                f"File '{changed}' was modified but has no owner in the battle plan."
-            )
+            alerts.append(f"File '{changed}' was modified but has no owner in the battle plan.")
 
     return alerts
 

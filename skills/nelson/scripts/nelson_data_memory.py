@@ -12,13 +12,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from nelson_data_utils import (
-    _err,
     _file_lock,
     _now_iso,
     _read_json_optional,
     _write_json,
 )
-
 
 # ---------------------------------------------------------------------------
 # Cross-Mission Memory Store
@@ -64,26 +62,24 @@ def _extract_patterns_from_mission(mission_dir: Path) -> dict | None:
     for ev in events:
         if ev.get("type") == "standing_order_violation":
             data = ev.get("data", {})
-            violations.append({
-                "order": data.get("order", ""),
-                "description": data.get("description", ""),
-                "severity": data.get("severity", ""),
-                "corrective_action": data.get("corrective_action", ""),
-            })
+            violations.append(
+                {
+                    "order": data.get("order", ""),
+                    "description": data.get("description", ""),
+                    "severity": data.get("severity", ""),
+                    "corrective_action": data.get("corrective_action", ""),
+                }
+            )
 
     # Count damage control events
     damage_control_types = frozenset({"relief_on_station", "hull_threshold_crossed"})
-    damage_control_events = sum(
-        1 for ev in events if ev.get("type") in damage_control_types
-    )
+    damage_control_events = sum(1 for ev in events if ev.get("type") in damage_control_types)
 
     # Quality metrics
     sd_tasks = stand_down.get("tasks", {})
     total_tasks = sd_tasks.get("total", 0)
     completed_tasks = sd_tasks.get("completed", 0)
-    task_completion_rate = (
-        round(completed_tasks / total_tasks, 2) if total_tasks > 0 else None
-    )
+    task_completion_rate = round(completed_tasks / total_tasks, 2) if total_tasks > 0 else None
 
     sd_quality = stand_down.get("quality", {})
     reusable = stand_down.get("reusable_patterns", {})
@@ -92,9 +88,7 @@ def _extract_patterns_from_mission(mission_dir: Path) -> dict | None:
         "mission_id": mission_dir.name,
         "completed_at": stand_down.get("created_at"),
         "outcome_achieved": stand_down.get("outcome_achieved", False),
-        "planned_outcome": stand_down.get(
-            "planned_outcome", sailing_orders.get("outcome", "")
-        ),
+        "planned_outcome": stand_down.get("planned_outcome", sailing_orders.get("outcome", "")),
         "adopt": list(reusable.get("adopt", [])),
         "avoid": list(reusable.get("avoid", [])),
         "standing_order_violations": violations,
@@ -135,7 +129,7 @@ def _update_patterns_store(mission_dir: Path) -> None:
         if record["mission_id"] in existing_ids:
             return
 
-        new_patterns = list(existing.get("patterns", [])) + [record]
+        new_patterns = [*list(existing.get("patterns", [])), record]
         updated = {
             "version": 1,
             "updated_at": _now_iso(),
@@ -211,15 +205,9 @@ def _update_standing_order_stats(mission_dir: Path) -> None:
 
         corr = dict(existing.get("correlation", {}))
         had_violations = len(mission_violations) > 0
-        missions_with = corr.get("missions_with_violations", 0) + (
-            1 if had_violations else 0
-        )
-        failures_with = corr.get("failures_with_violations", 0) + (
-            1 if had_violations and not outcome_achieved else 0
-        )
-        successes_with = corr.get("successes_with_violations", 0) + (
-            1 if had_violations and outcome_achieved else 0
-        )
+        missions_with = corr.get("missions_with_violations", 0) + (1 if had_violations else 0)
+        failures_with = corr.get("failures_with_violations", 0) + (1 if had_violations and not outcome_achieved else 0)
+        successes_with = corr.get("successes_with_violations", 0) + (1 if had_violations and outcome_achieved else 0)
 
         updated = {
             "version": 1,
@@ -233,7 +221,7 @@ def _update_standing_order_stats(mission_dir: Path) -> None:
                 "failures_with_violations": failures_with,
                 "successes_with_violations": successes_with,
             },
-            "_tracked_missions": tracked + [mission_id],
+            "_tracked_missions": [*tracked, mission_id],
         }
         _write_json(stats_path, updated)
 
@@ -247,16 +235,14 @@ def _rebuild_standing_order_stats(all_patterns: list[dict]) -> dict:
     all_violations = [v for p in all_patterns for v in p.get("standing_order_violations", [])]
     all_violations_count = len(all_violations)
 
-    missions_with = sum(
-        1 for p in all_patterns if len(p.get("standing_order_violations", [])) > 0
-    )
+    missions_with = sum(1 for p in all_patterns if len(p.get("standing_order_violations", [])) > 0)
     failures_with = sum(
-        1 for p in all_patterns
+        1
+        for p in all_patterns
         if len(p.get("standing_order_violations", [])) > 0 and not p.get("outcome_achieved", False)
     )
     successes_with = sum(
-        1 for p in all_patterns
-        if len(p.get("standing_order_violations", [])) > 0 and p.get("outcome_achieved", False)
+        1 for p in all_patterns if len(p.get("standing_order_violations", [])) > 0 and p.get("outcome_achieved", False)
     )
 
     by_order: dict[str, dict] = {}
@@ -267,17 +253,13 @@ def _rebuild_standing_order_stats(all_patterns: list[dict]) -> dict:
             missions_list = list(entry.get("missions", []))
             mid = p["mission_id"]
             if mid not in missions_list:
-                missions_list = missions_list + [mid]
+                missions_list = [*missions_list, mid]
             by_order[order] = {
                 "count": entry.get("count", 0) + 1,
                 "missions": missions_list,
             }
 
-    vpm = (
-        round(all_violations_count / all_missions_count, 2)
-        if all_missions_count > 0
-        else 0.0
-    )
+    vpm = round(all_violations_count / all_missions_count, 2) if all_missions_count > 0 else 0.0
     return {
         "version": 1,
         "updated_at": _now_iso(),
@@ -324,9 +306,7 @@ def _sync_memory_from_index(missions_dir: Path) -> None:
             return
 
         # Build new pattern records
-        new_records = [
-            r for r in (_extract_patterns_from_mission(d) for d in new_dirs) if r is not None
-        ]
+        new_records = [r for r in (_extract_patterns_from_mission(d) for d in new_dirs) if r is not None]
 
         if not new_records:
             return
@@ -391,11 +371,7 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
     sailing_orders = _read_json_optional(mission_dir / "sailing-orders.json") or {}
     mission_log = _read_json_optional(mission_dir / "mission-log.json") or {}
     estimate_outcomes_doc = _read_json_optional(mission_dir / "estimate-outcomes.json")
-    estimate_outcomes = (
-        estimate_outcomes_doc.get("outcomes", [])
-        if estimate_outcomes_doc
-        else []
-    )
+    estimate_outcomes = estimate_outcomes_doc.get("outcomes", []) if estimate_outcomes_doc else []
 
     # Fleet details from battle-plan
     fleet_details = _extract_fleet_details(battle_plan)
@@ -427,9 +403,7 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
     tasks = {
         "completed": sd_tasks.get("completed", 0),
         "total": sd_tasks.get("total", 0),
-        "by_station_tier": sd_tasks.get(
-            "by_station_tier", {"0": 0, "1": 0, "2": 0, "3": 0}
-        ),
+        "by_station_tier": sd_tasks.get("by_station_tier", {"0": 0, "1": 0, "2": 0, "3": 0}),
         "task_names": task_names,
         "file_ownership": file_ownership,
     }
@@ -455,9 +429,7 @@ def _build_mission_record(mission_dir: Path) -> dict | None:
         "fleet": fleet,
         "tasks": tasks,
         "quality": stand_down.get("quality", {}),
-        "reusable_patterns": stand_down.get(
-            "reusable_patterns", {"adopt": [], "avoid": []}
-        ),
+        "reusable_patterns": stand_down.get("reusable_patterns", {"adopt": [], "avoid": []}),
         "event_types": event_types,
         "estimate_outcomes": estimate_outcomes,
     }

@@ -11,14 +11,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 SCRIPT = Path(__file__).parent / "nelson-data.py"
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def run(
     *args: str,
@@ -31,6 +30,7 @@ def run(
         capture_output=True,
         text=True,
         cwd=cwd,
+        check=False,
     )
     if expect_fail:
         assert result.returncode != 0, (
@@ -68,11 +68,15 @@ def add_squadron(mission_dir: Path, captains: list[str] | None = None) -> None:
         captain_args.extend(["--captain", spec])
     run(
         "squadron",
-        "--mission-dir", str(mission_dir),
-        "--admiral", "HMS Victory",
-        "--admiral-model", "opus",
+        "--mission-dir",
+        str(mission_dir),
+        "--admiral",
+        "HMS Victory",
+        "--admiral-model",
+        "opus",
         *captain_args,
-        "--mode", "subagents",
+        "--mode",
+        "subagents",
     )
 
 
@@ -88,14 +92,22 @@ def add_task(
     """Add a task to the battle plan."""
     args = [
         "task",
-        "--mission-dir", str(mission_dir),
-        "--id", str(task_id),
-        "--name", name,
-        "--owner", owner,
-        "--deliverable", f"Deliverable for {name}",
-        "--deps", deps,
-        "--station-tier", str(station_tier),
-        "--files", "",
+        "--mission-dir",
+        str(mission_dir),
+        "--id",
+        str(task_id),
+        "--name",
+        name,
+        "--owner",
+        owner,
+        "--deliverable",
+        f"Deliverable for {name}",
+        "--deps",
+        deps,
+        "--station-tier",
+        str(station_tier),
+        "--files",
+        "",
     ]
     if task_type:
         args.extend(["--task-type", task_type])
@@ -138,13 +150,20 @@ def record_estimate_outcome(
     """Append an estimate outcome via the CLI."""
     run(
         "estimate-outcome",
-        "--mission-dir", str(mission_dir),
-        "--effect-id", effect_id,
-        "--criterion-id", criterion_id,
-        "--status", status,
-        "--method", method,
-        "--evidence", evidence,
-        "--recorded-by", recorded_by,
+        "--mission-dir",
+        str(mission_dir),
+        "--effect-id",
+        effect_id,
+        "--criterion-id",
+        criterion_id,
+        "--status",
+        status,
+        "--method",
+        method,
+        "--evidence",
+        evidence,
+        "--recorded-by",
+        recorded_by,
     )
 
 
@@ -159,10 +178,14 @@ def record_admiralty_decision(
     """Record an admiralty decision via the CLI."""
     args = [
         "admiralty-decision",
-        "--mission-dir", str(mission_dir),
-        "--task-id", str(task_id),
-        "--decision-type", decision_type,
-        "--recorded-by", recorded_by,
+        "--mission-dir",
+        str(mission_dir),
+        "--task-id",
+        str(task_id),
+        "--decision-type",
+        decision_type,
+        "--recorded-by",
+        recorded_by,
     ]
     if notes:
         args.extend(["--notes", notes])
@@ -210,26 +233,42 @@ def create_completed_mission(
 
     run(
         "checkpoint",
-        "--mission-dir", str(mission_dir),
-        "--pending", "0",
-        "--in-progress", "0",
-        "--completed", str(task_count),
-        "--blocked", "0",
-        "--tokens-spent", "50000",
-        "--tokens-remaining", "50000",
-        "--hull-green", str(len(captain_specs)),
-        "--hull-amber", "0",
-        "--hull-red", "0",
-        "--hull-critical", "0",
-        "--decision", "continue",
-        "--rationale", "All good",
+        "--mission-dir",
+        str(mission_dir),
+        "--pending",
+        "0",
+        "--in-progress",
+        "0",
+        "--completed",
+        str(task_count),
+        "--blocked",
+        "0",
+        "--tokens-spent",
+        "50000",
+        "--tokens-remaining",
+        "50000",
+        "--hull-green",
+        str(len(captain_specs)),
+        "--hull-amber",
+        "0",
+        "--hull-red",
+        "0",
+        "--hull-critical",
+        "0",
+        "--decision",
+        "continue",
+        "--rationale",
+        "All good",
     )
 
     sd_args = [
         "stand-down",
-        "--mission-dir", str(mission_dir),
-        "--actual-outcome", actual_outcome,
-        "--metric-result", metric_result,
+        "--mission-dir",
+        str(mission_dir),
+        "--actual-outcome",
+        actual_outcome,
+        "--metric-result",
+        metric_result,
     ]
     if outcome_achieved:
         sd_args.append("--outcome-achieved")

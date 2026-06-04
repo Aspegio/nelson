@@ -3,14 +3,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import unittest
 import tempfile
-import os
+import unittest
+
 from nelson_conflict_scan import (
-    parse_battle_plan,
-    parse_imports,
     build_dependency_graph,
     detect_conflicts,
+    parse_battle_plan,
+    parse_imports,
 )
 
 

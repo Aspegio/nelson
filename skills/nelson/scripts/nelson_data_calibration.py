@@ -47,9 +47,9 @@ from nelson_data_utils import (
     _file_lock,
     _now_iso,
     _read_json_optional,
+    _validate_calibration_key,
     _write_json,
 )
-
 
 CALIBRATION_FILENAME = "trust-calibration.json"
 CALIBRATION_LOCK_FILENAME = ".trust-calibration.lock"
@@ -93,11 +93,7 @@ def _build_squadron_index(fleet_status: dict | None) -> dict[str, str]:
     if not fleet_status:
         return {}
     squadron = fleet_status.get("squadron", []) or []
-    return {
-        ship.get("ship_name", ""): ship.get("ship_class", "")
-        for ship in squadron
-        if ship.get("ship_name")
-    }
+    return {ship.get("ship_name", ""): ship.get("ship_class", "") for ship in squadron if ship.get("ship_name")}
 
 
 def _build_task_index(battle_plan: dict | None) -> dict[int, dict]:
@@ -112,19 +108,83 @@ def _build_task_index(battle_plan: dict | None) -> dict[int, dict]:
 # ---------------------------------------------------------------------------
 
 
-def _extract_decisions_from_mission(mission_dir: Path) -> list[dict]:
-    """Return all admiralty_action_completed events that carry decision_type.
+def _resolve_event_keys(
+    data: dict,
+    task_index: dict[int, dict],
+    squadron_index: dict[str, str],
+) -> tuple[str | None, str | None]:
+    """Resolve (task_type, ship_class) for a decision event, with backfill.
 
-    Each returned dict has keys: task_id, decision_type, task_type, ship_class.
+    Prefers values embedded in the event ``data``; falls back to the task's
+    own task_type/owner (battle-plan) and the owner's ship_class
+    (fleet-status) when the event didn't embed them.
+    """
+    task_type = data.get("task_type")
+    ship_class = data.get("ship_class")
+    if task_type and ship_class:
+        return task_type, ship_class
+
+    task_id = data.get("task_id")
+    task = task_index.get(task_id) if task_id is not None else None
+    if task is not None:
+        task_type = task_type or task.get("task_type")
+        owner = task.get("owner")
+        if not ship_class and owner:
+            ship_class = squadron_index.get(owner)
+    return task_type, ship_class
+
+
+def _decision_record_for_event(
+    ev: dict,
+    task_index: dict[int, dict],
+    squadron_index: dict[str, str],
+) -> dict | None:
+    """Return a normalised decision record for one event, or None to skip it.
+
+    Skips events that aren't completed admiralty actions, lack a valid
+    decision_type, can't resolve a (task_type, ship_class) pair, or whose
+    resolved keys fail calibration-key validation. Validating here (not only
+    at the CLI) covers values arriving via cmd_squadron's raw ship_class, the
+    generic ``event`` subcommand, or a hand-edited mission log.
+    """
+    if ev.get("type") != "admiralty_action_completed":
+        return None
+    data = ev.get("data", {}) or {}
+    decision_type = data.get("decision_type")
+    if decision_type not in VALID_ADMIRALTY_OUTCOMES:
+        return None
+
+    task_type, ship_class = _resolve_event_keys(data, task_index, squadron_index)
+    if not task_type or not ship_class:
+        return None
+
+    try:
+        task_type = _validate_calibration_key(task_type, "task_type")
+        ship_class = _validate_calibration_key(ship_class, "ship_class")
+    except ValueError:
+        return None
+
+    return {
+        "task_id": data.get("task_id"),
+        "decision_type": decision_type,
+        "task_type": task_type,
+        "ship_class": ship_class,
+    }
+
+
+def _extract_decisions_from_mission(mission_dir: Path) -> list[dict]:
+    """Return one decision record per task_id from a mission's admiralty events.
+
+    Each record has keys: task_id, decision_type, task_type, ship_class.
     Events missing decision_type, task_type, or ship_class are skipped — only
     fully-attributed decisions feed the calibration store.
 
     Dedupe rule: at most one decision per ``task_id`` is returned. When a
-    mission emits multiple decisions for the same task (e.g. ``rejected``
-    then later ``approved``), the latest event by ``timestamp`` wins.
-    Events with equal timestamps fall back to last-encountered. This rule
-    is the single source of truth for both the incremental update path
-    (stand-down) and the rebuild path (``index --rebuild``).
+    mission emits multiple decisions for the same task (e.g. ``rejected`` then
+    later ``approved``), the latest event by ``timestamp`` wins; equal
+    timestamps fall back to last-encountered. This rule is the single source
+    of truth for both the incremental path (stand-down) and the rebuild path
+    (``index --rebuild``).
     """
     mission_log = _read_json_optional(mission_dir / "mission-log.json") or {}
     events = mission_log.get("events", [])
@@ -134,48 +194,19 @@ def _extract_decisions_from_mission(mission_dir: Path) -> list[dict]:
     task_index = _build_task_index(battle_plan)
     squadron_index = _build_squadron_index(fleet_status)
 
-    # task_id -> (timestamp, order_index, decision_record). A None task_id
-    # is treated as a single distinct slot ("__no_task_id__") so unattached
-    # decisions cannot mask each other arbitrarily.
+    # task_id -> (timestamp, order_index, record). A None task_id collapses to
+    # a single slot ("__no_task_id__") so unattached decisions can't mask each
+    # other arbitrarily.
     by_task: dict[Any, tuple[str, int, dict]] = {}
     for order_index, ev in enumerate(events):
-        if ev.get("type") != "admiralty_action_completed":
+        record = _decision_record_for_event(ev, task_index, squadron_index)
+        if record is None:
             continue
-        data = ev.get("data", {}) or {}
-        decision_type = data.get("decision_type")
-        if decision_type not in VALID_ADMIRALTY_OUTCOMES:
-            continue
-
-        task_type = data.get("task_type")
-        ship_class = data.get("ship_class")
-        task_id = data.get("task_id")
-
-        if not task_type or not ship_class:
-            task = task_index.get(task_id) if task_id is not None else None
-            if task is not None:
-                task_type = task_type or task.get("task_type")
-                owner = task.get("owner")
-                if not ship_class and owner:
-                    ship_class = squadron_index.get(owner)
-
-        if not task_type or not ship_class:
-            continue
-
-        record = {
-            "task_id": task_id,
-            "decision_type": decision_type,
-            "task_type": task_type,
-            "ship_class": ship_class,
-        }
         timestamp = ev.get("timestamp") or ""
-        slot = task_id if task_id is not None else "__no_task_id__"
+        slot = record["task_id"] if record["task_id"] is not None else "__no_task_id__"
         previous = by_task.get(slot)
-        if previous is None:
-            by_task[slot] = (timestamp, order_index, record)
-            continue
-        prev_ts, prev_order, _prev = previous
         # Latest-by-timestamp wins; ties fall back to last-encountered.
-        if (timestamp, order_index) >= (prev_ts, prev_order):
+        if previous is None or (timestamp, order_index) >= (previous[0], previous[1]):
             by_task[slot] = (timestamp, order_index, record)
 
     return [record for _, _, record in by_task.values()]
@@ -333,7 +364,7 @@ def _update_override_calibration(mission_dir: Path) -> None:
         updated = _apply_decisions(existing, decisions)
         updated = {
             **updated,
-            "_tracked_missions": tracked + [mission_id],
+            "_tracked_missions": [*tracked, mission_id],
         }
         _write_json(calibration_path, updated)
 
@@ -343,23 +374,31 @@ def _update_override_calibration(mission_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _sync_calibration_from_missions(missions_dir: Path) -> None:
-    """Backfill the calibration store from missions not yet tracked.
+def _sync_calibration_from_missions(missions_dir: Path, *, rebuild: bool = False) -> None:
+    """Backfill — or fully rebuild — the calibration store from missions.
 
-    Called from ``cmd_index`` so missions that predate the calibration store
-    can still contribute. Mirrors ``_sync_memory_from_index``.
+    Called from ``cmd_index``. By default only missions not yet tracked are
+    ingested, so missions predating the calibration store still contribute.
+    When *rebuild* is True the store is reset to empty and every completed
+    mission is re-ingested through the current (deduped) extractor — this is
+    what repairs a store written before per-task dedupe existed, or one whose
+    counts have drifted. Mirrors ``cmd_index``'s own rebuild semantics.
     """
     memory_dir = _resolve_memory_dir(missions_dir)
     calibration_path = memory_dir / CALIBRATION_FILENAME
     lock_path = memory_dir / CALIBRATION_LOCK_FILENAME
 
     with _file_lock(lock_path):
-        existing = _read_calibration_with_bak_rotation(calibration_path)
-        tracked = list(existing.get("_tracked_missions", []))
+        if rebuild:
+            existing = _empty_calibration()
+            tracked: list[str] = []
+        else:
+            existing = _read_calibration_with_bak_rotation(calibration_path)
+            tracked = list(existing.get("_tracked_missions", []))
 
         completed = _find_completed_missions(missions_dir)
         new_dirs = [d for d in completed if d.name not in tracked]
-        if not new_dirs:
+        if not new_dirs and not rebuild:
             return
 
         updated = existing
@@ -465,10 +504,7 @@ def _print_calibration_advisories(
             scope_note = f"{task_type} on {ship_class}"
             tail = "Consider raising station_tier."
         else:
-            scope_note = (
-                f"{task_type} (all ship classes — no per-class data "
-                f"for {ship_class})"
-            )
+            scope_note = f"{task_type} (all ship classes — no per-class data for {ship_class})"
             tail = "Consider applying caution to this task type."
         _err(
             f"[nelson-data] Trust advisory: task {task.get('id')} "
@@ -497,17 +533,12 @@ def _format_trust_report_text(
 ) -> str:
     """Return the human-readable trust report."""
     lines: list[str] = []
-    lines.append(
-        f"Trust calibration — {len(rows)} bucket(s) with >= {min_decisions} decision(s)"
-    )
+    lines.append(f"Trust calibration — {len(rows)} bucket(s) with >= {min_decisions} decision(s)")
     lines.append("")
     if not rows:
         lines.append("  No buckets meet the sample threshold yet.")
     else:
-        header = (
-            f"  {'task_type':<24} {'ship_class':<12} "
-            f"{'n':>4}  {'over%':>6}  approved/modified/rejected"
-        )
+        header = f"  {'task_type':<24} {'ship_class':<12} {'n':>4}  {'over%':>6}  approved/modified/rejected"
         lines.append(header)
         lines.append("  " + "-" * (len(header) - 2))
         for r in rows:
@@ -543,20 +574,13 @@ def cmd_trust_report(args: argparse.Namespace) -> None:
     buckets = calibration.get("buckets", {}) or {}
     rollups = calibration.get("by_task_type", {}) or {}
 
-    rows = [
-        b for b in buckets.values()
-        if b.get("total_decisions", 0) >= min_decisions
-    ]
+    rows = [b for b in buckets.values() if b.get("total_decisions", 0) >= min_decisions]
     rows.sort(key=lambda b: (-b.get("override_rate", 0.0), -b.get("total_decisions", 0)))
 
     rollup_rows = [
-        {"task_type": tt, **data}
-        for tt, data in rollups.items()
-        if data.get("total_decisions", 0) >= min_decisions
+        {"task_type": tt, **data} for tt, data in rollups.items() if data.get("total_decisions", 0) >= min_decisions
     ]
-    rollup_rows.sort(
-        key=lambda b: (-b.get("override_rate", 0.0), -b.get("total_decisions", 0))
-    )
+    rollup_rows.sort(key=lambda b: (-b.get("override_rate", 0.0), -b.get("total_decisions", 0)))
 
     if getattr(args, "json_output", False):
         payload = {

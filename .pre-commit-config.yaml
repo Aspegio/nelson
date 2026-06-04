@@ -1,0 +1,34 @@
+# Pre-commit sensors for Nelson.
+#
+# Install: `pre-commit install` (runs on every `git commit`).
+# Run on demand: `pre-commit run --all-files`.
+#
+# Hook output is a sensor: when a commit is blocked, an agent reads the
+# message and self-corrects. Treat failures as feedback, not as something
+# to bypass with `--no-verify`. See CLAUDE.md → "Maintainability sensors".
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: ^demos/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 0671d8ab202c4ac093b78433ae5baf74f3fc7246  # frozen: v0.15.15
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 2ca41cc1372d1e939a6a879f18cdc19fc1cac1ce  # frozen: v8.30.0
+    hooks:
+      - id: gitleaks

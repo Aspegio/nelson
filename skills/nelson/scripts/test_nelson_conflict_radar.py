@@ -9,14 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from nelson_conflict_radar import _paths_match, get_git_changes, radar_scan
-
 
 # ---------------------------------------------------------------------------
 # _paths_match
 # ---------------------------------------------------------------------------
+
 
 class TestPathsMatch:
     """Test the path component-aligned matching logic."""
@@ -51,6 +49,7 @@ class TestPathsMatch:
 # ---------------------------------------------------------------------------
 # get_git_changes
 # ---------------------------------------------------------------------------
+
 
 class TestGetGitChanges:
     """Test git status parsing with -z (NUL-separated) output."""
@@ -121,6 +120,7 @@ class TestGetGitChanges:
 # ---------------------------------------------------------------------------
 # radar_scan
 # ---------------------------------------------------------------------------
+
 
 class TestRadarScan:
     """Test the ownership scan logic."""

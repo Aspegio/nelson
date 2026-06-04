@@ -1,0 +1,140 @@
+# Nelson — Python tooling tuned for AI coding agents.
+#
+# These settings are sensors: a coding agent reads their output and
+# self-corrects against the messages. Keep the rule list narrow and the
+# thresholds meaningful. If a rule fires too noisily, bump the threshold
+# (with a comment explaining why) rather than disabling the rule entirely —
+# the rule still catches future drift, and the bump itself is a review anchor.
+#
+# See CLAUDE.md → "Maintainability sensors" for the suppress-with-reason /
+# bump-threshold conventions.
+
+# NOTE on line-length=120 (above PEP 8's 79 and Black's 88):
+# The existing codebase is comfortable at 100-120 columns; setting 100 fires
+# on ~40 lines of legitimate code (docstrings, CLI examples, long error
+# messages). 120 still catches the *next* drift toward unreadable lines but
+# clears the brownfield baseline. Ratchet down if the team adopts a stricter
+# editor width.
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [
+  ".venv",
+  ".claude/worktrees",
+  "demos",
+  "docs/superpowers",
+  "__pycache__",
+]
+
+[tool.ruff.lint]
+# AI-targeted rulesets. Each is included because agents are prone to a
+# specific failure mode it catches:
+#   E, W   — pycodestyle: drift from PEP 8
+#   F      — pyflakes: unused imports, undefined names (agents over-import)
+#   I      — isort: import ordering drift
+#   B      — bugbear: common real-world bugs (mutable default args, etc.)
+#   C90    — mccabe complexity (agents inflate functions)
+#   PL     — pylint subset (max-args, max-branches, etc.)
+#   RUF    — ruff-specific
+#   S      — bandit security rules (agents reach for unsafe APIs)
+#   SIM    — simplification (agents over-nest)
+#   T20    — flake8-print (force logging in app code; per-dir override allows
+#            print() in CLI scripts)
+#   UP     — pyupgrade (agents write code targeting old Python)
+select = [
+  "E", "F", "W", "I", "B", "C90", "PL", "RUF", "S", "SIM", "T20", "UP",
+]
+ignore = [
+  "PLR2004",  # magic-value-comparison — too noisy in glue code
+  # PLR0913 (too-many-arguments) is intentionally NOT ignored globally:
+  # test/conftest fixture helpers are covered via per-file ignore below,
+  # and production violations get a reasoned per-function noqa pointing
+  # at the refactor backlog. Keeping the rule active means it catches
+  # the *next* drift toward unwieldy signatures.
+  "SIM108",   # if-else-block-instead-of-if-exp — collapsing to a ternary
+              # often hurts readability when one branch is non-trivial.
+              # Leave as a stylistic choice rather than a rule.
+  "RUF002",   # ambiguous-unicode-character-docstring — docstrings legitimately
+              # use proper en-dashes (–) and multiplication signs (×). The rule
+              # is meant for source-string typo prevention, not prose.
+]
+
+[tool.ruff.lint.pylint]
+# Thresholds picked for AI-targeted feedback. They are deliberately lower
+# than pylint defaults — agents are good at obeying numeric limits and the
+# resulting code is more reviewable.
+max-args = 5
+max-branches = 10
+max-statements = 50
+max-returns = 6
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+# CLI tools print to stdout/stderr by design. App code should use logging.
+"scripts/**" = ["T201", "T203", "S101"]
+"hooks/**" = ["T201", "T203"]
+"skills/nelson/scripts/**" = ["T201", "T203", "S101"]
+# Tests legitimately use assert, bare magic values, late imports of the
+# system-under-test, and subprocess calls to the CLI scripts they're testing.
+"**/test_*.py" = [
+  "S101",      # assert is how pytest expresses test conditions
+  "PLR2004",   # magic values are how tests pin expected outputs
+  "PLR0915",   # large test bodies cover many assertions per scenario
+  "PLR0912",   # branchy test bodies handle multiple scenarios per test
+  "PLR0913",   # test helpers (e.g. _record_outcome, write_handoff) legitimately
+               # take many fixture kwargs by design
+  "PLC0415",   # late imports keep modules out of fixture collection scope
+  "S603",      # subprocess argv built from sys.executable + repo-internal Paths
+               # is safe — this is NOT a license for `python -c` with f-string
+               # interpolation of fixture-derived values; use env= injection instead
+  "E402",      # tests deliberately import after sys.path setup
+]
+"conftest.py" = [
+  "S101",
+  "S603",
+  "PLC0415",
+  "PLR0913",   # fixture builders (add_task, record_estimate_outcome,
+               # create_completed_mission) take many kwargs by design
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# mypy: roll-out tracked under nelson-8q8
+
+# ---------------------------------------------------------------------------
+# Tests + coverage.
+#
+# No --cov-fail-under yet — we want a baseline first. Add the gate once the
+# baseline is published; otherwise the very first run blocks every PR.
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+# Test directories must be invoked separately — each has its own conftest.py
+# with overlapping fixture names that collide when collected in one session.
+# CI runs them as: pytest skills/nelson/scripts/ && pytest hooks/ && pytest scripts/
+# A unified testpaths setup is tracked as a follow-up cleanup.
+addopts = "-ra"
+
+[tool.coverage.run]
+branch = true
+source = [
+  "hooks",
+  "scripts",
+  "skills/nelson/scripts",
+]
+omit = [
+  "*/test_*.py",
+  "*/conftest.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]

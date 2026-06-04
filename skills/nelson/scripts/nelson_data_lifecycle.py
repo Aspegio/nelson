@@ -13,16 +13,16 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from nelson_circuit_breakers import (
-    BreakerTrip,
     compute_budget_metrics,
-    evaluate as evaluate_circuit_breakers,
     format_alarm_line,
-    load_config as load_circuit_breaker_config,
+)
+from nelson_circuit_breakers import (
+    evaluate as evaluate_circuit_breakers,
 )
 from nelson_data_calibration import (
     _print_calibration_advisories,
@@ -80,8 +80,11 @@ PHASE_RECOVERY_GUIDANCE: dict[str, list[str]] = {
     ],
     "BATTLE_PLAN": [
         "You are in BATTLE_PLAN phase (Step 3).",
-        "Read estimate.md for commander's intent and effects, and battle-plan.md for any drafted plan.",
-        "Complete the Standing Order Check, then persist the final plan to {mission-dir}/battle-plan.md before advancing to Step 4.",
+        ("Read estimate.md for commander's intent and effects, and battle-plan.md for any drafted plan."),
+        (
+            "Complete the Standing Order Check, then persist the final plan to "
+            "{mission-dir}/battle-plan.md before advancing to Step 4."
+        ),
     ],
     "FORMATION": [
         "You are in FORMATION phase (Step 4).",
@@ -101,9 +104,7 @@ PHASE_RECOVERY_GUIDANCE: dict[str, list[str]] = {
 }
 
 
-BATTLE_PLAN_MD_REQUIRED_PHASES: frozenset[str] = frozenset(
-    {"BATTLE_PLAN", "FORMATION", "PERMISSION"}
-)
+BATTLE_PLAN_MD_REQUIRED_PHASES: frozenset[str] = frozenset({"BATTLE_PLAN", "FORMATION", "PERMISSION"})
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +112,7 @@ BATTLE_PLAN_MD_REQUIRED_PHASES: frozenset[str] = frozenset(
 # ---------------------------------------------------------------------------
 
 
-def _do_init(
+def _do_init(  # noqa: PLR0913 -- args mirror the sailing-orders.json schema; collapsing them into a config dict would obscure the contract. Refactor (e.g. SailingOrders dataclass) tracked in nelson-e6j.
     outcome: str,
     metric: str,
     deadline: str,
@@ -135,10 +136,7 @@ def _do_init(
     if session_id is None:
         session_id = _generate_session_id()
     elif not _is_valid_session_id(session_id):
-        _die(
-            "Error: --session-id must be exactly 8 lowercase hex characters "
-            f"(got: {session_id!r})"
-        )
+        _die(f"Error: --session-id must be exactly 8 lowercase hex characters (got: {session_id!r})")
 
     nelson_root = Path(".nelson")
     base = nelson_root / "missions" / f"{_mission_dir_stamp()}_{session_id}"
@@ -370,8 +368,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
 
     print(
         f"[nelson-data] Squadron formed: admiral {args.admiral}, "
-        f"{len(captains)} captains"
-        + (f", red cell {args.red_cell}" if args.red_cell else "")
+        f"{len(captains)} captains" + (f", red cell {args.red_cell}" if args.red_cell else "")
     )
 
 
@@ -386,8 +383,8 @@ def cmd_task(args: argparse.Namespace) -> None:
 
     deps: list[int] = []
     if args.deps:
-        for d in args.deps.split(","):
-            d = d.strip()
+        for raw_dep in args.deps.split(","):
+            d = raw_dep.strip()
             if d:
                 try:
                     deps.append(int(d))
@@ -433,7 +430,7 @@ def cmd_task(args: argparse.Namespace) -> None:
         battle_plan = {"version": 1}
 
     existing_tasks = list(battle_plan.get("tasks", []))
-    new_tasks = existing_tasks + [task]
+    new_tasks = [*existing_tasks, task]
 
     # Recompute dependents for all tasks
     new_tasks = _recompute_dependents(new_tasks)
@@ -559,9 +556,7 @@ def _compute_dag_metrics(tasks: list[dict]) -> tuple[int, int]:
             return memo[task_id]
         if task_id in visiting:
             cycle_members = ", ".join(str(t) for t in sorted(visiting))
-            _die(
-                f"Cycle detected in task dependencies (task IDs involved: {cycle_members})"
-            )
+            _die(f"Cycle detected in task dependencies (task IDs involved: {cycle_members})")
         visiting.add(task_id)
         task = task_map.get(task_id)
         if task is None:
@@ -605,9 +600,7 @@ def cmd_skip_estimate(args: argparse.Namespace) -> None:
 
     so_path = mission_dir / "sailing-orders.json"
     if not so_path.exists():
-        _die(
-            "Error: sailing-orders.json does not exist. Run 'init' before skipping the estimate."
-        )
+        _die("Error: sailing-orders.json does not exist. Run 'init' before skipping the estimate.")
 
     sailing_orders = _read_json(so_path)
     new_sailing_orders = {
@@ -645,25 +638,17 @@ def cmd_record_estimate_outcome(args: argparse.Namespace) -> None:
 
     status = args.status
     if status not in VALID_ESTIMATE_OUTCOME_STATUSES:
-        _die(
-            f"Error: invalid status '{status}'. "
-            f"Valid: {', '.join(sorted(VALID_ESTIMATE_OUTCOME_STATUSES))}"
-        )
+        _die(f"Error: invalid status '{status}'. Valid: {', '.join(sorted(VALID_ESTIMATE_OUTCOME_STATUSES))}")
 
     method = args.method
     if method not in VALID_ESTIMATE_OUTCOME_METHODS:
-        _die(
-            f"Error: invalid method '{method}'. "
-            f"Valid: {', '.join(sorted(VALID_ESTIMATE_OUTCOME_METHODS))}"
-        )
+        _die(f"Error: invalid method '{method}'. Valid: {', '.join(sorted(VALID_ESTIMATE_OUTCOME_METHODS))}")
 
     effect_id = (args.effect_id or "").strip()
     criterion_id = (args.criterion_id or "").strip()
     recorded_by = (args.recorded_by or "").strip()
     if not effect_id or not criterion_id or not recorded_by:
-        _die(
-            "Error: --effect-id, --criterion-id and --recorded-by are required and must be non-empty."
-        )
+        _die("Error: --effect-id, --criterion-id and --recorded-by are required and must be non-empty.")
 
     outcome = {
         "effect_id": effect_id,
@@ -691,14 +676,56 @@ def cmd_record_estimate_outcome(args: argparse.Namespace) -> None:
     _append_event(mission_dir, event)
 
     print(
-        f"[nelson-data] Estimate outcome recorded: {effect_id}/{criterion_id} "
-        f"{status} via {method} (by {recorded_by})"
+        f"[nelson-data] Estimate outcome recorded: {effect_id}/{criterion_id} {status} via {method} (by {recorded_by})"
     )
 
 
 # ---------------------------------------------------------------------------
 # Subcommand: event
 # ---------------------------------------------------------------------------
+
+
+def _resolve_ship_class(mission_dir: Path, owner: str | None) -> str | None:
+    """Return *owner*'s ship_class from fleet-status.json, or None if unknown."""
+    if not owner:
+        return None
+    fs_path = mission_dir / "fleet-status.json"
+    if not fs_path.exists():
+        return None
+    fleet_status = _read_json(fs_path)
+    for ship in fleet_status.get("squadron", []):
+        if ship.get("ship_name") == owner:
+            return ship.get("ship_class")
+    return None
+
+
+def _validate_optional_calibration_key(value: str | None, field: str) -> str | None:
+    """Validate a non-empty calibration key, exiting fatally on a bad value.
+
+    Empty/None passes through unchanged (the attribute is simply absent).
+    """
+    if not value:
+        return value
+    try:
+        return _validate_calibration_key(value, field)
+    except ValueError as exc:
+        _die(f"Error: invalid {field}: {exc}")
+    return None
+
+
+def _resolve_calibration_attrs(mission_dir: Path, task: dict[str, Any], task_id: int) -> tuple[str | None, str | None]:
+    """Resolve and validate (task_type, ship_class) for an admiralty decision.
+
+    task_type comes from the battle-plan task; ship_class is resolved via the
+    task owner against fleet-status.json. Both are validated as calibration
+    keys (a bad value is fatal). A missing task_type is a non-fatal warning:
+    the decision is still recorded, it just won't feed the calibration store.
+    """
+    task_type = _validate_optional_calibration_key(task.get("task_type"), "task_type")
+    ship_class = _validate_optional_calibration_key(_resolve_ship_class(mission_dir, task.get("owner")), "ship_class")
+    if not task_type:
+        _err(f"Warning: task {task_id} has no task_type — this decision will not feed calibration.")
+    return task_type, ship_class
 
 
 def cmd_admiralty_decision(args: argparse.Namespace) -> None:
@@ -720,10 +747,7 @@ def cmd_admiralty_decision(args: argparse.Namespace) -> None:
 
     decision_type = args.decision_type
     if decision_type not in VALID_ADMIRALTY_OUTCOMES:
-        _die(
-            f"Error: invalid decision-type '{decision_type}'. "
-            f"Valid: {', '.join(sorted(VALID_ADMIRALTY_OUTCOMES))}"
-        )
+        _die(f"Error: invalid decision-type '{decision_type}'. Valid: {', '.join(sorted(VALID_ADMIRALTY_OUTCOMES))}")
 
     recorded_by = (getattr(args, "recorded_by", None) or "").strip()
     if not recorded_by:
@@ -741,34 +765,7 @@ def cmd_admiralty_decision(args: argparse.Namespace) -> None:
     if task is None:
         _die(f"Error: task_id {task_id} not found in battle-plan.json")
 
-    task_type = task.get("task_type")
-
-    ship_class: str | None = None
-    owner = task.get("owner")
-    fs_path = mission_dir / "fleet-status.json"
-    if owner and fs_path.exists():
-        fleet_status = _read_json(fs_path)
-        for ship in fleet_status.get("squadron", []):
-            if ship.get("ship_name") == owner:
-                ship_class = ship.get("ship_class")
-                break
-
-    if task_type:
-        try:
-            task_type = _validate_calibration_key(task_type, "task_type")
-        except ValueError as exc:
-            _die(f"Error: invalid task_type: {exc}")
-    if ship_class:
-        try:
-            ship_class = _validate_calibration_key(ship_class, "ship_class")
-        except ValueError as exc:
-            _die(f"Error: invalid ship_class: {exc}")
-
-    if not task_type:
-        _err(
-            f"Warning: task {task_id} has no task_type — this decision "
-            f"will not feed calibration."
-        )
+    task_type, ship_class = _resolve_calibration_attrs(mission_dir, task, task_id)
 
     marker_path = mission_dir.parent.parent / ADMIRAL_SESSION_MARKER
     session_marker_present = marker_path.exists()
@@ -798,10 +795,7 @@ def cmd_admiralty_decision(args: argparse.Namespace) -> None:
     }
     _append_event(mission_dir, event)
 
-    print(
-        f"[nelson-data] Admiralty decision recorded: task {task_id} "
-        f"-> {decision_type}"
-    )
+    print(f"[nelson-data] Admiralty decision recorded: task {task_id} -> {decision_type}")
 
 
 def cmd_event(args: argparse.Namespace, extra: list[str]) -> None:
@@ -810,10 +804,7 @@ def cmd_event(args: argparse.Namespace, extra: list[str]) -> None:
 
     event_type = args.type
     if event_type not in VALID_EVENT_TYPES:
-        _die(
-            f"Error: invalid event type '{event_type}'. "
-            f"Valid types: {', '.join(sorted(VALID_EVENT_TYPES))}"
-        )
+        _die(f"Error: invalid event type '{event_type}'. Valid types: {', '.join(sorted(VALID_EVENT_TYPES))}")
 
     checkpoint = args.checkpoint
     if checkpoint is None:
@@ -840,7 +831,7 @@ def cmd_event(args: argparse.Namespace, extra: list[str]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def cmd_checkpoint(args: argparse.Namespace) -> None:
+def cmd_checkpoint(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912 -- end-to-end checkpoint command; refactor tracked in nelson-e6j
     """Record a quarterdeck checkpoint."""
     mission_dir = _require_mission_dir(args)
 
@@ -941,11 +932,9 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
     # Read sailing orders for outcome
     so_path = mission_dir / "sailing-orders.json"
     outcome = None
-    token_limit = None
     if so_path.exists():
         sailing_orders = _read_json(so_path)
         outcome = sailing_orders.get("outcome")
-        token_limit = sailing_orders.get("budget", {}).get("token_limit")
 
     # Carry forward existing phase from fleet-status
     existing_phase = None
@@ -983,9 +972,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
             "pct_consumed": pct_consumed,
             "burn_rate_per_checkpoint": burn_rate,
             "burn_rate_per_task": budget_metrics["burn_rate_per_task"],
-            "projected_budget_at_completion": budget_metrics[
-                "projected_budget_at_completion"
-            ],
+            "projected_budget_at_completion": budget_metrics["projected_budget_at_completion"],
         },
         "squadron": squadron_status,
         "blockers": [],
@@ -1011,7 +998,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
     trips = evaluate_circuit_breakers(
         fleet_status=fleet_status,
         sailing_orders=sailing_orders_for_breakers,
-        mission_log_events=events + [checkpoint_event],
+        mission_log_events=[*events, checkpoint_event],
         now_iso=_now_iso(),
     )
     for trip in trips:
@@ -1025,9 +1012,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
             },
         )
 
-    hull_summary = (
-        f"{args.hull_green}G {args.hull_amber}A {args.hull_red}R {args.hull_critical}C"
-    )
+    hull_summary = f"{args.hull_green}G {args.hull_amber}A {args.hull_red}R {args.hull_critical}C"
     print(
         f"[nelson-data] Checkpoint {checkpoint_num} recorded\n"
         f"Fleet: {args.completed}/{total} done | "
@@ -1044,7 +1029,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def cmd_stand_down(args: argparse.Namespace) -> None:
+def cmd_stand_down(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PLR0915 -- end-to-end stand-down command; refactor tracked in nelson-e6j
     """Record mission completion and write stand-down.json."""
     mission_dir = _require_mission_dir(args)
 
@@ -1074,9 +1059,7 @@ def cmd_stand_down(args: argparse.Namespace) -> None:
     duration_minutes = 0
     if len(timestamps) >= 2:
         try:
-            parsed_times = [
-                datetime.fromisoformat(ts.replace("Z", "+00:00")) for ts in timestamps
-            ]
+            parsed_times = [datetime.fromisoformat(ts.replace("Z", "+00:00")) for ts in timestamps]
             first = min(parsed_times)
             last = max(parsed_times)
             duration_minutes = int((last - first).total_seconds() / 60)
@@ -1274,10 +1257,7 @@ def cmd_status(args: argparse.Namespace) -> None:
 
     blockers = len(fs.get("blockers", []))
 
-    hull_str = (
-        f"{hull_counts['G']}G {hull_counts['A']}A "
-        f"{hull_counts['R']}R {hull_counts['C']}C"
-    )
+    hull_str = f"{hull_counts['G']}G {hull_counts['A']}A {hull_counts['R']}R {hull_counts['C']}C"
 
     print(
         f"[nelson-data] Status: {status} (checkpoint {cp})\n"
@@ -1317,7 +1297,7 @@ def _parse_captain_specs(specs: list[str]) -> list[dict[str, Any]]:
     return captains
 
 
-def _register_squadron(
+def _register_squadron(  # noqa: PLR0913 -- args are shaped by the squadron-registration CLI surface (admiral + admiral_model + captains + mode + optional red-cell pair); merging admiral/red-cell into dicts would just move the same kwargs to the caller.
     mission_dir: Path,
     admiral: str,
     admiral_model: str,
@@ -1403,7 +1383,7 @@ def _register_squadron(
     _write_json(fs_path, new_fleet_status)
 
 
-def _build_task_record(
+def _build_task_record(  # noqa: PLR0913 -- params mirror the task record schema 1:1 (id, name, owner, deliverable, deps, station_tier, files, …); a TaskRecord dataclass is the right refactor and is tracked in nelson-e6j.
     task_id: int,
     name: str,
     owner: str,
@@ -1528,12 +1508,8 @@ def _parse_partial_outputs(raw: list[str] | None) -> list[dict[str, str]]:
     for po in raw or []:
         parts = po.split(":", 2)
         if len(parts) != 3:
-            _die(
-                f"Error: --partial-output must be 'subtask:progress:notes', got: {po}"
-            )
-        results.append(
-            {"subtask": parts[0], "progress": parts[1], "notes": parts[2]}
-        )
+            _die(f"Error: --partial-output must be 'subtask:progress:notes', got: {po}")
+        results.append({"subtask": parts[0], "progress": parts[1], "notes": parts[2]})
     return results
 
 
@@ -1546,12 +1522,8 @@ def _parse_relief_chain(raw: list[str] | None) -> list[dict[str, str]]:
     for entry in raw or []:
         parts = entry.split(":", 2)
         if len(parts) != 3:
-            _die(
-                f"Error: --relief-entry must be 'ship:reason:time', got: {entry}"
-            )
-        entries.append(
-            {"ship": parts[0], "reason": parts[1], "handoff_time": parts[2]}
-        )
+            _die(f"Error: --relief-entry must be 'ship:reason:time', got: {entry}")
+        entries.append({"ship": parts[0], "reason": parts[1], "handoff_time": parts[2]})
     return entries
 
 
@@ -1569,10 +1541,7 @@ def cmd_handoff(args: argparse.Namespace) -> None:
     mission_dir = _require_mission_dir(args)
 
     if args.handoff_type not in VALID_HANDOFF_TYPES:
-        _die(
-            f"Error: --handoff-type must be one of "
-            f"{sorted(VALID_HANDOFF_TYPES)}"
-        )
+        _die(f"Error: --handoff-type must be one of {sorted(VALID_HANDOFF_TYPES)}")
 
     partial_outputs = _parse_partial_outputs(args.partial_output)
     relief_chain = _parse_relief_chain(args.relief_entry)
@@ -1589,16 +1558,13 @@ def cmd_handoff(args: argparse.Namespace) -> None:
     for t in bp.get("tasks", []):
         if t.get("id") == args.task_id and t.get("station_tier", 0) > 0:
             if not file_ownership:
-                _die(
-                    "Error: --file-ownership is required for implementation "
-                    "tasks (station_tier > 0)"
-                )
+                _die("Error: --file-ownership is required for implementation tasks (station_tier > 0)")
             break
 
     log = _read_json(mission_dir / "mission-log.json")
     checkpoint_num = _get_last_checkpoint_number(log.get("events", []))
 
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
     now = now_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     now_file = now_dt.strftime("%Y%m%dT%H%M%SZ")
 
@@ -1656,7 +1622,7 @@ def cmd_handoff(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _validate_plan_json(plan: dict) -> None:
+def _validate_plan_json(plan: dict) -> None:  # noqa: C901, PLR0912 -- schema validator with many shape checks; refactor tracked in nelson-e6j
     """Validate plan JSON structure.  Calls _die on failure."""
     if "squadron" not in plan:
         _die("Error: plan JSON must contain a 'squadron' key.")
@@ -1668,7 +1634,7 @@ def _validate_plan_json(plan: dict) -> None:
     if not isinstance(admiral, dict):
         _die(
             "Error: squadron.admiral must be an object with 'ship_name' and "
-            "'model' keys, e.g. {\"ship_name\": \"HMS Victory\", \"model\": \"opus\"}; "
+            '\'model\' keys, e.g. {"ship_name": "HMS Victory", "model": "opus"}; '
             f"got {type(admiral).__name__}."
         )
     admiral_missing = {"ship_name", "model"} - set(admiral.keys())
@@ -1712,10 +1678,11 @@ def _run_conflict_scan(battle_plan_path: Path) -> dict[str, Any]:
     """Run nelson_conflict_scan.py and return structured result."""
     if not _CONFLICT_SCAN_SCRIPT.exists():
         return {"clean": True, "skipped": True, "stdout": "conflict scan script not found"}
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 -- args are repo-internal paths, sys.executable is trusted
         [sys.executable, str(_CONFLICT_SCAN_SCRIPT), "--plan", str(battle_plan_path)],
         capture_output=True,
         text=True,
+        check=False,
     )
     has_warning = "[!] WARNING" in result.stdout
     return {
@@ -1830,12 +1797,13 @@ def cmd_headless(args: argparse.Namespace) -> None:
     plan_data = _read_json(bp_path)
     _validate_plan_json(plan_data)
 
+    budget_block = so_data.get("budget") if isinstance(so_data.get("budget"), dict) else {}
     mission_dir = _do_init(
         outcome=so_data.get("outcome", ""),
         metric=so_data.get("metric", so_data.get("success_metric", "")),
         deadline=so_data.get("deadline", "this_session"),
-        token_budget=so_data.get("budget", {}).get("token_limit") if isinstance(so_data.get("budget"), dict) else so_data.get("token_budget"),
-        time_limit=so_data.get("budget", {}).get("time_limit_minutes") if isinstance(so_data.get("budget"), dict) else so_data.get("time_limit"),
+        token_budget=budget_block.get("token_limit", so_data.get("token_budget")),
+        time_limit=budget_block.get("time_limit_minutes", so_data.get("time_limit")),
         constraints=so_data.get("constraints"),
         out_of_scope=so_data.get("out_of_scope"),
         stop_criteria=so_data.get("stop_criteria"),
@@ -1865,7 +1833,7 @@ def cmd_headless(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _find_active_mission(missions_dir: Path) -> Path | None:
+def _find_active_mission(missions_dir: Path) -> Path | None:  # noqa: C901 -- active-mission heuristic with several fallbacks; refactor tracked in nelson-e6j
     """Find the most recent active mission directory.
 
     Walks all ``.active-*`` markers, resolves each to a mission directory,
@@ -1912,20 +1880,14 @@ def _find_active_mission(missions_dir: Path) -> Path | None:
     if not missions_dir.is_dir():
         return None
     fallback = sorted(
-        (
-            d
-            for d in missions_dir.iterdir()
-            if d.is_dir() and not (d / "stand-down.json").exists()
-        ),
+        (d for d in missions_dir.iterdir() if d.is_dir() and not (d / "stand-down.json").exists()),
         key=lambda d: d.name,
         reverse=True,
     )
     return fallback[0] if fallback else None
 
 
-def _update_fleet_status_from_event(
-    mission_dir: Path, event: dict, event_id: int
-) -> None:
+def _update_fleet_status_from_event(mission_dir: Path, event: dict, event_id: int) -> None:
     """Apply a state-changing event's delta to fleet-status.json.
 
     Only event types in FLEET_STATUS_EVENT_TYPES update fleet-status; other
@@ -1981,9 +1943,7 @@ def _read_handoff_packets(mission_dir: Path) -> list[dict]:
     return packets
 
 
-def _compute_fleet_status_staleness(
-    fleet_status: dict | None, mission_log: dict | None
-) -> dict | None:
+def _compute_fleet_status_staleness(fleet_status: dict | None, mission_log: dict | None) -> dict | None:
     """Return a dict describing fleet-status staleness, or None if fresh.
 
     Considered stale when either:
@@ -1997,12 +1957,8 @@ def _compute_fleet_status_staleness(
     last_updated = fleet_status.get("last_updated")
     if last_updated:
         try:
-            ts = datetime.strptime(last_updated, "%Y-%m-%dT%H:%M:%SZ").replace(
-                tzinfo=timezone.utc
-            )
-            age_seconds = int(
-                (datetime.now(timezone.utc) - ts).total_seconds()
-            )
+            ts = datetime.strptime(last_updated, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+            age_seconds = int((datetime.now(UTC) - ts).total_seconds())
         except ValueError:
             age_seconds = None
 
@@ -2017,14 +1973,9 @@ def _compute_fleet_status_staleness(
             tail_data = tail.get("data", {}) or {}
             tail_id = tail_data.get("task_id")
             label = tail.get("type", "unknown")
-            last_event_summary = (
-                f"{label} task-{tail_id}" if tail_id is not None else label
-            )
+            last_event_summary = f"{label} task-{tail_id}" if tail_id is not None else label
 
-    age_threshold_exceeded = (
-        age_seconds is not None
-        and age_seconds > FLEET_STATUS_STALENESS_THRESHOLD_SECONDS
-    )
+    age_threshold_exceeded = age_seconds is not None and age_seconds > FLEET_STATUS_STALENESS_THRESHOLD_SECONDS
     if not age_threshold_exceeded and pending_count == 0:
         return None
 
@@ -2064,11 +2015,7 @@ def _build_recovery_briefing(
             }
         )
 
-    current_phase = (
-        fleet_status.get("mission", {}).get("phase", "unknown")
-        if fleet_status
-        else "unknown"
-    )
+    current_phase = fleet_status.get("mission", {}).get("phase", "unknown") if fleet_status else "unknown"
 
     recommended_actions: list[str] = []
     # Phase guidance takes precedence over handoff packets when both exist —
@@ -2076,10 +2023,7 @@ def _build_recovery_briefing(
     # it reflects the admiral's last recorded position in the workflow.
     if current_phase in PHASE_RECOVERY_GUIDANCE:
         recommended_actions = list(PHASE_RECOVERY_GUIDANCE[current_phase])
-        if (
-            current_phase in BATTLE_PLAN_MD_REQUIRED_PHASES
-            and not (mission_dir / "battle-plan.md").is_file()
-        ):
+        if current_phase in BATTLE_PLAN_MD_REQUIRED_PHASES and not (mission_dir / "battle-plan.md").is_file():
             recommended_actions.insert(
                 0,
                 "WARNING: battle-plan.md is missing — rebuild from estimate.md",
@@ -2089,21 +2033,13 @@ def _build_recovery_briefing(
         for pkt in handoff_packets:
             ship = pkt.get("ship_name", "unknown")
             task_id = pkt.get("task_id")
-            recommended_actions.append(
-                f"Resume task {task_id} from handoff packet ({ship})"
-            )
+            recommended_actions.append(f"Resume task {task_id} from handoff packet ({ship})")
         if not recommended_actions:
-            recommended_actions.append(
-                "No handoff packets found — review fleet-status.json for current state"
-            )
+            recommended_actions.append("No handoff packets found — review fleet-status.json for current state")
 
     return {
         "mission_dir": str(mission_dir),
-        "mission_status": (
-            fleet_status.get("mission", {}).get("status", "unknown")
-            if fleet_status
-            else "unknown"
-        ),
+        "mission_status": (fleet_status.get("mission", {}).get("status", "unknown") if fleet_status else "unknown"),
         "current_phase": current_phase,
         "fleet_status": fleet_status,
         "fleet_status_staleness": staleness,
@@ -2130,29 +2066,18 @@ def _format_recovery_text(briefing: dict) -> str:
         lines.append("  ⚠ Fleet status may be stale.")
         if last_updated and age is not None:
             minutes = age // 60
-            lines.append(
-                f"    fleet-status last updated: {last_updated} "
-                f"({minutes} minutes ago)"
-            )
+            lines.append(f"    fleet-status last updated: {last_updated} ({minutes} minutes ago)")
         if pending > 0:
             tail = f" (last: {last_event})" if last_event else ""
-            lines.append(
-                f"    mission-log has {pending} events newer than "
-                f"fleet-status{tail}"
-            )
-        lines.append(
-            "    Verify in-progress task state against handoff packets "
-            "and file state before resuming."
-        )
+            lines.append(f"    mission-log has {pending} events newer than fleet-status{tail}")
+        lines.append("    Verify in-progress task state against handoff packets and file state before resuming.")
         lines.append("")
 
     fs = briefing.get("fleet_status")
     if fs:
         progress = fs.get("progress", {})
         budget = fs.get("budget", {})
-        lines.append(
-            f"  Progress: {progress.get('completed', 0)}/{progress.get('total', 0)} tasks done"
-        )
+        lines.append(f"  Progress: {progress.get('completed', 0)}/{progress.get('total', 0)} tasks done")
         lines.append(f"  Budget: {budget.get('pct_consumed', 0)}% consumed")
         lines.append("")
 
@@ -2185,9 +2110,7 @@ def cmd_recover(args: argparse.Namespace) -> None:
         if not mission_dir.is_dir():
             _die(f"Error: mission directory does not exist: {mission_dir}")
     else:
-        missions_dir = Path(
-            args.missions_dir if args.missions_dir else ".nelson/missions"
-        )
+        missions_dir = Path(args.missions_dir if args.missions_dir else ".nelson/missions")
         mission_dir = _find_active_mission(missions_dir)
 
     if mission_dir is None:
@@ -2198,9 +2121,7 @@ def cmd_recover(args: argparse.Namespace) -> None:
     handoff_packets = _read_handoff_packets(mission_dir)
     battle_plan = _read_json_optional(mission_dir / "battle-plan.json") or {}
 
-    briefing = _build_recovery_briefing(
-        mission_dir, fleet_status, handoff_packets, battle_plan
-    )
+    briefing = _build_recovery_briefing(mission_dir, fleet_status, handoff_packets, battle_plan)
 
     output_format = getattr(args, "format", "json")
     if output_format == "text":

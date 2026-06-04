@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from conftest import (
@@ -13,9 +13,7 @@ from conftest import (
     read_json,
     run,
 )
-
 from nelson_circuit_breakers import (
-    BreakerTrip,
     DEFAULT_THRESHOLDS,
     clear_idle_tracker,
     compute_budget_metrics,
@@ -23,7 +21,6 @@ from nelson_circuit_breakers import (
     evaluate_idle_timeout,
     load_config,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,7 +32,7 @@ def _iso(dt: datetime) -> str:
 
 
 def _now_iso() -> str:
-    return _iso(datetime.now(timezone.utc))
+    return _iso(datetime.now(UTC))
 
 
 def _fleet_status(
@@ -127,16 +124,12 @@ class TestLoadConfig:
 
 class TestHullIntegrityBreaker:
     def test_clean_state_no_trips(self) -> None:
-        fs = _fleet_status(
-            squadron=[{"ship_name": "HMS Argyll", "hull_integrity_pct": 90}]
-        )
+        fs = _fleet_status(squadron=[{"ship_name": "HMS Argyll", "hull_integrity_pct": 90}])
         trips = evaluate(fs, _sailing_orders(), [], _now_iso())
         assert trips == []
 
     def test_equals_threshold_trips(self) -> None:
-        fs = _fleet_status(
-            squadron=[{"ship_name": "HMS Argyll", "hull_integrity_pct": 80}]
-        )
+        fs = _fleet_status(squadron=[{"ship_name": "HMS Argyll", "hull_integrity_pct": 80}])
         trips = evaluate(fs, _sailing_orders(), [], _now_iso())
         assert len(trips) == 1
         assert trips[0].type == "hull_integrity_breach"
@@ -156,9 +149,7 @@ class TestHullIntegrityBreaker:
         assert breach[0].context["ship_name"] == "HMS Kent"
 
     def test_missing_pct_skipped(self) -> None:
-        fs = _fleet_status(
-            squadron=[{"ship_name": "HMS Argyll", "hull_integrity_pct": None}]
-        )
+        fs = _fleet_status(squadron=[{"ship_name": "HMS Argyll", "hull_integrity_pct": None}])
         trips = evaluate(fs, _sailing_orders(), [], _now_iso())
         assert trips == []
 
@@ -280,13 +271,13 @@ class TestConsecutiveFailures:
 
 class TestTimeLimit:
     def test_within_limit_no_trip(self) -> None:
-        started = _iso(datetime.now(timezone.utc) - timedelta(minutes=5))
+        started = _iso(datetime.now(UTC) - timedelta(minutes=5))
         fs = _fleet_status(started_at=started)
         trips = evaluate(fs, _sailing_orders(time_limit_minutes=60), [], _now_iso())
         assert not any(t.type == "time_limit" for t in trips)
 
     def test_over_limit_trips(self) -> None:
-        started = _iso(datetime.now(timezone.utc) - timedelta(minutes=120))
+        started = _iso(datetime.now(UTC) - timedelta(minutes=120))
         fs = _fleet_status(started_at=started)
         trips = evaluate(fs, _sailing_orders(time_limit_minutes=60), [], _now_iso())
         time_trips = [t for t in trips if t.type == "time_limit"]
@@ -326,14 +317,14 @@ class TestIdleTimeout:
         assert "HMS Argyll" in tracker
 
     def test_under_threshold_no_trip(self, tmp_path: Path) -> None:
-        first = datetime.now(timezone.utc)
+        first = datetime.now(UTC)
         evaluate_idle_timeout(tmp_path, "HMS Argyll", _iso(first))
         later = _iso(first + timedelta(minutes=5))
         trip = evaluate_idle_timeout(tmp_path, "HMS Argyll", later)
         assert trip is None
 
     def test_over_threshold_trips(self, tmp_path: Path) -> None:
-        first = datetime.now(timezone.utc)
+        first = datetime.now(UTC)
         evaluate_idle_timeout(tmp_path, "HMS Argyll", _iso(first))
         later = _iso(first + timedelta(minutes=15))
         trip = evaluate_idle_timeout(tmp_path, "HMS Argyll", later)
@@ -343,7 +334,7 @@ class TestIdleTimeout:
         assert trip.context["ship_name"] == "HMS Argyll"
 
     def test_custom_threshold(self, tmp_path: Path) -> None:
-        first = datetime.now(timezone.utc)
+        first = datetime.now(UTC)
         config = dict(DEFAULT_THRESHOLDS)
         config["idle_timeout_minutes"] = 1
         evaluate_idle_timeout(tmp_path, "HMS Argyll", _iso(first), config)
@@ -365,23 +356,17 @@ class TestIdleTimeout:
 
 class TestBudgetMetrics:
     def test_no_progress_returns_none(self) -> None:
-        metrics = compute_budget_metrics(
-            tokens_spent=5000, tokens_remaining=None, completed=0, total=4
-        )
+        metrics = compute_budget_metrics(tokens_spent=5000, tokens_remaining=None, completed=0, total=4)
         assert metrics["burn_rate_per_task"] is None
         assert metrics["projected_budget_at_completion"] is None
 
     def test_linear_projection(self) -> None:
-        metrics = compute_budget_metrics(
-            tokens_spent=10_000, tokens_remaining=None, completed=2, total=8
-        )
+        metrics = compute_budget_metrics(tokens_spent=10_000, tokens_remaining=None, completed=2, total=8)
         assert metrics["burn_rate_per_task"] == 5000
         assert metrics["projected_budget_at_completion"] == 40_000
 
     def test_total_zero_projection_none(self) -> None:
-        metrics = compute_budget_metrics(
-            tokens_spent=10_000, tokens_remaining=None, completed=2, total=0
-        )
+        metrics = compute_budget_metrics(tokens_spent=10_000, tokens_remaining=None, completed=2, total=0)
         assert metrics["burn_rate_per_task"] == 5000
         assert metrics["projected_budget_at_completion"] is None
 
@@ -405,28 +390,39 @@ class TestCheckpointIntegration:
         run("plan-approved", "--mission-dir", str(mission_dir))
         run(
             "checkpoint",
-            "--mission-dir", str(mission_dir),
-            "--pending", "0",
-            "--in-progress", "0",
-            "--completed", "2",
-            "--blocked", "0",
-            "--tokens-spent", "20000",
-            "--tokens-remaining", "80000",
-            "--hull-green", "1",
-            "--hull-amber", "0",
-            "--hull-red", "0",
-            "--hull-critical", "0",
-            "--decision", "continue",
-            "--rationale", "All good",
+            "--mission-dir",
+            str(mission_dir),
+            "--pending",
+            "0",
+            "--in-progress",
+            "0",
+            "--completed",
+            "2",
+            "--blocked",
+            "0",
+            "--tokens-spent",
+            "20000",
+            "--tokens-remaining",
+            "80000",
+            "--hull-green",
+            "1",
+            "--hull-amber",
+            "0",
+            "--hull-red",
+            "0",
+            "--hull-critical",
+            "0",
+            "--decision",
+            "continue",
+            "--rationale",
+            "All good",
         )
         fs = read_json(mission_dir / "fleet-status.json")
         assert fs["budget"]["burn_rate_per_task"] == 10000
         # total comes from pending+in_progress+completed = 2
         assert fs["budget"]["projected_budget_at_completion"] == 20000
 
-    def test_checkpoint_emits_circuit_breaker_event_on_budget_alarm(
-        self, tmp_path: Path
-    ) -> None:
+    def test_checkpoint_emits_circuit_breaker_event_on_budget_alarm(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path, **{"--token-budget": "100000"})
         add_squadron(
             mission_dir,
@@ -437,39 +433,46 @@ class TestCheckpointIntegration:
                 "HMS Defiance:frigate:sonnet:4",
             ],
         )
-        for i, owner in enumerate(
-            ["HMS Argyll", "HMS Kent", "HMS Warspite", "HMS Defiance"]
-        ):
+        for i, owner in enumerate(["HMS Argyll", "HMS Kent", "HMS Warspite", "HMS Defiance"]):
             add_task(mission_dir, task_id=i + 1, owner=owner)
         run("plan-approved", "--mission-dir", str(mission_dir))
 
         # 80% spent but 25% complete — trips budget alarm.
         result = run(
             "checkpoint",
-            "--mission-dir", str(mission_dir),
-            "--pending", "3",
-            "--in-progress", "0",
-            "--completed", "1",
-            "--blocked", "0",
-            "--tokens-spent", "80000",
-            "--tokens-remaining", "20000",
-            "--hull-green", "4",
-            "--hull-amber", "0",
-            "--hull-red", "0",
-            "--hull-critical", "0",
-            "--decision", "continue",
-            "--rationale", "Pressing on",
+            "--mission-dir",
+            str(mission_dir),
+            "--pending",
+            "3",
+            "--in-progress",
+            "0",
+            "--completed",
+            "1",
+            "--blocked",
+            "0",
+            "--tokens-spent",
+            "80000",
+            "--tokens-remaining",
+            "20000",
+            "--hull-green",
+            "4",
+            "--hull-amber",
+            "0",
+            "--hull-red",
+            "0",
+            "--hull-critical",
+            "0",
+            "--decision",
+            "continue",
+            "--rationale",
+            "Pressing on",
         )
         assert "CIRCUIT BREAKER: budget_alarm" in result.stdout
 
         log = read_json(mission_dir / "mission-log.json")
-        trips = [
-            e for e in log["events"] if e.get("type") == "circuit_breaker_tripped"
-        ]
+        trips = [e for e in log["events"] if e.get("type") == "circuit_breaker_tripped"]
         assert len(trips) >= 1
-        assert any(
-            t["data"]["type"] == "budget_alarm" for t in trips
-        )
+        assert any(t["data"]["type"] == "budget_alarm" for t in trips)
 
     def test_clean_checkpoint_no_breakers(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path, **{"--token-budget": "100000"})
@@ -478,22 +481,33 @@ class TestCheckpointIntegration:
         run("plan-approved", "--mission-dir", str(mission_dir))
         result = run(
             "checkpoint",
-            "--mission-dir", str(mission_dir),
-            "--pending", "0",
-            "--in-progress", "0",
-            "--completed", "1",
-            "--blocked", "0",
-            "--tokens-spent", "10000",
-            "--tokens-remaining", "90000",
-            "--hull-green", "1",
-            "--hull-amber", "0",
-            "--hull-red", "0",
-            "--hull-critical", "0",
-            "--decision", "continue",
-            "--rationale", "All good",
+            "--mission-dir",
+            str(mission_dir),
+            "--pending",
+            "0",
+            "--in-progress",
+            "0",
+            "--completed",
+            "1",
+            "--blocked",
+            "0",
+            "--tokens-spent",
+            "10000",
+            "--tokens-remaining",
+            "90000",
+            "--hull-green",
+            "1",
+            "--hull-amber",
+            "0",
+            "--hull-red",
+            "0",
+            "--hull-critical",
+            "0",
+            "--decision",
+            "continue",
+            "--rationale",
+            "All good",
         )
         assert "CIRCUIT BREAKER" not in result.stdout
         log = read_json(mission_dir / "mission-log.json")
-        assert not any(
-            e.get("type") == "circuit_breaker_tripped" for e in log["events"]
-        )
+        assert not any(e.get("type") == "circuit_breaker_tripped" for e in log["events"])

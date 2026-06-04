@@ -24,7 +24,7 @@ import glob
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def count_tokens_from_jsonl(path):
@@ -36,9 +36,9 @@ def count_tokens_from_jsonl(path):
     the current context size.
     """
     last_usage = None
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+    with open(path, encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
@@ -66,7 +66,7 @@ def count_tokens_heuristic(path):
 
     Fallback for plain text files that lack API usage data.
     """
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         text = f.read()
     return len(text) // 4
 
@@ -90,7 +90,7 @@ def build_report(ship_name, token_count, token_limit, method):
 
     return {
         "ship_name": ship_name,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "token_count": token_count,
         "token_limit": token_limit,
         "hull_integrity_pct": pct,
@@ -113,16 +113,13 @@ def scan_squadron(session_dir, token_limit):
     """
     reports = []
     session_dir = session_dir.rstrip("/")
-    session_id = os.path.basename(session_dir)
 
     # Flagship JSONL is the sibling file with matching session ID
     flagship_path = session_dir + ".jsonl"
     if os.path.isfile(flagship_path):
         token_count = count_tokens_from_jsonl(flagship_path)
         if token_count is not None:
-            reports.append(
-                build_report("Flagship", token_count, token_limit, "jsonl_usage")
-            )
+            reports.append(build_report("Flagship", token_count, token_limit, "jsonl_usage"))
 
     # Subagent JSONLs live in the subagents/ subdirectory
     subagents_dir = os.path.join(session_dir, "subagents")
@@ -144,33 +141,23 @@ def scan_squadron(session_dir, token_limit):
     return reports
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Count tokens and produce a Nelson damage report."
-    )
+def main():  # noqa: C901, PLR0912, PLR0915 -- brownfield CLI main; refactor tracked in nelson-e6j
+    parser = argparse.ArgumentParser(description="Count tokens and produce a Nelson damage report.")
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument(
-        "--session", help="Path to a Claude Code session JSONL file (exact counts)"
-    )
-    source.add_argument(
-        "--file", help="Path to a plain text file (heuristic estimate)"
-    )
+    source.add_argument("--session", help="Path to a Claude Code session JSONL file (exact counts)")
+    source.add_argument("--file", help="Path to a plain text file (heuristic estimate)")
     source.add_argument(
         "--squadron",
         help="Path to a session directory to scan flagship + all subagents",
     )
-    parser.add_argument(
-        "--ship", help="Ship name for the report (required for --session and --file)"
-    )
+    parser.add_argument("--ship", help="Ship name for the report (required for --session and --file)")
     parser.add_argument(
         "--limit",
         type=int,
         default=200000,
         help="Context window token limit (default: 200000)",
     )
-    parser.add_argument(
-        "--output", help="Write JSON report to this path instead of stdout"
-    )
+    parser.add_argument("--output", help="Write JSON report to this path instead of stdout")
     args = parser.parse_args()
 
     if args.squadron:

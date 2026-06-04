@@ -29,15 +29,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from hashlib import sha256
 from math import exp, lgamma, log
 from pathlib import Path
-from typing import Callable
-
-import os
-import tempfile
 
 from nelson_data_utils import (
     _die,
@@ -63,7 +62,7 @@ def _write_text_atomic(path: Path, content: str) -> None:
             f.write(content)
         os.replace(tmp, path)
     except Exception:
-        try:
+        try:  # noqa: SIM105 -- nested cleanup; the outer raise dominates the control flow
             os.unlink(tmp)
         except OSError:
             pass
@@ -138,7 +137,7 @@ class Candidate:
     source: str
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Candidate":
+    def from_dict(cls, d: dict) -> Candidate:
         return cls(
             id=d["id"],
             title=d.get("title", "untitled"),
@@ -204,22 +203,65 @@ def _default_skill_md_path() -> Path:
 # ---------------------------------------------------------------------------
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
-_STOPWORDS = frozenset({
-    "the", "and", "for", "with", "from", "into", "that", "this", "these",
-    "those", "have", "has", "had", "but", "not", "are", "was", "were",
-    "their", "there", "what", "when", "which", "while", "where", "would",
-    "could", "should", "will", "may", "can", "any", "all", "out", "too",
-    "very", "just", "also", "only", "some", "such", "than", "then", "they",
-    "you", "your", "our", "its", "his", "her",
-})
+_STOPWORDS = frozenset(
+    {
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "into",
+        "that",
+        "this",
+        "these",
+        "those",
+        "have",
+        "has",
+        "had",
+        "but",
+        "not",
+        "are",
+        "was",
+        "were",
+        "their",
+        "there",
+        "what",
+        "when",
+        "which",
+        "while",
+        "where",
+        "would",
+        "could",
+        "should",
+        "will",
+        "may",
+        "can",
+        "any",
+        "all",
+        "out",
+        "too",
+        "very",
+        "just",
+        "also",
+        "only",
+        "some",
+        "such",
+        "than",
+        "then",
+        "they",
+        "you",
+        "your",
+        "our",
+        "its",
+        "his",
+        "her",
+    }
+)
 
 
 def _tokenize(text: str) -> set[str]:
     """Lowercase tokens of length >= 3, excluding common stopwords."""
-    return {
-        t for t in _TOKEN_RE.findall(text.lower())
-        if len(t) >= 3 and t not in _STOPWORDS
-    }
+    return {t for t in _TOKEN_RE.findall(text.lower()) if len(t) >= 3 and t not in _STOPWORDS}
 
 
 def _jaccard(a: set[str], b: set[str]) -> float:
@@ -253,7 +295,7 @@ def _canonical_fingerprint(tokens: set[str]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _mine_event_sequences(
+def _mine_event_sequences(  # noqa: C901, PLR0912 -- event-sequence miner with many state branches; refactor tracked in nelson-e6j
     patterns_data: dict,
     *,
     similarity_threshold: float = DEFAULT_CLUSTER_SIMILARITY,
@@ -328,12 +370,14 @@ def _mine_event_sequences(
         # so re-runs always pick the same representative even if the order of
         # observation differs.
         canonical = min(variants, key=lambda v: (len(v), v))
-        out.append(RawPattern(
-            cluster_id=_canonical_fingerprint(all_tokens),
-            canonical_text=canonical,
-            variants=variants,
-            mission_ids=missions,
-        ))
+        out.append(
+            RawPattern(
+                cluster_id=_canonical_fingerprint(all_tokens),
+                canonical_text=canonical,
+                variants=variants,
+                mission_ids=missions,
+            )
+        )
     out.sort(key=lambda r: r.cluster_id)
     return out
 
@@ -372,7 +416,7 @@ def _fisher_exact_pvalue(
         return 1.0
     row1 = a + b  # successes_total
     col1 = a + c  # missions_with_pattern_total
-    if row1 == 0 or row1 == n or col1 == 0 or col1 == n:
+    if row1 in (0, n) or col1 in (0, n):
         return 1.0
 
     log_denom = _log_binom(n, col1)
@@ -435,18 +479,13 @@ def _score_pattern(raw: RawPattern, all_patterns: list[dict]) -> ScoredPattern:
                 successes_with += 1
             else:
                 failures_with += 1
+        elif achieved:
+            successes_without += 1
         else:
-            if achieved:
-                successes_without += 1
-            else:
-                failures_without += 1
+            failures_without += 1
 
-    p_value = _fisher_exact_pvalue(
-        successes_with, failures_with, successes_without, failures_without
-    )
-    correlation = _log_odds_ratio(
-        successes_with, failures_with, successes_without, failures_without
-    )
+    p_value = _fisher_exact_pvalue(successes_with, failures_with, successes_without, failures_without)
+    correlation = _log_odds_ratio(successes_with, failures_with, successes_without, failures_without)
 
     confidence = max(0.0, 1.0 - p_value)
     frequency = missions_with / total if total > 0 else 0.0
@@ -517,8 +556,7 @@ def _novelty_score(
     for name, content in existing_orders:
         order_tokens = _tokenize(name.replace("-", " ") + " " + content)
         c = _containment(pattern_tokens, order_tokens)
-        if c > max_containment:
-            max_containment = c
+        max_containment = max(max_containment, c)
     return 1.0 - max_containment
 
 
@@ -571,9 +609,7 @@ def _build_synthesis_prompt(
     exemplars = sorted(existing, key=lambda x: len(x[1]))[:2]
     e1 = exemplars[0][1] if exemplars else ""
     e2 = exemplars[1][1] if len(exemplars) > 1 else ""
-    variant_lines = "\n".join(
-        f"  - \"{v}\"" for v in scored.raw.variants[:5]
-    )
+    variant_lines = "\n".join(f'  - "{v}"' for v in scored.raw.variants[:5])
     return SYNTHESIS_PROMPT_TEMPLATE.format(
         canonical=scored.raw.canonical_text,
         variant_block=variant_lines,
@@ -649,19 +685,13 @@ def _synthesize_candidate(
         prompt = _build_synthesis_prompt(scored, existing)
         try:
             response = fm_client(prompt)
-        except Exception as exc:  # noqa: BLE001 - graceful degradation
-            _err(
-                f"FM synthesis raised {type(exc).__name__} for "
-                f"{scored.raw.cluster_id}: {exc}; using heuristic stub"
-            )
+        except Exception as exc:
+            _err(f"FM synthesis raised {type(exc).__name__} for {scored.raw.cluster_id}: {exc}; using heuristic stub")
             response = None
         if response:
             data = _parse_fm_response(response)
             if data is None:
-                _err(
-                    f"FM returned malformed output for {scored.raw.cluster_id}; "
-                    "using heuristic stub"
-                )
+                _err(f"FM returned malformed output for {scored.raw.cluster_id}; using heuristic stub")
             else:
                 source = "fm"
 
@@ -678,9 +708,7 @@ def _synthesize_candidate(
         anti_pattern=str(data.get("anti_pattern", "")).strip(),
         symptoms=tuple(str(s).strip() for s in data.get("symptoms", []) if s),
         remedy=str(data.get("remedy", "")).strip(),
-        related_orders=tuple(
-            str(r).strip() for r in data.get("related_orders", []) if r
-        ),
+        related_orders=tuple(str(r).strip() for r in data.get("related_orders", []) if r),
         evidence_mission_ids=tuple(scored.raw.mission_ids),
         scores={
             "confidence": round(scored.confidence, 4),
@@ -720,6 +748,7 @@ def rank_for_review(candidates: list[Candidate]) -> list[Candidate]:
     underexplored anti-patterns aren't buried beneath duplicates of
     near-existing orders.
     """
+
     def _key(c: Candidate) -> float:
         conf = float(c.scores.get("confidence", 0.0))
         nov = float(c.scores.get("novelty", 0.0))
@@ -752,12 +781,15 @@ def _save_candidates(path: Path, candidates: list[dict]) -> None:
     lock_path = path.with_suffix(".lock")
     path.parent.mkdir(parents=True, exist_ok=True)
     with _file_lock(lock_path):
-        _write_json(path, {
-            "version": 1,
-            "updated_at": _now_iso(),
-            "candidate_count": len(candidates),
-            "candidates": candidates,
-        })
+        _write_json(
+            path,
+            {
+                "version": 1,
+                "updated_at": _now_iso(),
+                "candidate_count": len(candidates),
+                "candidates": candidates,
+            },
+        )
 
 
 def _load_dismissed(path: Path) -> list[dict]:
@@ -771,12 +803,15 @@ def _save_dismissed(path: Path, dismissed: list[dict]) -> None:
     lock_path = path.with_suffix(".lock")
     path.parent.mkdir(parents=True, exist_ok=True)
     with _file_lock(lock_path):
-        _write_json(path, {
-            "version": 1,
-            "updated_at": _now_iso(),
-            "dismissed_count": len(dismissed),
-            "dismissed": dismissed,
-        })
+        _write_json(
+            path,
+            {
+                "version": 1,
+                "updated_at": _now_iso(),
+                "dismissed_count": len(dismissed),
+                "dismissed": dismissed,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -784,7 +819,7 @@ def _save_dismissed(path: Path, dismissed: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def detect_candidate_orders(
+def detect_candidate_orders(  # noqa: PLR0913 -- public API; kwargs are CLI knobs (thresholds + max_candidates + injected FM client) with defaults. A DetectionConfig dataclass is the right refactor and is tracked in nelson-e6j.
     memory_dir: Path,
     *,
     standing_orders_dir: Path | None = None,
@@ -811,9 +846,7 @@ def detect_candidate_orders(
 
     existing_orders = _load_existing_orders(standing_orders_dir)
     dismissed = _load_dismissed(_dismissed_path(memory_dir))
-    dismissed_fingerprints = {
-        d.get("pattern_fingerprint") for d in dismissed if d.get("pattern_fingerprint")
-    }
+    dismissed_fingerprints = {d.get("pattern_fingerprint") for d in dismissed if d.get("pattern_fingerprint")}
 
     raw_patterns = _mine_event_sequences(patterns_data)
     if not raw_patterns:
@@ -839,14 +872,9 @@ def detect_candidate_orders(
 
     # Pre-rank with the same heuristic the review queue uses, so synthesis
     # spends its FM budget on the most informative candidates first.
-    scored.sort(
-        key=lambda s: -_review_score(s.confidence, s.novelty)
-    )
+    scored.sort(key=lambda s: -_review_score(s.confidence, s.novelty))
 
-    return [
-        _synthesize_candidate(sp, existing_orders, fm_client)
-        for sp in scored[:max_candidates]
-    ]
+    return [_synthesize_candidate(sp, existing_orders, fm_client) for sp in scored[:max_candidates]]
 
 
 def promote_candidate(
@@ -907,7 +935,7 @@ def promote_candidate(
         except Exception:
             # Roll back the standing-order .md so promote_candidate stays
             # transactional from the caller's perspective.
-            try:
+            try:  # noqa: SIM105 -- nested cleanup; the outer raise dominates the control flow
                 out_path.unlink()
             except OSError:
                 pass
@@ -938,13 +966,15 @@ def dismiss_candidate(
         raise ValueError(f"Candidate {candidate_id!r} not found in queue")
 
     dismissed = _load_dismissed(dismissed_path)
-    dismissed.append({
-        "id": candidate_id,
-        "reason": reason,
-        "dismissed_at": _now_iso(),
-        "pattern_fingerprint": candidate.get("pattern_fingerprint", ""),
-        "title": candidate.get("title", ""),
-    })
+    dismissed.append(
+        {
+            "id": candidate_id,
+            "reason": reason,
+            "dismissed_at": _now_iso(),
+            "pattern_fingerprint": candidate.get("pattern_fingerprint", ""),
+            "title": candidate.get("title", ""),
+        }
+    )
     _save_dismissed(dismissed_path, dismissed)
 
     remaining = [c for c in candidates if c.get("id") != candidate_id]
@@ -990,11 +1020,7 @@ def _render_standing_order(candidate: dict) -> str:
 
     related = candidate.get("related_orders") or []
     if related:
-        related_block = (
-            "\n**Related orders:** "
-            + ", ".join(f"`{r}.md`" for r in related)
-            + "\n"
-        )
+        related_block = "\n**Related orders:** " + ", ".join(f"`{r}.md`" for r in related) + "\n"
     else:
         related_block = ""
 
@@ -1004,7 +1030,7 @@ def _render_standing_order(candidate: dict) -> str:
     return _STANDING_ORDER_TEMPLATE.format(
         title_human=_human_title(candidate.get("title", "Untitled")),
         anti_pattern=candidate.get("anti_pattern", "").strip()
-            or "(no anti-pattern description supplied — expand before merge)",
+        or "(no anti-pattern description supplied — expand before merge)",
         trigger=candidate.get("trigger", "").strip() or "(supply trigger)",
         symptoms_block=symptoms_block,
         remedy=candidate.get("remedy", "").strip() or "(supply remedy)",
@@ -1032,7 +1058,7 @@ def _sanitize_table_cell(text: str) -> str:
     return flattened.replace("|", "\\|").strip()
 
 
-def _prepare_skill_md_insertion(
+def _prepare_skill_md_insertion(  # noqa: C901, PLR0912 -- skill.md insertion handler with many path branches; refactor tracked in nelson-e6j
     skill_md_path: Path,
     candidate: dict,
 ) -> list[str] | None:
@@ -1047,9 +1073,7 @@ def _prepare_skill_md_insertion(
     standing order .md until we know the table mutation will succeed.
     """
     if not skill_md_path.exists():
-        raise FileNotFoundError(
-            f"SKILL.md not found at {skill_md_path}; cannot update lookup table"
-        )
+        raise FileNotFoundError(f"SKILL.md not found at {skill_md_path}; cannot update lookup table")
 
     text = skill_md_path.read_text(encoding="utf-8")
     title = candidate.get("title", "")
@@ -1068,9 +1092,7 @@ def _prepare_skill_md_insertion(
             section_start = i
             break
     if section_start == -1:
-        raise ValueError(
-            f"Could not locate '{_SKILL_MD_SECTION_HEADING}' heading in SKILL.md"
-        )
+        raise ValueError(f"Could not locate '{_SKILL_MD_SECTION_HEADING}' heading in SKILL.md")
     for i in range(section_start + 1, len(lines)):
         stripped = lines[i].lstrip()
         if stripped.startswith("## "):
@@ -1082,9 +1104,7 @@ def _prepare_skill_md_insertion(
         if _SKILL_MD_TABLE_ROW_RE.match(lines[i]):
             last_row_idx = i
     if last_row_idx == -1:
-        raise ValueError(
-            "Found Standing Orders heading but no lookup table rows below it"
-        )
+        raise ValueError("Found Standing Orders heading but no lookup table rows below it")
 
     trigger = _sanitize_table_cell(candidate.get("trigger", ""))
     if not trigger:
@@ -1126,20 +1146,23 @@ def cmd_detect_patterns(args: argparse.Namespace) -> None:
     """CLI: detect candidate standing orders and append them to the queue."""
     memory_dir = _resolve_memory_dir(args)
     standing_orders_dir = (
-        Path(args.standing_orders_dir)
-        if getattr(args, "standing_orders_dir", None)
-        else _default_standing_orders_dir()
+        Path(args.standing_orders_dir) if getattr(args, "standing_orders_dir", None) else _default_standing_orders_dir()
     )
     json_output = bool(getattr(args, "json_output", False))
 
     def _emit(status: str, detected: int, queue_size: int, message: str) -> None:
         if json_output:
-            print(json.dumps({
-                "status": status,
-                "detected": detected,
-                "queue_size": queue_size,
-                "memory_dir": str(memory_dir),
-            }, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "status": status,
+                        "detected": detected,
+                        "queue_size": queue_size,
+                        "memory_dir": str(memory_dir),
+                    },
+                    indent=2,
+                )
+            )
         else:
             print(f"[nelson-data] {message}")
 
@@ -1148,10 +1171,7 @@ def cmd_detect_patterns(args: argparse.Namespace) -> None:
             status="no-patterns",
             detected=0,
             queue_size=count_pending_candidates(memory_dir),
-            message=(
-                "No patterns.json yet — nothing to detect. "
-                f"(Expected: {memory_dir / 'patterns.json'})"
-            ),
+            message=(f"No patterns.json yet — nothing to detect. (Expected: {memory_dir / 'patterns.json'})"),
         )
         return
 
@@ -1185,19 +1205,14 @@ def cmd_detect_patterns(args: argparse.Namespace) -> None:
         return
 
     # Re-rank the whole queue so the highest-priority items surface first.
-    ranked = [
-        c.to_dict()
-        for c in rank_for_review([Candidate.from_dict(c) for c in merged])
-    ]
+    ranked = [c.to_dict() for c in rank_for_review([Candidate.from_dict(c) for c in merged])]
     _save_candidates(_candidates_path(memory_dir), ranked)
 
     _emit(
         status="ok",
         detected=len(appended),
         queue_size=len(ranked),
-        message=(
-            f"Detected {len(appended)} new candidate(s); queue size: {len(ranked)}"
-        ),
+        message=(f"Detected {len(appended)} new candidate(s); queue size: {len(ranked)}"),
     )
 
 
