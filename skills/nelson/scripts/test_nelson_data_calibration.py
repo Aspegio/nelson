@@ -86,6 +86,7 @@ class TestAdmiraltyDecisionCommand:
             "--mission-dir", str(mission_dir),
             "--task-id", "1",
             "--decision-type", "weasel",
+            "--recorded-by", "Admiral Test",
             expect_fail=True,
         )
         assert "decision-type" in result.stderr.lower() or "invalid choice" in result.stderr.lower()
@@ -101,6 +102,7 @@ class TestAdmiraltyDecisionCommand:
             "--mission-dir", str(mission_dir),
             "--task-id", "999",
             "--decision-type", "approved",
+            "--recorded-by", "Admiral Test",
             expect_fail=True,
         )
         assert "999" in result.stderr
@@ -420,3 +422,333 @@ class TestTrustReport:
         payload = json.loads(result.stdout)
         assert len(payload["buckets"]) == 1
         assert payload["buckets"][0]["total_decisions"] == 2
+
+
+# ---------------------------------------------------------------------------
+# H3: rebuild path must agree with incremental path
+# ---------------------------------------------------------------------------
+
+
+class TestRebuildAgreesWithIncremental:
+    def test_rebuild_equals_incremental(self, tmp_path: Path) -> None:
+        # Build store via 3 stand-downs (incremental path).
+        _accrue_history(tmp_path, ["modified", "rejected", "approved"])
+
+        cal_path = _calibration_path(tmp_path)
+        incremental = read_json(cal_path)
+
+        # Delete and rebuild via `index` (rebuild path).
+        cal_path.unlink()
+        run(
+            "index",
+            "--missions-dir", str(tmp_path / ".nelson" / "missions"),
+            "--rebuild",
+        )
+        rebuilt = read_json(cal_path)
+
+        # Buckets and rollups must be byte-identical (ignoring wall-clock
+        # `updated_at` / per-bucket `last_updated` timestamps and the
+        # mission ordering inside `_tracked_missions`).
+        assert rebuilt["buckets"].keys() == incremental["buckets"].keys()
+        for key in incremental["buckets"]:
+            a = dict(incremental["buckets"][key])
+            b = dict(rebuilt["buckets"][key])
+            a.pop("last_updated", None)
+            b.pop("last_updated", None)
+            assert a == b, f"bucket {key} differs: incremental={a} rebuilt={b}"
+        assert rebuilt["by_task_type"] == incremental["by_task_type"]
+        assert sorted(rebuilt["_tracked_missions"]) == sorted(
+            incremental["_tracked_missions"]
+        )
+
+
+# ---------------------------------------------------------------------------
+# H1: dedupe — same task_id in one mission counts at most once
+# ---------------------------------------------------------------------------
+
+
+class TestDuplicateDecisionsDeduped:
+    def test_duplicate_admiralty_decisions_deduped(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir, task_type="auth_refactor")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+
+        # Two decisions for the same task: 'rejected' then later 'approved'.
+        # Latest event wins, so the bucket should reflect one approval.
+        record_admiralty_decision(
+            mission_dir, task_id=1, decision_type="rejected"
+        )
+        record_admiralty_decision(
+            mission_dir, task_id=1, decision_type="approved"
+        )
+        _stand_down(mission_dir)
+
+        data = read_json(_calibration_path(tmp_path))
+        bucket = data["buckets"]["auth_refactor::frigate"]
+        assert bucket["total_decisions"] == 1
+        assert bucket["approved"] == 1
+        assert bucket["rejected"] == 0
+        assert bucket["modified"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Backwards compatibility: events without embedded task_type/ship_class
+# ---------------------------------------------------------------------------
+
+
+class TestBackwardsCompatEvent:
+    def test_backwards_compat_event_without_embedded_attrs(
+        self, tmp_path: Path
+    ) -> None:
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir, task_type="auth_refactor")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+
+        # Write the event directly via `event` subcommand with only task_id
+        # + decision_type — no task_type / ship_class baked in.
+        run(
+            "event",
+            "--mission-dir", str(mission_dir),
+            "--type", "admiralty_action_completed",
+            "--task-id", "1",
+            "--decision-type", "modified",
+        )
+        _stand_down(mission_dir)
+
+        data = read_json(_calibration_path(tmp_path))
+        bucket = data["buckets"]["auth_refactor::frigate"]
+        assert bucket["total_decisions"] == 1
+        assert bucket["modified"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Rollup fallback wording when bucket is undersampled
+# ---------------------------------------------------------------------------
+
+
+class TestRollupFallbackWording:
+    def test_rollup_fallback_with_undersampled_bucket(
+        self, tmp_path: Path
+    ) -> None:
+        # 2 frigate decisions for auth_refactor — below the n=3 advisory
+        # threshold so the frigate bucket alone is silent.
+        _accrue_history(
+            tmp_path,
+            ["modified", "rejected"],
+            captains=["HMS Argyll:frigate:sonnet:1"],
+        )
+        # 5 destroyer decisions for the same task type — the rollup
+        # accumulates these and crosses the threshold.
+        for i in range(5):
+            mid = f"2026-06-{i + 1:02d}_000001_dd{i:02d}{i:02d}eeff"
+            md = init_mission(tmp_path)
+            md = _rename_mission(md, mid)
+            add_squadron(md, captains=["HMS Defender:destroyer:sonnet:1"])
+            add_task(
+                md,
+                owner="HMS Defender",
+                task_type="auth_refactor",
+            )
+            run("plan-approved", "--mission-dir", str(md))
+            record_admiralty_decision(md, task_id=1, decision_type="modified")
+            _stand_down(md)
+
+        # New frigate task — bucket has only n=2 so we fall through to the
+        # rollup which has n=7 across all classes.
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir, task_type="auth_refactor")
+        result = run("plan-approved", "--mission-dir", str(mission_dir))
+
+        assert "Trust advisory" in result.stderr
+        assert "all ship classes" in result.stderr
+        assert "no per-class data for frigate" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Advisory text — exact percentage and sample size
+# ---------------------------------------------------------------------------
+
+
+class TestAdvisoryExactWording:
+    def test_advisory_exact_percentage_and_n(self, tmp_path: Path) -> None:
+        # Three 'modified' decisions — override rate is exactly 100%, n=3.
+        _accrue_history(tmp_path, ["modified", "modified", "modified"])
+
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir, task_type="auth_refactor")
+        result = run("plan-approved", "--mission-dir", str(mission_dir))
+
+        assert "100%" in result.stderr
+        assert "n=3" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# H2: corrupt calibration file is rotated to .bak
+# ---------------------------------------------------------------------------
+
+
+class TestCorruptCalibrationRotated:
+    def test_corrupt_calibration_file_rotated(self, tmp_path: Path) -> None:
+        # Hand-write garbage where the calibration store will go.
+        memory_dir = tmp_path / ".nelson" / "memory"
+        memory_dir.mkdir(parents=True, exist_ok=True)
+        cal_path = memory_dir / "trust-calibration.json"
+        corrupt_text = "{not json"
+        cal_path.write_text(corrupt_text, encoding="utf-8")
+
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir, task_type="auth_refactor")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+        record_admiralty_decision(
+            mission_dir, task_id=1, decision_type="modified"
+        )
+        _stand_down(mission_dir)
+
+        # The store rebuilt clean with the new decision; the corrupt
+        # original was rotated to .bak (no crash).
+        bak_path = cal_path.with_suffix(".json.bak")
+        assert bak_path.exists()
+        assert bak_path.read_text(encoding="utf-8") == corrupt_text
+        data = read_json(cal_path)
+        bucket = data["buckets"]["auth_refactor::frigate"]
+        assert bucket["total_decisions"] == 1
+        assert bucket["modified"] == 1
+
+
+# ---------------------------------------------------------------------------
+# task_type validation rejects separator and control chars
+# ---------------------------------------------------------------------------
+
+
+class TestTaskTypeValidation:
+    def test_rejects_task_type_with_separator(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        result = run(
+            "task",
+            "--mission-dir", str(mission_dir),
+            "--id", "1",
+            "--name", "Bad task",
+            "--owner", "HMS Argyll",
+            "--deliverable", "x",
+            "--deps", "",
+            "--station-tier", "0",
+            "--files", "",
+            "--task-type", "foo::bar",
+            expect_fail=True,
+        )
+        assert "task_type" in result.stderr.lower()
+        assert "::" in result.stderr
+
+    def test_rejects_task_type_with_newline(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        result = run(
+            "task",
+            "--mission-dir", str(mission_dir),
+            "--id", "1",
+            "--name", "Bad task",
+            "--owner", "HMS Argyll",
+            "--deliverable", "x",
+            "--deps", "",
+            "--station-tier", "0",
+            "--files", "",
+            "--task-type", "foo\nbar",
+            expect_fail=True,
+        )
+        assert "task_type" in result.stderr.lower()
+        assert "control character" in result.stderr.lower()
+
+    def test_rejects_task_type_with_control_char(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        result = run(
+            "task",
+            "--mission-dir", str(mission_dir),
+            "--id", "1",
+            "--name", "Bad task",
+            "--owner", "HMS Argyll",
+            "--deliverable", "x",
+            "--deps", "",
+            "--station-tier", "0",
+            "--files", "",
+            "--task-type", "foo\tbar",
+            expect_fail=True,
+        )
+        assert "control character" in result.stderr.lower()
+
+
+# ---------------------------------------------------------------------------
+# --recorded-by is required and captured (with session marker presence)
+# ---------------------------------------------------------------------------
+
+
+class TestRecordedByRequired:
+    def test_recorded_by_required(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir, task_type="auth_refactor")
+        run("plan-approved", "--mission-dir", str(mission_dir))
+
+        # Without --recorded-by, the command must fail.
+        result = run(
+            "admiralty-decision",
+            "--mission-dir", str(mission_dir),
+            "--task-id", "1",
+            "--decision-type", "approved",
+            expect_fail=True,
+        )
+        assert "recorded-by" in result.stderr.lower()
+
+        # With --recorded-by, the event captures it and session_marker_present.
+        record_admiralty_decision(
+            mission_dir,
+            task_id=1,
+            decision_type="approved",
+            recorded_by="HMS Victory",
+        )
+        log = read_json(mission_dir / "mission-log.json")
+        ev = next(
+            e for e in log["events"]
+            if e.get("type") == "admiralty_action_completed"
+        )
+        assert ev["data"]["recorded_by"] == "HMS Victory"
+        assert "session_marker_present" in ev["data"]
+        # No marker exists in the tmp_path, so it must be False.
+        assert ev["data"]["session_marker_present"] is False
+
+
+# ---------------------------------------------------------------------------
+# M6: missing task_type yields a stderr warning but still writes event
+# ---------------------------------------------------------------------------
+
+
+class TestMissingTaskTypeWarning:
+    def test_warning_when_task_type_missing(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        add_squadron(mission_dir)
+        add_task(mission_dir)  # no --task-type
+        run("plan-approved", "--mission-dir", str(mission_dir))
+
+        result = run(
+            "admiralty-decision",
+            "--mission-dir", str(mission_dir),
+            "--task-id", "1",
+            "--decision-type", "modified",
+            "--recorded-by", "Admiral Test",
+        )
+        assert "will not feed calibration" in result.stderr
+
+        # Event was still written, sans task_type.
+        log = read_json(mission_dir / "mission-log.json")
+        ev = next(
+            e for e in log["events"]
+            if e.get("type") == "admiralty_action_completed"
+        )
+        assert ev["data"]["decision_type"] == "modified"
+        assert "task_type" not in ev["data"]

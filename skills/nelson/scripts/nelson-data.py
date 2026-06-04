@@ -55,7 +55,7 @@ from nelson_data_patterns import (
     cmd_promote_candidate,
 )
 from nelson_data_utils import (
-    VALID_DECISION_TYPES,
+    VALID_ADMIRALTY_OUTCOMES,
     VALID_ESTIMATE_OUTCOME_METHODS,
     VALID_ESTIMATE_OUTCOME_STATUSES,
     VALID_MODES,
@@ -497,8 +497,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_ad.add_argument(
         "--decision-type",
         required=True,
-        choices=sorted(VALID_DECISION_TYPES),
+        choices=sorted(VALID_ADMIRALTY_OUTCOMES),
         help="Decision outcome: approved, modified, or rejected",
+    )
+    p_ad.add_argument(
+        "--recorded-by",
+        required=True,
+        help="Ship that recorded the decision (e.g. 'Admiral' or captain ship name)",
     )
     p_ad.add_argument(
         "--notes", default="", help="Optional free-text rationale for the decision"

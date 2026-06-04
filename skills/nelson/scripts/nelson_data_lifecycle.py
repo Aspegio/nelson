@@ -34,7 +34,7 @@ from nelson_data_utils import (
     FLEET_STATUS_EVENT_TYPES,
     FLEET_STATUS_STALENESS_THRESHOLD_SECONDS,
     JSON_INDENT,
-    VALID_DECISION_TYPES,
+    VALID_ADMIRALTY_OUTCOMES,
     VALID_DECISIONS,
     VALID_ESTIMATE_OUTCOME_METHODS,
     VALID_ESTIMATE_OUTCOME_STATUSES,
@@ -57,6 +57,7 @@ from nelson_data_utils import (
     _read_json,
     _read_json_optional,
     _require_mission_dir,
+    _validate_calibration_key,
     _write_json,
 )
 
@@ -401,6 +402,14 @@ def cmd_task(args: argparse.Namespace) -> None:
     if getattr(args, "modification_targets", None):
         mod_targets = [m.strip() for m in args.modification_targets.split(",") if m.strip()]
 
+    task_type_raw = getattr(args, "task_type", None)
+    task_type: str | None = None
+    if task_type_raw:
+        try:
+            task_type = _validate_calibration_key(task_type_raw, "task_type")
+        except ValueError as exc:
+            _die(f"Error: invalid --task-type: {exc}")
+
     task: dict[str, Any] = {
         "id": args.id,
         "name": args.name,
@@ -414,7 +423,7 @@ def cmd_task(args: argparse.Namespace) -> None:
         "validation_required": args.validation or None,
         "rollback_note_required": bool(args.rollback_note),
         "admiralty_action_required": bool(args.admiralty_action),
-        "task_type": getattr(args, "task_type", None) or None,
+        "task_type": task_type,
     }
 
     bp_path = mission_dir / "battle-plan.json"
@@ -480,7 +489,7 @@ def cmd_plan_approved(args: argparse.Namespace) -> None:
     # Emit trust calibration advisories (stderr, best-effort, non-fatal).
     try:
         _print_calibration_advisories(mission_dir, tasks)
-    except Exception as exc:
+    except (OSError, ValueError, KeyError) as exc:
         _err(f"Warning: trust calibration advisory failed: {exc}")
 
     # Append battle_plan_approved event
@@ -700,15 +709,25 @@ def cmd_admiralty_decision(args: argparse.Namespace) -> None:
     ship_class (resolved via the task owner against fleet-status.json
     squadron). Calibration aggregation runs at stand-down and consumes these
     events.
+
+    ``--recorded-by`` is required (mirrors ``record-effect-outcome``) and is
+    captured into ``data.recorded_by`` for later audit. The presence of the
+    admiral session marker at the time of recording is captured into
+    ``data.session_marker_present`` so a v2 calibration pipeline can
+    distinguish admiral-confirmed decisions from self-reported ones.
     """
     mission_dir = _require_mission_dir(args)
 
     decision_type = args.decision_type
-    if decision_type not in VALID_DECISION_TYPES:
+    if decision_type not in VALID_ADMIRALTY_OUTCOMES:
         _die(
             f"Error: invalid decision-type '{decision_type}'. "
-            f"Valid: {', '.join(sorted(VALID_DECISION_TYPES))}"
+            f"Valid: {', '.join(sorted(VALID_ADMIRALTY_OUTCOMES))}"
         )
+
+    recorded_by = (getattr(args, "recorded_by", None) or "").strip()
+    if not recorded_by:
+        _die("Error: --recorded-by is required and must be non-empty.")
 
     task_id = int(args.task_id)
     bp_path = mission_dir / "battle-plan.json"
@@ -734,12 +753,34 @@ def cmd_admiralty_decision(args: argparse.Namespace) -> None:
                 ship_class = ship.get("ship_class")
                 break
 
+    if task_type:
+        try:
+            task_type = _validate_calibration_key(task_type, "task_type")
+        except ValueError as exc:
+            _die(f"Error: invalid task_type: {exc}")
+    if ship_class:
+        try:
+            ship_class = _validate_calibration_key(ship_class, "ship_class")
+        except ValueError as exc:
+            _die(f"Error: invalid ship_class: {exc}")
+
+    if not task_type:
+        _err(
+            f"Warning: task {task_id} has no task_type — this decision "
+            f"will not feed calibration."
+        )
+
+    marker_path = mission_dir.parent.parent / ADMIRAL_SESSION_MARKER
+    session_marker_present = marker_path.exists()
+
     log = _read_json(mission_dir / "mission-log.json")
     checkpoint = _get_last_checkpoint_number(log.get("events", []))
 
     data: dict[str, Any] = {
         "task_id": task_id,
         "decision_type": decision_type,
+        "recorded_by": recorded_by,
+        "session_marker_present": session_marker_present,
     }
     if task_type:
         data["task_type"] = task_type

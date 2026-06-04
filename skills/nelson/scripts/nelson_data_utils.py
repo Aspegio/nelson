@@ -61,8 +61,10 @@ VALID_HANDOFF_TYPES = frozenset(
     }
 )
 
+# Quarterdeck checkpoint decisions — what the captains do this checkpoint.
 VALID_DECISIONS = frozenset({"continue", "rescope", "stop"})
-VALID_DECISION_TYPES = frozenset({"approved", "modified", "rejected"})
+# Admiralty action outcomes — how the admiral ruled on an admiralty action.
+VALID_ADMIRALTY_OUTCOMES = frozenset({"approved", "modified", "rejected"})
 VALID_MODES = frozenset({"single-session", "subagents", "agent-team"})
 VALID_ESTIMATE_OUTCOME_STATUSES = frozenset({"pass", "fail", "not-verified"})
 VALID_ESTIMATE_OUTCOME_METHODS = frozenset(
@@ -310,6 +312,33 @@ def _coerce_value(val: str) -> Any:
         parts = [_coerce_value(v.strip()) for v in val.split(",")]
         return parts
     return val
+
+
+_CALIBRATION_KEY_MAX_LEN = 64
+
+
+def _validate_calibration_key(value: str, field: str) -> str:
+    """Return a sanitised calibration key, or raise ValueError.
+
+    Used for ``task_type`` and ``ship_class`` values that become parts of the
+    flat ``task_type::ship_class`` bucket key in the trust calibration store.
+    Rejects empty/oversize values, the ``::`` separator (would break bucket
+    parsing), and any control character (NL/CR/etc. would corrupt log lines).
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError(f"{field} must not be empty")
+    if len(stripped) > _CALIBRATION_KEY_MAX_LEN:
+        raise ValueError(
+            f"{field} too long ({len(stripped)} > {_CALIBRATION_KEY_MAX_LEN})"
+        )
+    if "::" in stripped:
+        raise ValueError(f"{field} must not contain '::' separator")
+    if any(ord(c) < 0x20 for c in stripped):
+        raise ValueError(f"{field} must not contain control characters")
+    return stripped
 
 
 def _safe_mean(values: list[float | int]) -> float | None:

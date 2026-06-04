@@ -8,6 +8,27 @@ weigh historical override rates when setting station_tier.
 v1 is advisory-only: no station_tier mutation, no significance gating.
 Backwards compatible — every schema addition is optional.
 
+Mutability / objective-hacking
+------------------------------
+This module's counters are mutable by design because v1 is advisory only:
+the admiral reads stderr and decides. There is no automated mutation of
+``station_tier`` from these counters. Three guardrails MUST hold before any
+v2 begins auto-mutating tier from this store:
+
+1. Asymmetric mutation: v2 may only *raise* ``station_tier``, never *lower*.
+   A learned policy that can downgrade oversight from data the agent itself
+   produced is the classic objective-hacking loop (DGM Appendix H).
+2. Independence: the gating threshold must count *missions* (independent
+   admiral sessions) not *events* — a single mission emitting many
+   ``admiralty_action_completed`` events must contribute at most one sample
+   per (task_type, ship_class) bucket, and a Wilson or Fisher's-exact gate
+   should bound false-positive elevations.
+3. Provenance: today the ``approved`` / ``modified`` / ``rejected`` labels
+   are self-reported by the agent that called ``admiralty-decision``. v2
+   must derive "modified" from the admiral editing ``battle-plan.json``,
+   not from a flag the agent passed itself, and must verify the admiral
+   session marker was present when the decision was recorded.
+
 No external dependencies — stdlib only.
 """
 
@@ -21,7 +42,7 @@ from typing import Any
 from nelson_data_memory import _find_completed_missions, _resolve_memory_dir
 from nelson_data_utils import (
     JSON_INDENT,
-    VALID_DECISION_TYPES,
+    VALID_ADMIRALTY_OUTCOMES,
     _err,
     _file_lock,
     _now_iso,
@@ -32,6 +53,9 @@ from nelson_data_utils import (
 
 CALIBRATION_FILENAME = "trust-calibration.json"
 CALIBRATION_LOCK_FILENAME = ".trust-calibration.lock"
+# v1 advisory-only threshold. DO NOT reuse as an auto-elevation trigger —
+# see issue #88 v2 (require Wilson/Fisher gating and asymmetric raise-only
+# mutation, plus per-mission independence rather than per-event).
 MIN_DECISIONS_FOR_ADVISORY = 3
 
 
@@ -94,6 +118,13 @@ def _extract_decisions_from_mission(mission_dir: Path) -> list[dict]:
     Each returned dict has keys: task_id, decision_type, task_type, ship_class.
     Events missing decision_type, task_type, or ship_class are skipped — only
     fully-attributed decisions feed the calibration store.
+
+    Dedupe rule: at most one decision per ``task_id`` is returned. When a
+    mission emits multiple decisions for the same task (e.g. ``rejected``
+    then later ``approved``), the latest event by ``timestamp`` wins.
+    Events with equal timestamps fall back to last-encountered. This rule
+    is the single source of truth for both the incremental update path
+    (stand-down) and the rebuild path (``index --rebuild``).
     """
     mission_log = _read_json_optional(mission_dir / "mission-log.json") or {}
     events = mission_log.get("events", [])
@@ -103,20 +134,23 @@ def _extract_decisions_from_mission(mission_dir: Path) -> list[dict]:
     task_index = _build_task_index(battle_plan)
     squadron_index = _build_squadron_index(fleet_status)
 
-    decisions: list[dict] = []
-    for ev in events:
+    # task_id -> (timestamp, order_index, decision_record). A None task_id
+    # is treated as a single distinct slot ("__no_task_id__") so unattached
+    # decisions cannot mask each other arbitrarily.
+    by_task: dict[Any, tuple[str, int, dict]] = {}
+    for order_index, ev in enumerate(events):
         if ev.get("type") != "admiralty_action_completed":
             continue
         data = ev.get("data", {}) or {}
         decision_type = data.get("decision_type")
-        if decision_type not in VALID_DECISION_TYPES:
+        if decision_type not in VALID_ADMIRALTY_OUTCOMES:
             continue
 
         task_type = data.get("task_type")
         ship_class = data.get("ship_class")
+        task_id = data.get("task_id")
 
-        if (not task_type or not ship_class):
-            task_id = data.get("task_id")
+        if not task_type or not ship_class:
             task = task_index.get(task_id) if task_id is not None else None
             if task is not None:
                 task_type = task_type or task.get("task_type")
@@ -127,14 +161,24 @@ def _extract_decisions_from_mission(mission_dir: Path) -> list[dict]:
         if not task_type or not ship_class:
             continue
 
-        decisions.append({
-            "task_id": data.get("task_id"),
+        record = {
+            "task_id": task_id,
             "decision_type": decision_type,
             "task_type": task_type,
             "ship_class": ship_class,
-        })
+        }
+        timestamp = ev.get("timestamp") or ""
+        slot = task_id if task_id is not None else "__no_task_id__"
+        previous = by_task.get(slot)
+        if previous is None:
+            by_task[slot] = (timestamp, order_index, record)
+            continue
+        prev_ts, prev_order, _prev = previous
+        # Latest-by-timestamp wins; ties fall back to last-encountered.
+        if (timestamp, order_index) >= (prev_ts, prev_order):
+            by_task[slot] = (timestamp, order_index, record)
 
-    return decisions
+    return [record for _, _, record in by_task.values()]
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +264,46 @@ def _apply_decisions(
 
 
 # ---------------------------------------------------------------------------
+# Corrupt-store rotation for writer paths
+# ---------------------------------------------------------------------------
+
+
+def _read_calibration_with_bak_rotation(path: Path) -> dict[str, Any]:
+    """Read the calibration store, rotating it to .bak on JSON corruption.
+
+    Mirrors ``_read_json``'s ``.bak`` rename behaviour in
+    ``nelson_data_utils.py``: if the file parses cleanly, return it; if the
+    JSON is malformed, rename the corrupt file to ``<name>.bak`` (replacing
+    any previous backup) and return a fresh empty store so the writer can
+    proceed. Missing file is silent. OS errors emit a warning and yield an
+    empty store. This is the writer-side counterpart to the read-only
+    ``_read_json_optional`` used by advisory printer / trust-report.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return _empty_calibration()
+    except OSError as exc:
+        _err(f"Warning: could not read {path}: {exc}")
+        return _empty_calibration()
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        backup = path.with_suffix(".json.bak")
+        try:
+            if backup.exists():
+                backup.unlink()
+            path.rename(backup)
+            _err(f"Warning: corrupt JSON at {path}, backed up to {backup}")
+        except OSError as exc:
+            _err(f"Warning: corrupt JSON at {path}, could not back up: {exc}")
+        return _empty_calibration()
+    if not isinstance(parsed, dict):
+        return _empty_calibration()
+    return parsed
+
+
+# ---------------------------------------------------------------------------
 # Incremental update at stand-down
 # ---------------------------------------------------------------------------
 
@@ -238,7 +322,7 @@ def _update_override_calibration(mission_dir: Path) -> None:
     mission_id = mission_dir.name
 
     with _file_lock(lock_path):
-        existing = _read_json_optional(calibration_path) or _empty_calibration()
+        existing = _read_calibration_with_bak_rotation(calibration_path)
         tracked = list(existing.get("_tracked_missions", []))
         if mission_id in tracked:
             return
@@ -270,7 +354,7 @@ def _sync_calibration_from_missions(missions_dir: Path) -> None:
     lock_path = memory_dir / CALIBRATION_LOCK_FILENAME
 
     with _file_lock(lock_path):
-        existing = _read_json_optional(calibration_path) or _empty_calibration()
+        existing = _read_calibration_with_bak_rotation(calibration_path)
         tracked = list(existing.get("_tracked_missions", []))
 
         completed = _find_completed_missions(missions_dir)
@@ -377,15 +461,19 @@ def _print_calibration_advisories(
 
         rate_pct = round(advisory["override_rate"] * 100)
         n = advisory["total_decisions"]
-        scope_note = (
-            f"{task_type} on {ship_class}"
-            if advisory["scope"] == "bucket"
-            else f"{task_type} (all ship classes)"
-        )
+        if advisory["scope"] == "bucket":
+            scope_note = f"{task_type} on {ship_class}"
+            tail = "Consider raising station_tier."
+        else:
+            scope_note = (
+                f"{task_type} (all ship classes — no per-class data "
+                f"for {ship_class})"
+            )
+            tail = "Consider applying caution to this task type."
         _err(
             f"[nelson-data] Trust advisory: task {task.get('id')} "
             f"({scope_note}) — historical override rate {rate_pct}% "
-            f"(n={n}). Consider raising station_tier."
+            f"(n={n}). {tail}"
         )
 
 

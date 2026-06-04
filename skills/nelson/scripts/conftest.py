@@ -154,6 +154,7 @@ def record_admiralty_decision(
     task_id: int = 1,
     decision_type: str = "approved",
     notes: str = "",
+    recorded_by: str = "Admiral Test",
 ) -> None:
     """Record an admiralty decision via the CLI."""
     args = [
@@ -161,6 +162,7 @@ def record_admiralty_decision(
         "--mission-dir", str(mission_dir),
         "--task-id", str(task_id),
         "--decision-type", decision_type,
+        "--recorded-by", recorded_by,
     ]
     if notes:
         args.extend(["--notes", notes])
