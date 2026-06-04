@@ -103,7 +103,38 @@ max-complexity = 10
 [tool.ruff.format]
 docstring-code-format = true
 
-# mypy: roll-out tracked under nelson-8q8
+# ---------------------------------------------------------------------------
+# mypy — Tier 1.5 type sensor, rolled out per-module (nelson-8q8).
+#
+# Why allow-list, not repo-wide: a full lenient run currently reports ~99
+# errors across 6 modules (root cause: _read_json returns `dict | list` and
+# callers treat it as `dict`). Turning mypy on repo-wide would block every
+# commit and derail agents — the exact failure the bead warns about.
+#
+# Mechanism: the base config below is lenient; strict is enabled per-module
+# via the overrides block, and the pre-commit hook's `files:` allow-list (see
+# .pre-commit-config.yaml) only checks modules already proven strict-clean.
+# Add a module to BOTH lists once it passes `mypy --strict`. End state:
+# `strict = true` repo-wide, then this scaffolding collapses to one line.
+#
+# Migrated (strict-clean): nelson_circuit_breakers. The remaining modules and
+# the next candidate are tracked in beads nelson-8q8 (kept there, not here, so
+# this comment can't rot as the rollout proceeds).
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true   # cross-dir imports use runtime sys.path shims
+
+[[tool.mypy.overrides]]
+module = "nelson_circuit_breakers"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+strict_equality = true
+disallow_any_generics = true
 
 # ---------------------------------------------------------------------------
 # Tests + coverage.

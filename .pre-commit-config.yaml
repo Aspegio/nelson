@@ -28,6 +28,17 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: d2823d321df3af8f878f7ee3414dc94d037145b9  # frozen: v2.1.0
+    hooks:
+      - id: mypy
+        name: mypy (strict, per-module rollout — nelson-8q8)
+        # Allow-list: only modules already proven strict-clean. Grow this
+        # regex together with the [tool.mypy] overrides in pyproject.toml as
+        # each module is migrated. Keeps the sensor from blocking commits on
+        # the ~99 pre-existing lenient errors elsewhere in the tree.
+        files: ^skills/nelson/scripts/nelson_circuit_breakers\.py$
+
   - repo: https://github.com/gitleaks/gitleaks
     rev: 2ca41cc1372d1e939a6a879f18cdc19fc1cac1ce  # frozen: v8.30.0
     hooks:
