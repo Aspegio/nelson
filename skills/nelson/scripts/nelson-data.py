@@ -110,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915 -- argparse subc
     p_sq.add_argument(
         "--mode",
         default="subagents",
-        help="Execution mode: single-session, subagents, agent-team",
+        help="Execution mode: single-session, subagents, agent-team, workflow, hybrid-workflow",
     )
 
     # --- task ---
@@ -267,7 +267,7 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915 -- argparse subc
     p_form.add_argument(
         "--mode",
         default="subagents",
-        help="Execution mode: single-session, subagents, agent-team",
+        help="Execution mode: single-session, subagents, agent-team, workflow, hybrid-workflow",
     )
 
     # --- headless ---
@@ -277,7 +277,7 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915 -- argparse subc
     p_hl.add_argument(
         "--mode",
         default="subagents",
-        help="Execution mode: single-session, subagents, agent-team",
+        help="Execution mode: single-session, subagents, agent-team, workflow, hybrid-workflow",
     )
     p_hl.add_argument(
         "--auto-approve",

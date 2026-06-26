@@ -6,11 +6,13 @@ Use this file to choose execution mode and team size.
 
 **User preference override:** If the user explicitly requests a specific execution mode (e.g., "use agent teams"), that request MUST be honoured. User preference takes priority over the decision matrix below. Do not second-guess or override the user's choice.
 
-Evaluate all three conditions and select the best fit. When two modes could apply, prefer the one that gives captains more autonomy.
+Evaluate all five conditions and select the best fit. When two modes could apply, prefer the one that gives captains more autonomy while preserving required human gates.
 
 - `single-session`: Work is sequential, tightly coupled, or mostly in the same files.
 - `subagents`: Work is parallel and each captain's task is fully independent — no shared coordination surface needed.
 - `agent-team`: Work is parallel and captains benefit from a shared task list, peer messaging, or coordinated deliverables. Also use when 4+ captains are needed, or when the user requests it.
+- `workflow`: Work is a single approved dynamic workflow run with large fan-out, repeatable review or migration logic, codebase-wide audit scope, or cross-checked research. Treat the workflow as one fleet asset, not as ordinary captains.
+- `hybrid-workflow`: Work is a Nelson-gated sequence of workflow stages. Use when a probe, Station 2/3 sign-off, or human approval is required between workflow runs.
 
 ## Decision Matrix
 
@@ -21,7 +23,11 @@ Evaluate all three conditions and select the best fit. When two modes could appl
 | Parallel implementation with dependencies | `agent-team` | Supports teammate-to-teammate coordination |
 | 4+ parallel captains | `agent-team` | Shared task list simplifies coordination at scale |
 | High threat or high blast radius | `agent-team` + red-cell navigator | Adds explicit control points |
+| Large repeatable audit, migration, or research fan-out | `workflow` | Dynamic workflow scripts can orchestrate many agents and aggregate results |
+| Workflow-suitable mission with stage gates or Station 2/3 approvals | `hybrid-workflow` | Human approval happens between separate workflow runs |
 | User explicitly requests a mode | As requested | User preference overrides the matrix |
+
+Before selecting `workflow` or `hybrid-workflow`, read `workflow-doctrine.md` and record the workflow suitability, probe, verification contract, cost guardrail, and fallback mode in the battle plan. Nelson v1 produces a workflow charter; it does not directly generate or launch `.claude/workflows/*.js`.
 
 ## Team Sizing
 

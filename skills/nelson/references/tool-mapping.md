@@ -9,6 +9,9 @@ Maps Nelson operations to Claude Code tool calls by execution mode.
 | Form the squadron | `TeamCreate` | agent-team |
 | Spawn captain | `Agent` with `team_name` + `name` | agent-team |
 | Spawn captain | `Agent` with `subagent_type` | subagents |
+| Charter dynamic workflow | Battle-plan Workflow Charter prompt | workflow / hybrid-workflow |
+| Launch workflow stage | Claude Code workflow run from approved charter | workflow / hybrid-workflow |
+| Record workflow telemetry | `nelson-data.py event --type workflow_* ...` | workflow / hybrid-workflow |
 | Create task (coordination) | `TaskCreate` | agent-team |
 | Assign task to captain | `TaskUpdate` with `owner` | agent-team |
 | Check task progress (coordination) | `TaskList` / `TaskGet` | agent-team |
@@ -45,11 +48,39 @@ Maps Nelson operations to Claude Code tool calls by execution mode.
     - **Available:** `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet` (for
       visibility tracking) ¹
     - **Not available:** `Agent`, `TeamCreate`, `TeamDelete`, `SendMessage`
+- **`workflow` mode:** One approved autonomous dynamic workflow run. Nelson v1
+  does not directly call a workflow API or write runnable workflow scripts; it
+  produces the Workflow Charter and verification contract that Claude Code can
+  use to create or run the workflow. Track the workflow as a fleet asset and log
+  `workflow_charter_created`, `workflow_run_started`, and
+  `workflow_run_completed` / `workflow_run_stopped` events as appropriate.
+    - **Available:** Workflow Charter, Claude Code workflow run, loose telemetry
+      via `nelson-data.py event`
+    - **Not available:** Mid-run Nelson approval gates. Stop the run and use
+      `hybrid-workflow` when approval is needed before continuing.
+- **`hybrid-workflow` mode:** A sequence of separately approved workflow stages.
+  Use for Station 2/3 work, Sounding-the-Channel probes, or any mission that
+  needs human sign-off between stages. Each stage is its own workflow run with
+  Nelson review before the next stage launches.
+    - **Available:** Same workflow primitives as `workflow`, plus Nelson
+      permission gates between stages
+    - **Not available:** Arbitrary mid-run human input inside a workflow stage
 
 ¹ Visibility tracking uses the same task tools as agent-team coordination but
 serves a different purpose: making mission progress visible in the user's
 Ctrl+T task list. In `subagents` and `single-session` modes, only the admiral
 calls these tools; captains never see or interact with these task entries.
+
+## Dynamic Workflow Notes
+
+Agents spawned by Claude Code workflows run in `acceptEdits` mode and inherit
+the session tool allowlist. Shell, web, or MCP calls outside that
+allowlist may still prompt. Therefore, the workflow charter must state any
+expected tool needs up front and the admiral must not assume a workflow can
+bypass permission gates.
+
+Use `workflow-doctrine.md` for suitability, Sounding-the-Channel probes,
+verification contracts, cost guardrails, telemetry, and damage-control mapping.
 
 ## Anti-Patterns
 
@@ -63,3 +94,6 @@ Common mode-tool mismatches and their correct alternatives. See
 | `Agent` with `subagent_type` to spawn a captain in agent-team mode | Agent is not registered as a teammate | Use `Agent` with `team_name` + `name` |
 | `TeamCreate` in subagents mode | Creates an unnecessary team structure | Omit — spawn captains directly with `Agent` |
 | `TaskCreate` by captains in subagents mode | No shared task list exists for captains | Admiral tracks visibility via `TaskCreate`/`TaskUpdate` in its own session; captains report via `Agent` return value |
+| Treating a workflow stage as an agent-team squadron | Workflows are scripted runs, not peer-messaging teams | Track it as a fleet asset with a Workflow Charter and telemetry |
+| Expecting human input inside a workflow run | Dynamic workflows do not provide arbitrary mid-run Nelson gates | Use `hybrid-workflow` and require approval between separate workflow runs |
+| Assuming Nelson v1 invokes workflow APIs directly | v1 ships doctrine and charters, not a workflow compiler | Give Claude Code the approved charter/prompt to create or run the workflow |

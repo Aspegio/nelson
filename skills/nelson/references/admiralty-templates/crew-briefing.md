@@ -29,7 +29,7 @@ Standing Orders:
   variables that duplicate existing ones. If you believe a rewrite is necessary,
   signal the admiral with your rationale before proceeding.
 - Report blockers to admiral immediately with options and one recommendation
-- Execution mode: [subagents | agent-team] — your available coordination tools are listed in references/tool-mapping.md
+- Execution mode: [single-session | subagents | agent-team | workflow | hybrid-workflow] — your available coordination tools are listed in references/tool-mapping.md
 - When done, report: deliverable, validation evidence, failure modes, rollback note
 - File a damage report to {mission-dir}/damage-reports/{ship-name}.json when your task
   is complete or when hull integrity crosses a threshold (Green → Amber → Red → Critical).

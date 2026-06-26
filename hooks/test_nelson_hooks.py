@@ -757,6 +757,18 @@ class TestSessionCheck:
         )
         assert code == 0
 
+    def test_workflow_modes_allow_workflow_contexts(self, tmp_path: Path) -> None:
+        """Workflow modes are not captain-gated like subagents/single-session."""
+        for mode in ("workflow", "hybrid-workflow"):
+            _make_mission(tmp_path, mode=mode)
+            _write_marker(tmp_path, "/admiral.jsonl")
+            code = _run(
+                cmd_session_check,
+                {"transcript_path": f"/{mode}-runner.jsonl"},
+                cwd=str(tmp_path),
+            )
+            assert code == 0
+
 
 # ---------------------------------------------------------------------------
 # Preflight admiral-marker backfill

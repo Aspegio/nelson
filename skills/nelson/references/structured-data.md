@@ -4,6 +4,8 @@ Reference for the `nelson-data.py` script. Run these commands via Bash at each w
 
 The script lives at `scripts/nelson-data.py` relative to the skill directory. All subcommands handle schema validation, timestamps, and file I/O. Only stdout is consumed — the script source is never loaded into context.
 
+Mode enum: `single-session | subagents | agent-team | workflow | hybrid-workflow`.
+
 ## Script Commands
 
 ### `init` — Create mission and sailing orders
@@ -38,7 +40,7 @@ python3 .claude/skills/nelson/scripts/nelson-data.py squadron \
   --mode agent-team
 ```
 
-Repeat `--captain "name:class:model:task_id"` for each captain. Fields are colon-delimited.
+Repeat `--captain "name:class:model:task_id"` for each captain. Fields are colon-delimited. Valid modes are `single-session`, `subagents`, `agent-team`, `workflow`, and `hybrid-workflow`.
 
 ### `task` — Add task to battle plan
 
@@ -80,6 +82,19 @@ python3 .claude/skills/nelson/scripts/nelson-data.py event \
   --checkpoint 2 \
   --task-id 1 --task-name "Auth module refactor" --owner "HMS Argyll" \
   --station-tier 1 --verification passed
+```
+
+Workflow telemetry uses the same loose key-value mechanism. Nelson v1 allows manual entry from Claude Code's `/workflows` view; do not require telemetry fields that are not programmatically exposed.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py event \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
+  --type workflow_probe_completed \
+  --workflow-name "auth-audit" --phase probe --status completed \
+  --agents-total 8 --agents-completed 8 \
+  --tokens-used 42000 --elapsed-minutes 11 \
+  --summary "Probe found two real issues and three false positives" \
+  --next-gate "User approval before full run"
 ```
 
 ### `handoff` — Write a typed handoff packet
@@ -155,7 +170,7 @@ Repeat `--adopt` and `--avoid` for each pattern. These are optional — omitting
 
 Run at Step 3 instead of individual `task`, `squadron`, and `plan-approved` calls. Consolidates the entire formation phase into a single command.
 
-Reads a plan JSON file containing tasks and squadron definitions. Registers all tasks, records the squadron, computes DAG metrics, and runs the conflict scan. Outputs a structured JSON summary to stdout; progress messages go to stderr.
+Reads a plan JSON file containing tasks and squadron definitions. Registers all tasks, records the squadron, computes DAG metrics, and runs the conflict scan. Optional workflow charter and battle-plan advisory fields are preserved in `battle-plan.json`. Outputs a structured JSON summary to stdout; progress messages go to stderr.
 
 ```bash
 python3 .claude/skills/nelson/scripts/nelson-data.py form \
@@ -189,6 +204,37 @@ The plan JSON file must contain `squadron` and `tasks` keys:
   ]
 }
 ```
+
+For `workflow` or `hybrid-workflow`, add an optional `workflow` object. Existing plan JSON without this object remains valid.
+
+```json
+{
+  "mode": "hybrid-workflow",
+  "workflow": {
+    "suitability": "large fan-out across independent files",
+    "phases": [
+      {
+        "name": "probe",
+        "purpose": "Run a small representative slice",
+        "requires_human_gate_after": true
+      },
+      {
+        "name": "full_run",
+        "purpose": "Run the approved workflow across target scope",
+        "requires_human_gate_after": false
+      }
+    ],
+    "verification_contract": [
+      "Findings require independent reviewer confirmation",
+      "Rejected or uncertain findings must be surfaced separately"
+    ],
+    "cost_guardrail": "Run a small slice before full repo scope",
+    "fallback_mode": "agent-team"
+  }
+}
+```
+
+Top-level advisory fields are also preserved when present: `execution_primitive`, `workflow_suitability`, `workflow_phases`, `human_gates`, `verification_contract`, `cost_guardrail`, and `fallback_mode`.
 
 Output summary (stdout):
 
@@ -438,6 +484,7 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py set \
 | Step 4: Get Permission to Sail | (none) | — | (conversation-only) |
 | Step 5: Each Checkpoint | `checkpoint` | `mission-log.json`, `fleet-status.json` | `quarterdeck-report.md` |
 | Step 5: Between Checkpoints | `event` | `mission-log.json` | -- |
+| Step 5: Workflow stage boundary | `event --type workflow_*` | `mission-log.json` | workflow telemetry from `/workflows` view |
 | Step 5: Relief on Station | `handoff` | `mission-log.json`, `turnover-briefs/{ship}.json` | `turnover-briefs/{ship}.md` (optional companion) |
 | Step 5: Action Stations | `event --type task_completed` | `mission-log.json` | -- |
 | Step 6: Stand Down | `stand-down` | `mission-log.json`, `fleet-status.json`, `stand-down.json`, `.nelson/memory/patterns.json`, `.nelson/memory/standing-order-stats.json` | `captains-log.md` |
@@ -467,6 +514,11 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py set \
 | `phase_override` | Manual phase set (recovery) | from_phase, to_phase |
 | `permission_granted` | User approves formation | (empty data) |
 | `mission_complete` | Step 6 | outcome_achieved, tasks_completed, total_tokens_consumed, duration_minutes |
+| `workflow_charter_created` | Workflow charter approved | workflow_name, phase, summary, next_gate |
+| `workflow_probe_completed` | Sounding-the-Channel probe complete | workflow_name, phase, status, agents_total, agents_completed, tokens_used, elapsed_minutes, summary, next_gate |
+| `workflow_run_started` | Workflow stage launched | workflow_name, phase, status, agents_total, summary |
+| `workflow_run_completed` | Workflow stage completed | workflow_name, phase, status, agents_total, agents_completed, tokens_used, elapsed_minutes, summary, next_gate |
+| `workflow_run_stopped` | Workflow stage halted | workflow_name, phase, status, agents_total, agents_completed, tokens_used, elapsed_minutes, summary, next_gate |
 
 ## JSON Schemas
 
@@ -539,6 +591,19 @@ All artifacts are stored in `{mission-dir}/`.
       "unblocks": "Task 3: Database migration"
     }
   ],
+  "workflow": {
+    "suitability": "large fan-out across independent files",
+    "phases": [
+      {
+        "name": "probe",
+        "purpose": "Run a small representative slice",
+        "requires_human_gate_after": true
+      }
+    ],
+    "verification_contract": ["Findings require independent reviewer confirmation"],
+    "cost_guardrail": "Run a small slice before full repo scope",
+    "fallback_mode": "agent-team"
+  },
   "created_at": "2026-03-27T12:05:00Z",
   "amended_at": null
 }

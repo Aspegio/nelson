@@ -50,6 +50,11 @@ VALID_EVENT_TYPES = frozenset(
         "circuit_breaker_tripped",
         "estimate_skipped",
         "estimate_outcome_recorded",
+        "workflow_charter_created",
+        "workflow_probe_completed",
+        "workflow_run_started",
+        "workflow_run_completed",
+        "workflow_run_stopped",
     }
 )
 
@@ -65,7 +70,7 @@ VALID_HANDOFF_TYPES = frozenset(
 VALID_DECISIONS = frozenset({"continue", "rescope", "stop"})
 # Admiralty action outcomes — how the admiral ruled on an admiralty action.
 VALID_ADMIRALTY_OUTCOMES = frozenset({"approved", "modified", "rejected"})
-VALID_MODES = frozenset({"single-session", "subagents", "agent-team"})
+VALID_MODES = frozenset({"single-session", "subagents", "agent-team", "workflow", "hybrid-workflow"})
 VALID_ESTIMATE_OUTCOME_STATUSES = frozenset({"pass", "fail", "not-verified"})
 VALID_ESTIMATE_OUTCOME_METHODS = frozenset({"test", "type-check", "lint", "review", "visual"})
 JSON_INDENT = 2

@@ -106,6 +106,19 @@ PHASE_RECOVERY_GUIDANCE: dict[str, list[str]] = {
 
 BATTLE_PLAN_MD_REQUIRED_PHASES: frozenset[str] = frozenset({"BATTLE_PLAN", "FORMATION", "PERMISSION"})
 
+BATTLE_PLAN_ADVISORY_FIELDS: frozenset[str] = frozenset(
+    {
+        "execution_primitive",
+        "workflow_suitability",
+        "workflow_phases",
+        "human_gates",
+        "verification_contract",
+        "cost_guardrail",
+        "fallback_mode",
+        "workflow",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Internal helper: _do_init (used by cmd_init and cmd_headless)
@@ -257,7 +270,12 @@ def cmd_squadron(args: argparse.Namespace) -> None:
             }
         )
 
+    if args.mode and args.mode not in VALID_MODES:
+        _die(f"Error: --mode must be one of {sorted(VALID_MODES)}")
+    mode = args.mode or "subagents"
+
     squadron: dict[str, Any] = {
+        "mode": mode,
         "admiral": {
             "ship_name": args.admiral,
             "model": args.admiral_model,
@@ -270,9 +288,6 @@ def cmd_squadron(args: argparse.Namespace) -> None:
             "ship_name": args.red_cell,
             "model": args.red_cell_model or "haiku",
         }
-
-    if args.mode and args.mode not in VALID_MODES:
-        _die(f"Error: --mode must be one of {sorted(VALID_MODES)}")
 
     # Build/update battle-plan.json
     bp_path = mission_dir / "battle-plan.json"
@@ -292,7 +307,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
         "data": {
             "captain_count": len(captains),
             "has_red_cell": args.red_cell is not None,
-            "execution_mode": args.mode or "subagents",
+            "execution_mode": mode,
             "standing_order_check": {"triggered": [], "remedies": []},
         },
     }
@@ -330,6 +345,7 @@ def cmd_squadron(args: argparse.Namespace) -> None:
             "outcome": None,
             "status": "forming",
             "phase": existing_phase,
+            "execution_mode": mode,
             "started_at": existing_started_at,
             "checkpoint_number": 0,
         },
@@ -1375,6 +1391,7 @@ def _register_squadron(  # noqa: PLR0913 -- args are shaped by the squadron-regi
             **fleet_status.get("mission", {}),
             "outcome": outcome,
             "status": "forming",
+            "execution_mode": mode,
         },
         "squadron": squadron_list,
         "recent_events": [f"Squadron formed: {len(captains)} captains"],
@@ -1622,11 +1639,20 @@ def cmd_handoff(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _validate_plan_json(plan: dict) -> None:  # noqa: C901, PLR0912 -- schema validator with many shape checks; refactor tracked in nelson-e6j
+def _validate_plan_json(plan: dict) -> None:  # noqa: C901, PLR0912, PLR0915 -- schema validator with many shape checks; refactor tracked in nelson-e6j
     """Validate plan JSON structure.  Calls _die on failure."""
+    mode = plan.get("mode")
+    if mode is not None and (not isinstance(mode, str) or mode not in VALID_MODES):
+        _die(f"Error: plan.mode must be one of {sorted(VALID_MODES)}")
+
     if "squadron" not in plan:
         _die("Error: plan JSON must contain a 'squadron' key.")
     sq = plan["squadron"]
+    if not isinstance(sq, dict):
+        _die(f"Error: squadron must be an object; got {type(sq).__name__}.")
+    squadron_mode = sq.get("mode")
+    if squadron_mode is not None and (not isinstance(squadron_mode, str) or squadron_mode not in VALID_MODES):
+        _die(f"Error: squadron.mode must be one of {sorted(VALID_MODES)}")
     if "admiral" not in sq or "captains" not in sq:
         _die("Error: squadron must contain 'admiral' and 'captains'.")
 
@@ -1673,6 +1699,18 @@ def _validate_plan_json(plan: dict) -> None:  # noqa: C901, PLR0912 -- schema va
         if missing:
             _die(f"Error: task {i} is missing required fields: {sorted(missing)}")
 
+    workflow = plan.get("workflow")
+    if workflow is not None:
+        if not isinstance(workflow, dict):
+            _die(f"Error: workflow must be an object when provided; got {type(workflow).__name__}.")
+        phases = workflow.get("phases")
+        if phases is not None:
+            if not isinstance(phases, list):
+                _die("Error: workflow.phases must be an array when provided.")
+            for i, phase in enumerate(phases):
+                if not isinstance(phase, dict):
+                    _die(f"Error: workflow.phases[{i}] must be an object; got {type(phase).__name__}.")
+
 
 def _run_conflict_scan(battle_plan_path: Path) -> dict[str, Any]:
     """Run nelson_conflict_scan.py and return structured result."""
@@ -1700,7 +1738,9 @@ def _do_form(
     """Execute the full formation sequence.  Returns a summary dict."""
     tasks = plan["tasks"]
     sq = plan["squadron"]
-    mode = plan.get("mode", mode)
+    mode = plan.get("mode", sq.get("mode", mode))
+    if mode not in VALID_MODES:
+        _die(f"Error: --mode must be one of {sorted(VALID_MODES)}")
 
     task_records = [
         _build_task_record(
@@ -1719,6 +1759,8 @@ def _do_form(
         )
         for t in tasks
     ]
+
+    _register_plan_advisory_fields(mission_dir, plan)
 
     _err(f"[nelson-data] Registering {len(task_records)} tasks...")
     _register_tasks(mission_dir, task_records)
@@ -1760,6 +1802,27 @@ def _do_form(
         },
         "conflict_scan": scan_result,
     }
+
+
+def _register_plan_advisory_fields(mission_dir: Path, plan: dict[str, Any]) -> None:
+    """Preserve optional battle-plan advisory fields from a composite plan."""
+    advisory = {field: plan[field] for field in BATTLE_PLAN_ADVISORY_FIELDS if field in plan}
+    if not advisory:
+        return
+
+    if "workflow" in advisory:
+        _err("[nelson-data] Preserving workflow charter...")
+    else:
+        _err("[nelson-data] Preserving battle-plan advisory fields...")
+
+    bp_path = mission_dir / "battle-plan.json"
+    if bp_path.exists():
+        battle_plan = _read_json(bp_path)
+    else:
+        battle_plan = {"version": 1}
+
+    new_battle_plan = {**battle_plan, **advisory}
+    _write_json(bp_path, new_battle_plan)
 
 
 def cmd_form(args: argparse.Namespace) -> None:

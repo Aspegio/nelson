@@ -24,6 +24,7 @@ from nelson_data_lifecycle import (
     BATTLE_PLAN_MD_REQUIRED_PHASES,
     PHASE_RECOVERY_GUIDANCE,
 )
+from nelson_data_utils import VALID_EVENT_TYPES, VALID_MODES
 
 
 def _set_mission_phase(mission_dir: Path, phase: str) -> None:
@@ -206,6 +207,48 @@ class TestSquadron:
         )
         bp = read_json(mission_dir / "battle-plan.json")
         assert bp["squadron"]["red_cell"]["ship_name"] == "HMS Astute"
+
+    def test_workflow_mode_is_valid_and_persisted(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        run(
+            "squadron",
+            "--mission-dir",
+            str(mission_dir),
+            "--admiral",
+            "HMS Victory",
+            "--admiral-model",
+            "opus",
+            "--captain",
+            "HMS Argyll:frigate:sonnet:1",
+            "--mode",
+            "workflow",
+        )
+
+        bp = read_json(mission_dir / "battle-plan.json")
+        fs = read_json(mission_dir / "fleet-status.json")
+        log = read_json(mission_dir / "mission-log.json")
+
+        assert bp["squadron"]["mode"] == "workflow"
+        assert fs["mission"]["execution_mode"] == "workflow"
+        assert log["events"][0]["data"]["execution_mode"] == "workflow"
+
+    def test_invalid_mode_fails(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        result = run(
+            "squadron",
+            "--mission-dir",
+            str(mission_dir),
+            "--admiral",
+            "HMS Victory",
+            "--admiral-model",
+            "opus",
+            "--captain",
+            "HMS Argyll:frigate:sonnet:1",
+            "--mode",
+            "workflow-but-not-really",
+            expect_fail=True,
+        )
+        assert "mode" in result.stderr.lower()
 
     def test_invalid_captain_spec_fails(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path)
@@ -520,6 +563,74 @@ class TestEstimateOutcome:
 
 
 class TestEvent:
+    def test_valid_event_types_include_workflow_events(self) -> None:
+        assert {
+            "workflow_charter_created",
+            "workflow_probe_completed",
+            "workflow_run_started",
+            "workflow_run_completed",
+            "workflow_run_stopped",
+        } <= VALID_EVENT_TYPES
+
+    def test_workflow_event_types_are_valid(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        for event_type in [
+            "workflow_charter_created",
+            "workflow_probe_completed",
+            "workflow_run_started",
+            "workflow_run_completed",
+            "workflow_run_stopped",
+        ]:
+            run(
+                "event",
+                "--mission-dir",
+                str(mission_dir),
+                "--type",
+                event_type,
+                "--workflow-name",
+                "auth-audit",
+                "--phase",
+                "probe",
+                "--status",
+                "completed",
+                "--agents-total",
+                "3",
+                "--agents-completed",
+                "3",
+                "--tokens-used",
+                "12000",
+                "--elapsed-minutes",
+                "7",
+                "--summary",
+                "stage summary",
+                "--next-gate",
+                "review",
+            )
+
+        log = read_json(mission_dir / "mission-log.json")
+        logged_types = [e["type"] for e in log["events"]]
+        assert logged_types == [
+            "workflow_charter_created",
+            "workflow_probe_completed",
+            "workflow_run_started",
+            "workflow_run_completed",
+            "workflow_run_stopped",
+        ]
+        assert log["events"][1]["data"]["workflow_name"] == "auth-audit"
+        assert log["events"][1]["data"]["agents_total"] == 3
+
+    def test_unknown_workflow_like_event_fails(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        result = run(
+            "event",
+            "--mission-dir",
+            str(mission_dir),
+            "--type",
+            "workflow_magic_happened",
+            expect_fail=True,
+        )
+        assert "invalid event type" in result.stderr.lower() or "workflow_magic_happened" in result.stderr
+
     def test_logs_valid_event(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path)
         run(
@@ -1079,6 +1190,9 @@ def make_plan(
 
 
 class TestForm:
+    def test_valid_modes_include_workflow_modes(self) -> None:
+        assert {"workflow", "hybrid-workflow"} <= VALID_MODES
+
     def test_form_registers_tasks(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path)
         plan = make_plan()
@@ -1160,6 +1274,122 @@ class TestForm:
         assert summary["squadron"]["captains"] == 1
         assert summary["squadron"]["mode"] == "subagents"
         assert "conflict_scan" in summary
+
+    def test_form_hybrid_workflow_mode_and_charter_are_persisted(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        workflow = {
+            "suitability": "large fan-out across independent files",
+            "phases": [
+                {
+                    "name": "probe",
+                    "purpose": "Run a small representative slice",
+                    "requires_human_gate_after": True,
+                },
+                {
+                    "name": "full_run",
+                    "purpose": "Run the approved workflow across target scope",
+                    "requires_human_gate_after": False,
+                },
+            ],
+            "verification_contract": [
+                "Findings require independent reviewer confirmation",
+                "Rejected or uncertain findings must be surfaced separately",
+            ],
+            "cost_guardrail": "Run a small slice before full repo scope",
+            "fallback_mode": "agent-team",
+        }
+        plan = {
+            **make_plan(mode="hybrid-workflow"),
+            "execution_primitive": "hybrid-workflow",
+            "workflow_suitability": "large fan-out across independent files",
+            "workflow_phases": workflow["phases"],
+            "human_gates": ["approve after probe"],
+            "verification_contract": workflow["verification_contract"],
+            "cost_guardrail": workflow["cost_guardrail"],
+            "fallback_mode": workflow["fallback_mode"],
+            "workflow": workflow,
+        }
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+
+        result = run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        summary = json.loads(result.stdout)
+        bp = read_json(mission_dir / "battle-plan.json")
+        fs = read_json(mission_dir / "fleet-status.json")
+
+        assert summary["squadron"]["mode"] == "hybrid-workflow"
+        assert bp["squadron"]["mode"] == "hybrid-workflow"
+        assert fs["mission"]["execution_mode"] == "hybrid-workflow"
+        assert bp["workflow"] == workflow
+        assert bp["execution_primitive"] == "hybrid-workflow"
+        assert bp["verification_contract"] == workflow["verification_contract"]
+
+    def test_form_cli_hybrid_workflow_mode_is_persisted(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan()
+        plan.pop("mode")
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+
+        result = run(
+            "form",
+            "--mission-dir",
+            str(mission_dir),
+            "--plan",
+            str(plan_path),
+            "--mode",
+            "hybrid-workflow",
+        )
+        summary = json.loads(result.stdout)
+        bp = read_json(mission_dir / "battle-plan.json")
+        fs = read_json(mission_dir / "fleet-status.json")
+
+        assert summary["squadron"]["mode"] == "hybrid-workflow"
+        assert bp["squadron"]["mode"] == "hybrid-workflow"
+        assert fs["mission"]["execution_mode"] == "hybrid-workflow"
+
+    def test_form_without_workflow_object_remains_valid(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan(mode="subagents")
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+
+        run("form", "--mission-dir", str(mission_dir), "--plan", str(plan_path))
+        bp = read_json(mission_dir / "battle-plan.json")
+        assert "workflow" not in bp
+
+    def test_form_rejects_invalid_workflow_like_mode(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan(mode="workflowish")
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        result = run(
+            "form",
+            "--mission-dir",
+            str(mission_dir),
+            "--plan",
+            str(plan_path),
+            expect_fail=True,
+        )
+        assert "mode" in result.stderr.lower()
+
+    def test_form_cli_invalid_mode_fails(self, tmp_path: Path) -> None:
+        mission_dir = init_mission(tmp_path)
+        plan = make_plan()
+        plan.pop("mode")
+        plan_path = tmp_path / "plan.json"
+        write_plan_json(plan_path, plan)
+        result = run(
+            "form",
+            "--mission-dir",
+            str(mission_dir),
+            "--plan",
+            str(plan_path),
+            "--mode",
+            "workflowish",
+            expect_fail=True,
+        )
+        assert "mode" in result.stderr.lower()
 
     def test_form_missing_plan_fails(self, tmp_path: Path) -> None:
         mission_dir = init_mission(tmp_path)
@@ -1417,6 +1647,42 @@ class TestHeadless:
         assert "sailing_orders" in summary
         assert summary["sailing_orders"]["outcome"] == "Test mission"
         assert "formation" in summary
+
+    def test_headless_preserves_workflow_mode_and_charter(self, tmp_path: Path) -> None:
+        so = make_sailing_orders()
+        workflow = {
+            "suitability": "repeatable review",
+            "phases": [{"name": "full_run", "purpose": "Review all packages"}],
+            "verification_contract": ["Independent reviewer confirmation"],
+            "cost_guardrail": "Stop at 100k tokens",
+            "fallback_mode": "agent-team",
+        }
+        plan = {**make_plan(mode="workflow"), "workflow": workflow}
+        so_path = tmp_path / "sailing-orders.json"
+        plan_path = tmp_path / "plan.json"
+        write_sailing_orders_json(so_path, so)
+        write_plan_json(plan_path, plan)
+
+        result = run(
+            "headless",
+            "--sailing-orders",
+            str(so_path),
+            "--battle-plan",
+            str(plan_path),
+            "--mode",
+            "subagents",
+            "--auto-approve",
+            cwd=tmp_path,
+        )
+
+        summary = json.loads(result.stdout)
+        mission_dir = tmp_path / summary["mission_dir"]
+        bp = read_json(mission_dir / "battle-plan.json")
+        fs = read_json(mission_dir / "fleet-status.json")
+        assert summary["formation"]["squadron"]["mode"] == "workflow"
+        assert bp["squadron"]["mode"] == "workflow"
+        assert bp["workflow"] == workflow
+        assert fs["mission"]["execution_mode"] == "workflow"
 
     def test_headless_missing_sailing_orders_fails(self, tmp_path: Path) -> None:
         plan = make_plan()

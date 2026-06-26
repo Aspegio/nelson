@@ -1323,6 +1323,35 @@ class TestSkillMdEstimateStep:
         assert "elegant" in intro.lower()
 
 
+class TestWorkflowDocumentation:
+    """Structural assertions for dynamic workflow alignment docs."""
+
+    ROOT = Path(__file__).resolve().parents[3]
+    SKILL_MD = ROOT / "skills" / "nelson" / "SKILL.md"
+    README = ROOT / "README.md"
+    SQUADRON = ROOT / "skills" / "nelson" / "references" / "squadron-composition.md"
+    TOOL_MAPPING = ROOT / "skills" / "nelson" / "references" / "tool-mapping.md"
+    WORKFLOW_DOCTRINE = ROOT / "skills" / "nelson" / "references" / "workflow-doctrine.md"
+
+    def test_required_docs_mention_workflow_modes(self) -> None:
+        for path in (self.SKILL_MD, self.README, self.SQUADRON, self.TOOL_MAPPING):
+            text = path.read_text(encoding="utf-8")
+            assert "workflow" in text, f"{path} does not mention workflow"
+            assert "hybrid-workflow" in text, f"{path} does not mention hybrid-workflow"
+
+    def test_workflow_doctrine_covers_core_terms(self) -> None:
+        text = self.WORKFLOW_DOCTRINE.read_text(encoding="utf-8")
+        for phrase in [
+            "Sounding the Channel",
+            "ultracode",
+            "verification contract",
+            "cost",
+            "telemetry",
+            "Station 2/3",
+        ]:
+            assert phrase in text
+
+
 # ---------------------------------------------------------------------------
 # TestEstimateE2E — T9 (happy path) and T10 (opt-out)
 # ---------------------------------------------------------------------------

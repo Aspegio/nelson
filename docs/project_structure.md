@@ -25,6 +25,7 @@ skills/nelson/
     structured-data.md      — Structured fleet data capture reference
     the-estimate.md         — 7 Question Maritime Tactical Estimate reference
     tool-mapping.md         — Nelson-to-Claude Code tool reference
+    workflow-doctrine.md    — Dynamic workflow and ultracode doctrine
     admiralty-templates/    — One file per template, loaded on demand
       battle-plan.md            — Battle plan with commander's intent and acceptance criteria
       captains-log.md           — Final mission report
