@@ -55,6 +55,8 @@ VALID_EVENT_TYPES = frozenset(
         "workflow_run_started",
         "workflow_run_completed",
         "workflow_run_stopped",
+        "goal_set",
+        "goal_cleared",
     }
 )
 

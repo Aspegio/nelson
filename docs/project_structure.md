@@ -19,6 +19,7 @@ skills/nelson/
     action-stations.md      — Risk tier definitions (Station 0–3)
     commendations.md        — Recognition signals & graduated correction
     crew-roles.md           — Crew role definitions, ship names & sizing rules
+    goal-alignment.md       — Claude Code /goal (standing goal) doctrine
     model-selection.md      — Cost-optimized model assignment for agents
     royal-marines.md        — Royal Marines deployment rules & specialisations
     squadron-composition.md — Mode selection & team sizing rules
@@ -69,6 +70,7 @@ skills/nelson/scripts/    — Skill-level scripts (run by Nelson itself)
   nelson_data_utils.py      — Shared I/O, validation, and constants
   nelson_data_memory.py     — Cross-mission memory store and pattern library
   nelson_data_lifecycle.py  — Mission lifecycle commands (init through status)
+  nelson_data_goal.py       — Composes a Claude Code /goal condition from sailing orders
   nelson_data_fleet.py      — Fleet intelligence and analytics commands
   nelson_data_patterns.py   — Learned standing orders pipeline (mine → score → synthesise)
   nelson_circuit_breakers.py — Automated alarm thresholds (hull, budget, idle, blockers)
@@ -76,6 +78,7 @@ skills/nelson/scripts/    — Skill-level scripts (run by Nelson itself)
   nelson_conflict_scan.py   — Conflict scan CLI
   conftest.py               — Shared test helpers (pytest auto-discovery)
   test_nelson_data.py       — Lifecycle command tests
+  test_nelson_data_goal.py  — Goal-condition composer and CLI tests
   test_nelson_data_fleet.py — Fleet intelligence and analytics tests
   test_nelson_data_memory.py — Memory store and I/O tests
   test_nelson_data_patterns.py — Learned standing orders pipeline tests

@@ -4,7 +4,9 @@ Nelson treats Claude Code dynamic workflows as a fleet asset: powerful for broad
 
 ## What a workflow is
 
-A dynamic workflow moves orchestration into a JavaScript workflow script. The script can fan work out to many agents, keep intermediate results in script variables, aggregate outputs, and repeat a review or migration pattern across a large scope. Nelson v1 does **not** compile or invoke workflow scripts directly; it produces the doctrine, battle-plan charter, gates, and verification contract that Claude Code can use to create or run the workflow.
+A dynamic workflow moves orchestration into a JavaScript workflow script. The script can fan work out to many agents, keep intermediate results in script variables, aggregate outputs, and repeat a review or migration pattern across a large scope. The script begins with `export const meta = {...}` and a body using `agent()`, `parallel()`, `pipeline()`, and `phase()` under top-level `await`. A workflow may be one-shot (Claude writes and runs it inline) or saved as `.claude/workflows/<name>.js` (project) or `~/.claude/workflows/<name>.js` (personal) and re-run as the `/<name>` command; runs are watched, paused, and resumed from the `/workflows` view.
+
+Nelson v1 does **not** compile or invoke workflow scripts directly; it produces the doctrine, battle-plan charter, gates, and verification contract that Claude Code can use to create or run the workflow. The charter-to-script bridge below turns that charter into a script skeleton a power user can run without re-deriving the structure.
 
 `ultracode` is not a Nelson execution mode. It is a Claude Code `xhigh` effort/automation setting that can let Claude decide when dynamic workflows are appropriate. Nelson still owns the charter, approval gate, risk tiering, and acceptance criteria.
 
@@ -70,6 +72,47 @@ When selecting `workflow` or `hybrid-workflow`, include a compact Workflow Chart
 - `cost_guardrail`: budget limits, scope limits, and stop triggers;
 - `fallback_mode`: usually `agent-team`, or `single-session` for tightly coupled recovery.
 
+## From charter to a runnable script
+
+The charter is not just documentation — its fields map one-to-one onto a Workflow
+script, so a power user can run the approved plan instead of re-deriving it. This
+is a **starting skeleton** the admiral hands over after approval, not something
+Nelson executes itself. Each charter field becomes a script element:
+
+- `workflow_phases` → a `phase('...')` group, or a `pipeline`/`parallel` stage per phase;
+- `verification_contract` → a verify stage that adversarially re-checks each finding and drops those that fail the contract;
+- `cost_guardrail` → a Sounding-the-Channel probe first, plus a budget/agent-count guard before the full run;
+- `human_gates` → for `hybrid-workflow`, a script boundary where the run ends and the next stage is a separate approved run (workflows have no mid-run gate);
+- `fallback_mode` → the mode to drop to if the probe shows low signal.
+
+A review-shaped charter maps to the canonical find-then-verify pipeline:
+
+```javascript
+export const meta = {
+  name: 'audit-<scope>',            // from the charter's workflow name
+  description: '<workflow_suitability>',
+  phases: [{ title: 'Probe' }, { title: 'Review' }, { title: 'Verify' }],
+}
+// Sounding the Channel — cost_guardrail: prove signal on one slice first.
+const probe = await agent(`Review ${args.slice} for <finding type>.`, { phase: 'Probe', schema: FINDINGS })
+if (!probe.findings.length) return { stopped: 'probe found no signal; fall back to <fallback_mode>' }
+
+// Full run — one reviewer per target, each finding verified as its review lands.
+const results = await pipeline(
+  args.targets,                                    // bounded per cost_guardrail
+  t => agent(`Review ${t} for <finding type>.`, { phase: 'Review', schema: FINDINGS }),
+  review => parallel(review.findings.map(f => () =>  // verification_contract
+    agent(`Adversarially verify: ${f.summary}. Default to rejected if uncertain.`, { phase: 'Verify', schema: VERDICT })
+      .then(v => ({ ...f, verdict: v })))),
+)
+return { confirmed: results.flat().filter(Boolean).filter(f => f.verdict?.real) }
+```
+
+Keep the charter's Station tier in view: Station 2 outputs still need red-cell
+review and Station 3 outputs still need explicit human confirmation, so a
+Station 2/3 audit runs as `hybrid-workflow` — end the run at each `human_gate`
+and resume only after approval.
+
 ## Verification contract
 
 Workflow output is not accepted merely because the workflow completed. The battle plan must say what counts as verified. Common contracts:
@@ -108,6 +151,23 @@ At each checkpoint or workflow stage boundary, capture what Claude Code exposes 
 - next gate.
 
 Nelson v1 mission-log events are deliberately loose: `workflow_name`, `phase`, `status`, `agents_total`, `agents_completed`, `tokens_used`, `elapsed_minutes`, `summary`, and `next_gate` are all acceptable event data fields.
+
+## Standing goal and workflows
+
+A Claude Code `/goal` and a workflow operate at different levels and do not
+interfere, but they must be coordinated:
+
+- The goal is the **mission-level** completion barrier; the workflow is an
+  orchestration primitive inside the mission. Never set a `/goal` inside a
+  workflow run — set it once at Step 1 (see `references/goal-alignment.md`).
+- The goal evaluator does not see inside a run, and a run has no mid-run human
+  gate. So the goal cannot police workflow internals — it enforces that the
+  mission's results are reviewed and accepted in the transcript before the
+  session may stop.
+- For `hybrid-workflow`, word the goal so it is met only once every planned stage
+  has completed and its results have been accepted in the conversation. That
+  keeps the session from standing down between stages while the human gate is
+  still pending.
 
 ## Damage-control mapping
 

@@ -30,6 +30,7 @@ import sys
 
 from nelson_data_calibration import cmd_trust_report
 from nelson_data_fleet import VALID_METRICS, cmd_analytics, cmd_brief, cmd_history, cmd_index
+from nelson_data_goal import cmd_goal_condition
 from nelson_data_lifecycle import (
     cmd_admiralty_decision,
     cmd_checkpoint,
@@ -148,6 +149,30 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915 -- argparse subc
     # --- plan-approved ---
     p_pa = subs.add_parser("plan-approved", help="Finalize battle plan")
     p_pa.add_argument("--mission-dir", required=True, help="Mission directory path")
+
+    # --- goal-condition ---
+    p_goal = subs.add_parser(
+        "goal-condition",
+        help="Compose a Claude Code /goal condition from sailing orders",
+    )
+    p_goal.add_argument("--mission-dir", required=True, help="Mission directory path")
+    p_goal.add_argument(
+        "--max-turns",
+        type=int,
+        default=None,
+        help="Optional turn cap appended as 'or stop after N turns'",
+    )
+    p_goal.add_argument(
+        "--record",
+        action="store_true",
+        help="Persist the condition into sailing-orders.json and log a goal_set event",
+    )
+    p_goal.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit a JSON object (condition, command, char_count, within_limit)",
+    )
 
     # --- skip-estimate ---
     p_se = subs.add_parser("skip-estimate", help="Record that the ESTIMATE phase is being skipped")
@@ -501,6 +526,7 @@ def main() -> None:
         "init": lambda: cmd_init(args),
         "squadron": lambda: cmd_squadron(args),
         "task": lambda: cmd_task(args),
+        "goal-condition": lambda: cmd_goal_condition(args),
         "plan-approved": lambda: cmd_plan_approved(args),
         "skip-estimate": lambda: cmd_skip_estimate(args),
         "estimate-outcome": lambda: cmd_record_estimate_outcome(args),

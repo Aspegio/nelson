@@ -12,6 +12,9 @@ Maps Nelson operations to Claude Code tool calls by execution mode.
 | Charter dynamic workflow | Battle-plan Workflow Charter prompt | workflow / hybrid-workflow |
 | Launch workflow stage | Claude Code workflow run from approved charter | workflow / hybrid-workflow |
 | Record workflow telemetry | `nelson-data.py event --type workflow_* ...` | workflow / hybrid-workflow |
+| Compose a standing-goal condition | `nelson-data.py goal-condition --mission-dir ...` | all modes |
+| Set the standing goal | `/goal <condition>` (Stop hook) | all modes |
+| Check / clear the standing goal | `/goal` / `/goal clear` | all modes |
 | Create task (coordination) | `TaskCreate` | agent-team |
 | Assign task to captain | `TaskUpdate` with `owner` | agent-team |
 | Check task progress (coordination) | `TaskList` / `TaskGet` | agent-team |
@@ -79,8 +82,23 @@ allowlist may still prompt. Therefore, the workflow charter must state any
 expected tool needs up front and the admiral must not assume a workflow can
 bypass permission gates.
 
-Use `workflow-doctrine.md` for suitability, Sounding-the-Channel probes,
-verification contracts, cost guardrails, telemetry, and damage-control mapping.
+A reusable workflow can be saved as `.claude/workflows/<name>.js` (project) or
+`~/.claude/workflows/<name>.js` (personal) and re-run as the `/<name>` command;
+watch and pause/resume runs from the `/workflows` view. Nelson's charter is what
+you hand to that mechanism. See `workflow-doctrine.md` for the charter-to-script
+bridge, Sounding-the-Channel probes, verification contracts, cost guardrails,
+telemetry, and damage-control mapping.
+
+## Standing Goal Notes
+
+`/goal <condition>` is an admiral-level Stop hook, not a per-agent tool — set it
+once for the session, never inside a captain or workflow run. Its evaluator
+judges the condition against the **conversation transcript only**; it does not
+read files or run commands. Because Nelson's completion evidence lives on disk,
+compose the condition with `nelson-data.py goal-condition` (which words it
+against transcript-visible facts) rather than by hand, and surface that evidence
+into chat at Stand Down. Full doctrine — availability, resumption, subagent
+scope, anti-patterns — is in `references/goal-alignment.md`.
 
 ## Anti-Patterns
 
@@ -97,3 +115,5 @@ Common mode-tool mismatches and their correct alternatives. See
 | Treating a workflow stage as an agent-team squadron | Workflows are scripted runs, not peer-messaging teams | Track it as a fleet asset with a Workflow Charter and telemetry |
 | Expecting human input inside a workflow run | Dynamic workflows do not provide arbitrary mid-run Nelson gates | Use `hybrid-workflow` and require approval between separate workflow runs |
 | Assuming Nelson v1 invokes workflow APIs directly | v1 ships doctrine and charters, not a workflow compiler | Give Claude Code the approved charter/prompt to create or run the workflow |
+| Hand-writing a `/goal` against on-disk artifacts | The evaluator sees only the transcript, so it never observes them and the Stop hook loops forever | Compose with `nelson-data.py goal-condition` and state completion evidence in chat |
+| Setting a `/goal` inside a captain or workflow run | The goal is a session-scoped admiral backstop, not a per-agent control | Set it once at Step 1; govern subagents with the verification contract |

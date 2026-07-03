@@ -37,7 +37,7 @@ Out of scope: Migration script for existing sessions
 
 **Establish Mission Directory:**
 - **New session:** Run `nelson-data.py init` (see "Structured Data Capture" below). The script owns directory creation: it generates an 8-character hex SESSION_ID, creates `.nelson/missions/{YYYY-MM-DD_HHMMSS}_{SESSION_ID}/` with the `damage-reports/` and `turnover-briefs/` subdirectories, writes `sailing-orders.json`, `mission-log.json`, and `fleet-status.json`, writes `.nelson/.active-{SESSION_ID}` as the session marker, and prints the mission directory path to stdout. Capture that path as `{mission-dir}` for the remainder of this mission. The SESSION_ID is the segment after the last underscore in the directory name. If you need a specific SESSION_ID (e.g., testing or resuming a known id), pass `--session-id <8-hex>`.
-- **Resumed session:** First, attempt auto-recovery by running `python3 .claude/skills/nelson/scripts/nelson-data.py recover --missions-dir .nelson/missions`. If this finds an active mission with handoff packets, use the structured recovery briefing to resume directly. Otherwise, if you know the SESSION_ID, read `.nelson/.active-{SESSION_ID}` to recover the mission path. Set that path as `{mission-dir}`. If you cannot determine your SESSION_ID (e.g., after a full restart), list `.nelson/missions/` and present the options to the user for selection. Set the chosen directory as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose).
+- **Resumed session:** First, attempt auto-recovery by running `python3 .claude/skills/nelson/scripts/nelson-data.py recover --missions-dir .nelson/missions`. If this finds an active mission with handoff packets, use the structured recovery briefing to resume directly. Otherwise, if you know the SESSION_ID, read `.nelson/.active-{SESSION_ID}` to recover the mission path. Set that path as `{mission-dir}`. If you cannot determine your SESSION_ID (e.g., after a full restart), list `.nelson/missions/` and present the options to the user for selection. Set the chosen directory as `{mission-dir}`. Recover state per `references/damage-control/session-resumption.md` (prefer JSON files, fall back to quarterdeck report prose). **Re-establish the standing goal:** a `/goal` is restored automatically on `--resume`/`--continue` but not in a fresh session, so if none is active (check with a bare `/goal`) and `sailing-orders.json` carries a recorded `goal_condition`, re-issue it per `references/goal-alignment.md`.
 
 All mission artifacts — captain's log, quarterdeck reports, damage reports, and turnover briefs — are written inside `{mission-dir}`.
 
@@ -50,6 +50,15 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py advance --mission-dir {mis
 ```
 
 **Session Hygiene:** Execute session hygiene per `references/damage-control/session-hygiene.md`. Skip this step when resuming an interrupted session.
+
+**Standing Goal (optional):** For long autonomous, headless (`-p`), scheduled, or ultracode missions — where standing down too early is the failure mode — offer to set a Claude Code `/goal` that keeps the session from stopping until the mission is genuinely complete. Compose it from the sailing orders rather than by hand:
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py goal-condition \
+  --mission-dir {mission-dir} --record
+```
+
+Present the printed `/goal ...` line for the user to set. If the user already set a `/goal` before invoking Nelson, do NOT replace it — read it back with a bare `/goal`, reconcile the sailing orders to it, and only re-issue a composed goal with the user's agreement. Skip this for short interactive missions where the human is steering turn by turn. You MUST read `references/goal-alignment.md` before setting a goal — the evaluator judges the condition against the conversation transcript only, so completion evidence must be surfaced into chat (this shapes Stand Down in Step 8).
 
 **The Estimate opt-in:** Before proceeding, ask the user:
 
@@ -352,6 +361,8 @@ Reference `references/admiralty-templates/captains-log.md` for the captain's log
 **Session State Cleanup:** Remove the session state file by deleting `.nelson/.active-{SESSION_ID}`.
 
 **Mission Complete Gate:** You MUST NOT declare the mission complete until `{mission-dir}/captains-log.md` exists on disk and has been confirmed readable. If context pressure is high, write a minimal log noting which sections were abbreviated — but the file must exist. Skipping Step 8 is never permitted.
+
+**Clear the Standing Goal:** If a `/goal` is active, its evaluator only sees this conversation — so state the completion evidence in chat for the goal to auto-clear: the success metric result (matching the sailing orders' metric), that `captains-log.md` was written (with its path), and that stand-down was recorded. Do NOT tell the user to run `/goal clear` on a successful mission — the goal clears itself once this evidence is visible. Only if the mission was abandoned: run `scuttle-and-reform`, state the blocking reason in chat, and log a `goal_cleared` event via `nelson-data.py event`. See `references/goal-alignment.md`.
 
 **GitHub Star Prompt (one-time, success only):** After the Mission Complete Gate passes, ask the user once whether they would like to star the Nelson repo (canonical slug `harrymunro/nelson`). Run all three preflight checks below; if any prints `SKIP`, skip the prompt silently and finish Stand Down.
 

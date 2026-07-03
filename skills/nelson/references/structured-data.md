@@ -24,6 +24,25 @@ python3 .claude/skills/nelson/scripts/nelson-data.py init \
 
 Optional: pass `--session-id <8-hex>` to use a specific session identifier (e.g., for deterministic tests or when resuming with a known id). Must be exactly 8 lowercase hex characters; invalid values are rejected.
 
+### `goal-condition` — Compose a Claude Code `/goal` condition (read-only unless `--record`)
+
+Run at Step 1, after `init`, when the mission warrants a standing goal (long autonomous, headless, scheduled, or ultracode runs). Reads `sailing-orders.json` and composes a transcript-verifiable `/goal` condition from `outcome`, `success_metric`, and `stop_criteria`. Prints a ready-to-paste `/goal ...` line to stdout.
+
+```bash
+python3 .claude/skills/nelson/scripts/nelson-data.py goal-condition \
+  --mission-dir .nelson/missions/2026-03-27_120000_a1b2c3d4 \
+  --max-turns 40 --record
+```
+
+Arguments:
+
+- `--mission-dir` (required) — mission directory containing `sailing-orders.json`.
+- `--max-turns N` — append `or stop after N turns` as a safety bound.
+- `--record` — persist the composed condition into `sailing-orders.json` as `goal_condition` and log a `goal_set` event (so a resumed session can re-establish the goal). Without `--record` the command is read-only.
+- `--json` — emit `{condition, command, char_count, within_limit, recorded}` instead of the plain `/goal` line.
+
+The composed condition is worded against facts visible in the conversation (metric confirmed, stop criteria met, captain's log written with its path stated, stand-down recorded) because the `/goal` evaluator judges only the transcript. It also accepts a formal `scuttle-and-reform` abandonment as a legitimate stop. If the condition exceeds the 4,000-character `/goal` limit, a warning is printed to stderr and `within_limit` is `false`. See `references/goal-alignment.md` for the full doctrine.
+
 ### `squadron` — Record squadron formation
 
 Run at Step 3 after the squadron is formed.
@@ -478,6 +497,7 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py set \
 | Workflow Step | Script Command | JSON Written | Prose (existing) |
 |---|---|---|---|
 | Step 1: Sailing Orders | `init` | `sailing-orders.json`, `mission-log.json` | (conversation-only) |
+| Step 1: Standing Goal (optional) | `goal-condition --record` | `sailing-orders.json`, `mission-log.json` | `/goal` set in the session |
 | Step 2: Battle Plan | (none — owners not yet assigned) | — | (conversation-only) |
 | Step 3: Form Squadron | `form` (recommended), or individual `task` + `plan-approved` + `squadron` | `battle-plan.json`, `mission-log.json`, `fleet-status.json` | (conversation-only) |
 | Step 1-3: Headless | `headless` (CI/CD) | all of the above in one step | — |
@@ -519,6 +539,8 @@ python3 .claude/skills/nelson/scripts/nelson-phase.py set \
 | `workflow_run_started` | Workflow stage launched | workflow_name, phase, status, agents_total, summary |
 | `workflow_run_completed` | Workflow stage completed | workflow_name, phase, status, agents_total, agents_completed, tokens_used, elapsed_minutes, summary, next_gate |
 | `workflow_run_stopped` | Workflow stage halted | workflow_name, phase, status, agents_total, agents_completed, tokens_used, elapsed_minutes, summary, next_gate |
+| `goal_set` | Standing goal composed with `--record` | goal_condition |
+| `goal_cleared` | Standing goal cleared (mission abandoned) | reason |
 
 ## JSON Schemas
 
@@ -540,9 +562,12 @@ All artifacts are stored in `{mission-dir}/`.
   "out_of_scope": ["Migration script for existing sessions"],
   "stop_criteria": ["All tests pass", "No regressions in integration suite"],
   "handoff_artifacts": ["Updated auth module", "Test results"],
+  "goal_condition": "The Nelson mission is complete: ... (optional; present only when goal-condition --record was run)",
   "created_at": "2026-03-27T12:00:00Z"
 }
 ```
+
+`goal_condition` is optional and additive — it is written only by `goal-condition --record` and preserved through subsequent sailing-orders writes. A resumed session reads it to re-establish the standing goal.
 
 ### battle-plan.json (Write-Once, Amendable)
 

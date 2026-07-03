@@ -119,6 +119,10 @@ Claude Code dynamic workflows move orchestration into workflow scripts that can 
 
 `ultracode` is treated as a Claude Code `xhigh` effort/automation setting, not a Nelson execution mode. If ultracode or the user chooses a workflow, Nelson still supplies the mission charter, risk tiering, human gates, telemetry expectations, and fallback mode.
 
+### Standing goals
+
+For long autonomous, headless, or scheduled runs, Nelson aligns with Claude Code's [`/goal`](https://code.claude.com/docs/en/goal) — a session-scoped Stop hook that keeps the session from stopping until a completion condition is met. Nelson composes the condition from the sailing orders (`nelson-data.py goal-condition`) so it stays tied to the mission's outcome, metric, and stop criteria, and phrases it against what the goal evaluator can actually see: the conversation transcript. The standing goal and Nelson's Mission Complete Gate reinforce each other — the gate is the discipline the admiral applies, the goal is the harness backstop that enforces it. See `references/goal-alignment.md`.
+
 ### Chain of command
 
 Nelson uses a three-tier hierarchy. The admiral coordinates captains, each captain commands a named ship, and crew members aboard each ship do the specialist work.
@@ -451,6 +455,7 @@ skills/nelson/
 │   ├── admiralty-templates/      # 11 structured templates
 │   ├── crew-roles.md             # Crew role definitions & ship names
 │   ├── damage-control/           # 11 recovery procedures
+│   ├── goal-alignment.md         # Claude Code /goal (standing goal) doctrine
 │   ├── standing-orders/          # 16 anti-pattern guards
 │   ├── the-estimate.md           # 7 Question Maritime Tactical Estimate reference
 │   ├── squadron-composition.md   # Mode selection & team sizing
@@ -488,6 +493,7 @@ skills/nelson/
 │   │   └── turnover-brief.md
 │   ├── commendations.md                       # Recognition signals and correction guidance
 │   ├── crew-roles.md                         # Crew role definitions, ship names, sizing
+│   ├── goal-alignment.md                     # Claude Code /goal (standing goal) doctrine
 │   ├── damage-control/                       # Individual procedure files
 │   │   ├── circuit-breakers.md
 │   │   ├── comms-failure.md
@@ -529,6 +535,7 @@ skills/nelson/
     ├── nelson_data_utils.py                  # Shared I/O, validation, constants
     ├── nelson_data_memory.py                 # Cross-mission memory store (v2.0.0)
     ├── nelson_data_lifecycle.py              # Mission lifecycle commands
+    ├── nelson_data_goal.py                   # Composes a Claude Code /goal condition
     ├── nelson_data_fleet.py                  # Fleet intelligence & analytics
     ├── nelson_conflict_scan.py               # Pre-flight split-keel scanner
     ├── nelson_conflict_radar.py              # Runtime file-conflict monitor
